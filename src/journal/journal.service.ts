@@ -152,7 +152,7 @@ export class JournalService {
     if (updateData.content) {
       entry.content = updateData.content;
       // Re-analyze sentiment if content changed
-      entry.sentiment_analysis = this.analyzeSentiment(updateData.content);
+      entry.sentiment_analysis = await this.analyzeSentiment(updateData.content);
       entry.nlp_analysis = {
         keywords: this.extractKeywords(updateData.content),
       };
