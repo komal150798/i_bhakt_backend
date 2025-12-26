@@ -5,6 +5,9 @@ import { Customer } from '../entities/customer.entity';
 import { UpdateCustomerProfileDto } from '../dtos/update-customer-profile.dto';
 import { ListUsersDto } from '../dtos/list-users.dto';
 import { PlanType } from '../../common/enums/plan-type.enum';
+import { KundliService } from '../../kundli/services/kundli.service';
+import { IKundliRepository } from '../../core/interfaces/repositories/kundli-repository.interface';
+import { Inject } from '@nestjs/common';
 
 @Injectable()
 export class CustomerService {
@@ -13,6 +16,9 @@ export class CustomerService {
   constructor(
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
+    private readonly kundliService: KundliService,
+    @Inject('IKundliRepository')
+    private readonly kundliRepository: IKundliRepository,
   ) {}
 
   /**
@@ -108,10 +114,109 @@ export class CustomerService {
     try {
       const updated = await this.customerRepository.save(customer);
       this.logger.log(`Profile updated for customer ${id}`);
+
+      // Update kundli if birth data is available
+      await this.updateKundliOnProfileChange(id, updated);
+
       return updated;
     } catch (error) {
       this.logger.error(`Error updating customer profile: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to update profile');
+    }
+  }
+
+  /**
+   * Update or create kundli when customer profile birth data changes
+   */
+  private async updateKundliOnProfileChange(userId: number, customer: Customer): Promise<void> {
+    try {
+      // Check if birth data is available
+      if (
+        !customer.date_of_birth ||
+        !customer.time_of_birth ||
+        !customer.latitude ||
+        !customer.longitude ||
+        !customer.place_name
+      ) {
+        this.logger.debug(`Incomplete birth data for customer ${userId}, skipping kundli update`);
+        return;
+      }
+
+      // Format birth date and time
+      // date_of_birth is guaranteed to be non-null at this point (checked above)
+      const birthDateObj = customer.date_of_birth instanceof Date 
+        ? customer.date_of_birth 
+        : new Date(customer.date_of_birth);
+      const birthDate = birthDateObj.toISOString().split('T')[0];
+
+      const birthTime = customer.time_of_birth || '12:00:00';
+
+      // Check if kundli exists for this user
+      const existingKundli = await this.kundliRepository.findOneByUserId(userId, { is_deleted: false });
+
+      if (!existingKundli) {
+        // Create new kundli if it doesn't exist
+        this.logger.log(`No existing kundli found for customer ${userId}, creating new kundli`);
+        
+        // Format customer name for kundli generation
+        const firstName = customer.first_name || 'User';
+        const lastName = customer.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+
+        // Generate and save kundli
+        await this.kundliService.generateKundli(
+          {
+            name: fullName,
+            birth_date: birthDate,
+            birth_time: birthTime,
+            birth_place: customer.place_name || '',
+            latitude: customer.latitude || 0,
+            longitude: customer.longitude || 0,
+            timezone: customer.timezone || 'Asia/Kolkata',
+          },
+          userId, // Pass userId to save to database
+        );
+
+        this.logger.log(`Kundli created for customer ${userId}`);
+        return;
+      }
+
+      // Update existing kundli
+      this.logger.log(`Updating existing kundli for customer ${userId}`);
+
+      // Generate kundli update JSON
+      const kundliUpdate = await this.kundliService.generateKundliUpdateJSON({
+        user_id: userId,
+        birth_date: birthDate,
+        birth_time: birthTime,
+        birth_place: customer.place_name || '',
+        latitude: customer.latitude || 0,
+        longitude: customer.longitude || 0,
+        timezone: customer.timezone || 'Asia/Kolkata',
+      });
+
+      // Update kundli record using repository
+      const kundli = await this.kundliRepository.findOneByUserId(userId, { is_deleted: false });
+
+      if (kundli) {
+        // Convert string values to proper types for update
+        const updateData: any = {
+          ...kundliUpdate.kundli_db_update.update,
+          birth_date: new Date(kundliUpdate.kundli_db_update.update.birth_date),
+          latitude: parseFloat(kundliUpdate.kundli_db_update.update.latitude),
+          longitude: parseFloat(kundliUpdate.kundli_db_update.update.longitude),
+          lagna_degrees: parseFloat(kundliUpdate.kundli_db_update.update.lagna_degrees),
+          pada: parseInt(kundliUpdate.kundli_db_update.update.pada.toString()),
+          ayanamsa: parseFloat(kundliUpdate.kundli_db_update.update.ayanamsa),
+          modify_date: new Date(kundliUpdate.kundli_db_update.update.modify_date),
+        };
+
+        await this.kundliRepository.update(kundli, updateData);
+        this.logger.log(`Kundli updated for customer ${userId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to update/create kundli for customer ${userId}:`, error);
+      // Don't throw - profile update succeeded even if kundli update failed
     }
   }
 

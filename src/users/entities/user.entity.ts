@@ -8,6 +8,7 @@ import { Kundli } from '../../kundli/entities/kundli.entity';
 // KarmaEntry now uses Customer entity, not User
 // import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
 import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
+import { DashaRecord } from '../../database/entities/dasha-record.entity';
 
 @Entity('users')
 @Index(['phone_number', 'is_deleted'])
@@ -98,5 +99,8 @@ export class User extends BaseEntity {
 
   @OneToMany(() => ManifestationLog, (manifestation) => manifestation.user)
   manifestation_logs: ManifestationLog[];
+
+  @OneToMany(() => DashaRecord, (dasha) => dasha.user, { cascade: true })
+  dasha_records: DashaRecord[];
 }
 

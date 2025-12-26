@@ -64,17 +64,45 @@ export class PromptService {
       const cached = await this.cacheManager.get<string>(cacheKey);
       if (cached) {
         const promptData = JSON.parse(cached);
-        const finalText = this.replaceVariables(promptData.template, context);
-        return {
-          ...promptData,
-          finalText,
-        };
+        this.logger.log(`📦 Found cached prompt ${key} v${promptData.version}, verifying against database...`);
+        
+        // 2. Verify version matches database (prevent stale cache)
+        // Use raw query to ensure we get the latest version
+        const dbVersionResult = await this.promptRepo
+          .createQueryBuilder('prompt')
+          .select('prompt.version', 'version')
+          .where('prompt.key = :key', { key })
+          .andWhere('prompt.is_active = :isActive', { isActive: true })
+          .getRawOne();
+        
+        const dbVersion = dbVersionResult?.version;
+        
+        if (!dbVersion) {
+          // Prompt not found in DB, clear cache
+          this.logger.warn(`❌ Prompt ${key} not found in database, clearing cache`);
+          await this.cacheManager.del(cacheKey);
+        } else if (dbVersion !== promptData.version) {
+          // Version mismatch - cache is stale, clear it and reload
+          this.logger.warn(`⚠️ Cache version mismatch for ${key}: cached v${promptData.version} vs DB v${dbVersion}. Clearing cache and reloading.`);
+          await this.cacheManager.del(cacheKey);
+          // Continue to load from database below
+        } else {
+          // Cache is valid, use it
+          this.logger.log(`✅ Using cached prompt ${key} v${promptData.version} (matches DB v${dbVersion})`);
+          const finalText = this.replaceVariables(promptData.template, context);
+          return {
+            ...promptData,
+            finalText,
+          };
+        }
+      } else {
+        this.logger.log(`📭 No cache found for ${key}, loading from database...`);
       }
     } catch (error) {
       this.logger.warn(`Cache read failed for key ${key}, loading from DB`, error);
     }
 
-    // 2. Load from database
+    // 3. Load from database (cache miss or version mismatch)
     const prompt = await this.promptRepo.findOne({
       where: { key, is_active: true },
     });
@@ -84,7 +112,7 @@ export class PromptService {
       throw new Error(`Prompt not found: ${key}`);
     }
 
-    // 3. Store in cache
+    // 4. Store in cache
     try {
       const promptData = {
         key: prompt.key,
@@ -100,11 +128,12 @@ export class PromptService {
         JSON.stringify(promptData),
         this.cacheTtl * 1000, // Convert to milliseconds
       );
+      this.logger.debug(`Cached prompt ${key} v${prompt.version}`);
     } catch (error) {
       this.logger.warn(`Cache write failed for key ${key}`, error);
     }
 
-    // 4. Apply variable replacement
+    // 5. Apply variable replacement
     const finalText = this.replaceVariables(prompt.template, context);
 
     return {

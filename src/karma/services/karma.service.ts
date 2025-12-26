@@ -37,6 +37,16 @@ export interface KarmaSummaryDto {
 export class KarmaService {
   private readonly logger = new Logger(KarmaService.name);
 
+  // Constants for karma scoring
+  private static readonly SCORE_THRESHOLD_HIGH = 70;
+  private static readonly SCORE_THRESHOLD_MEDIUM = 50;
+  private static readonly SCORE_NORMALIZATION_DIVISOR = 10;
+  private static readonly BASE_KARMA_SCORE = 50;
+  private static readonly MAX_KARMA_SCORE = 100;
+  private static readonly MIN_KARMA_SCORE = 0;
+  private static readonly TREND_THRESHOLD = 2;
+  private static readonly PREDICTION_SCORE_INCREMENT = 10;
+
   private readonly useLLM: boolean;
   private readonly openaiApiKey: string;
   private readonly openaiBaseUrl: string;
@@ -86,14 +96,12 @@ export class KarmaService {
     );
 
     // Map classification to KarmaType enum
-    let karmaType: KarmaType;
-    if (classification.type === 'good') {
-      karmaType = KarmaType.GOOD;
-    } else if (classification.type === 'bad') {
-      karmaType = KarmaType.BAD;
-    } else {
-      karmaType = KarmaType.NEUTRAL;
-    }
+    const karmaTypeMap: Record<string, KarmaType> = {
+      good: KarmaType.GOOD,
+      bad: KarmaType.BAD,
+      neutral: KarmaType.NEUTRAL,
+    };
+    const karmaType = karmaTypeMap[classification.type] || KarmaType.NEUTRAL;
 
     // Create karma entry
     const entry = await this.karmaRepository.create({
@@ -238,10 +246,10 @@ export class KarmaService {
       weekly_summary: weekly.summary_text,
       monthly_summary: monthly.summary_text,
       prediction: karmaScore.trend === 'improving'
-        ? `Your karma is improving! If you continue this pattern, your score could reach ${Math.min(100, karmaScore.karma_score + 10)} in the next month.`
+        ? `Your karma is improving! If you continue this pattern, your score could reach ${Math.min(KarmaService.MAX_KARMA_SCORE, karmaScore.karma_score + KarmaService.PREDICTION_SCORE_INCREMENT)} in the next month.`
         : karmaScore.trend === 'declining'
-        ? `Your karma shows a declining trend. Focus on your habit plan to reverse this pattern.`
-        : `Your karma is stable. Continue practicing your recommended habits for steady growth.`,
+          ? `Your karma shows a declining trend. Focus on your habit plan to reverse this pattern.`
+          : `Your karma is stable. Continue practicing your recommended habits for steady growth.`,
     };
   }
 
@@ -278,7 +286,8 @@ export class KarmaService {
       const response = await this.callLLMForInsights(prompt.finalText);
       return response || null;
     } catch (error) {
-      this.logger.warn('Failed to generate weekly summary with AI', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to generate weekly summary with AI: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       return null;
     }
   }
@@ -314,7 +323,8 @@ export class KarmaService {
       const response = await this.callLLMForInsights(prompt.finalText);
       return response || null;
     } catch (error) {
-      this.logger.warn('Failed to generate monthly summary with AI', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to generate monthly summary with AI: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       return null;
     }
   }
@@ -348,7 +358,8 @@ export class KarmaService {
       // Extract prediction part if available, otherwise use fallback
       return response || null;
     } catch (error) {
-      this.logger.warn('Failed to generate prediction with AI', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to generate prediction with AI: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       return null;
     }
   }
@@ -382,7 +393,9 @@ export class KarmaService {
 
       return response.data.choices[0]?.message?.content?.trim() || null;
     } catch (error) {
-      this.logger.error('LLM call failed for insights', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`LLM call failed for insights: ${errorMessage}`, errorStack);
       return null;
     }
   }
@@ -391,14 +404,20 @@ export class KarmaService {
    * Generate weekly summary text (fallback)
    */
   private generateWeeklySummary(summary: any, patternAnalysis: PatternAnalysisResult): string {
-    return `This week, you recorded ${summary.total_actions} actions. Your karma score is ${summary.karma_score.toFixed(1)}. ${patternAnalysis.behavioral_insights}`;
+    const totalActions = summary.total_actions ?? 0;
+    const karmaScore = summary.karma_score ?? 0;
+    const insights = patternAnalysis.behavioral_insights ?? '';
+    return `This week, you recorded ${totalActions} actions. Your karma score is ${karmaScore.toFixed(1)}. ${insights}`;
   }
 
   /**
    * Generate monthly summary text (fallback)
    */
   private generateMonthlySummary(summary: any, patternAnalysis: PatternAnalysisResult): string {
-    return `This month, you recorded ${summary.total_actions} actions. Your karma score is ${summary.karma_score.toFixed(1)}. ${patternAnalysis.behavioral_insights}`;
+    const totalActions = summary.total_actions ?? 0;
+    const karmaScore = summary.karma_score ?? 0;
+    const insights = patternAnalysis.behavioral_insights ?? '';
+    return `This month, you recorded ${totalActions} actions. Your karma score is ${karmaScore.toFixed(1)}. ${insights}`;
   }
 
   /**
@@ -560,7 +579,11 @@ export class KarmaService {
         categoryMap.set(categorySlug, { good: 0, bad: 0, name: categoryName });
       }
 
-      const category = categoryMap.get(categorySlug)!;
+      const category = categoryMap.get(categorySlug);
+      if (!category) {
+        // Should not happen based on logic, but safe guard
+        return;
+      }
       if (entry.karma_type === 'good') {
         category.good += Math.abs(score);
       } else if (entry.karma_type === 'bad') {
@@ -570,7 +593,13 @@ export class KarmaService {
 
     return Array.from(categoryMap.entries()).map(([slug, data]) => {
       const netPoints = data.good - data.bad;
-      const normalizedScore = Math.max(0, Math.min(100, 50 + netPoints / 10));
+      const normalizedScore = Math.max(
+        KarmaService.MIN_KARMA_SCORE,
+        Math.min(
+          KarmaService.MAX_KARMA_SCORE,
+          KarmaService.BASE_KARMA_SCORE + netPoints / KarmaService.SCORE_NORMALIZATION_DIVISOR
+        )
+      );
       
       return {
         category_slug: slug,
@@ -587,8 +616,8 @@ export class KarmaService {
    * Get category status
    */
   private getCategoryStatus(score: number): string {
-    if (score >= 70) return 'High';
-    if (score >= 50) return 'Medium';
+    if (score >= KarmaService.SCORE_THRESHOLD_HIGH) return 'High';
+    if (score >= KarmaService.SCORE_THRESHOLD_MEDIUM) return 'Medium';
     return 'Needs Work';
   }
 
@@ -755,15 +784,18 @@ export class KarmaService {
     const currentWeek = await this.karmaScoreService.calculateWeeklyScore(userId, weekStart);
     const lastWeek = await this.karmaScoreService.calculateWeeklyScore(userId, lastWeekStart);
     
-    const change = Number(currentWeek.karma_score) - Number(lastWeek.karma_score);
+    const currentScore = Number(currentWeek.karma_score);
+    const previousScore = Number(lastWeek.karma_score);
+    const change = currentScore - previousScore;
+    const changePercentage = previousScore !== 0 
+      ? Math.round((change / previousScore) * 100)
+      : 0;
     
     return {
-      current_score: Number(currentWeek.karma_score),
-      previous_score: Number(lastWeek.karma_score),
+      current_score: currentScore,
+      previous_score: previousScore,
       change: Math.round(change * 100) / 100,
-      change_percentage: lastWeek.karma_score > 0 
-        ? Math.round((change / Number(lastWeek.karma_score)) * 100) 
-        : 0,
+      change_percentage: changePercentage,
     };
   }
 
@@ -781,15 +813,18 @@ export class KarmaService {
     const currentMonth = await this.karmaScoreService.calculateMonthlyScore(userId, monthStart);
     const lastMonth = await this.karmaScoreService.calculateMonthlyScore(userId, lastMonthStart);
     
-    const change = Number(currentMonth.karma_score) - Number(lastMonth.karma_score);
+    const currentScore = Number(currentMonth.karma_score);
+    const previousScore = Number(lastMonth.karma_score);
+    const change = currentScore - previousScore;
+    const changePercentage = previousScore !== 0 
+      ? Math.round((change / previousScore) * 100)
+      : 0;
     
     return {
-      current_score: Number(currentMonth.karma_score),
-      previous_score: Number(lastMonth.karma_score),
+      current_score: currentScore,
+      previous_score: previousScore,
       change: Math.round(change * 100) / 100,
-      change_percentage: lastMonth.karma_score > 0 
-        ? Math.round((change / Number(lastMonth.karma_score)) * 100) 
-        : 0,
+      change_percentage: changePercentage,
     };
   }
 }

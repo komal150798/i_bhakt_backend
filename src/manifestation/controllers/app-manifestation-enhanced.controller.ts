@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -147,6 +148,7 @@ export class AppManifestationEnhancedController {
         insights: manifestation.insights,
         summary_for_ui: manifestation.insights?.summary_for_ui || null,
         is_archived: manifestation.is_archived,
+        is_locked: manifestation.is_locked,
         added_date: manifestation.added_date,
         modify_date: manifestation.modify_date,
       },
@@ -184,6 +186,43 @@ export class AppManifestationEnhancedController {
       data: {
         id: manifestation.id,
         is_archived: manifestation.is_archived,
+      },
+    };
+  }
+
+  /**
+   * PUT /api/v1/app/manifestation/lock/:id
+   * Lock/Unlock a manifestation (locked manifestations are used for dashboard calculations)
+   */
+  @Put('lock/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Lock or unlock a manifestation' })
+  @ApiResponse({
+    status: 200,
+    description: 'Manifestation lock status updated successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Manifestation not found',
+  })
+  async toggleLockManifestation(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
+    const manifestation = await this.manifestationService.toggleLockManifestation(
+      id,
+      user.id,
+    );
+
+    return {
+      success: true,
+      code: 200,
+      message: manifestation.is_locked
+        ? 'Manifestation locked. It will now be included in dashboard calculations.'
+        : 'Manifestation unlocked. It will no longer be included in dashboard calculations.',
+      data: {
+        id: manifestation.id,
+        is_locked: manifestation.is_locked,
       },
     };
   }
@@ -247,8 +286,43 @@ export class AppManifestationEnhancedController {
         resonance_score: m.resonance_score,
         mfp_score: m.mfp_score,
         is_archived: m.is_archived,
+        is_locked: m.is_locked,
         added_date: m.added_date,
       })),
+    };
+  }
+
+  /**
+   * POST /api/v1/app/manifestation/calculate-resonance
+   * Calculate detailed resonance score with Dasha analysis
+   */
+  @Post('calculate-resonance')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Calculate detailed resonance score with Dasha analysis' })
+  @ApiResponse({
+    status: 200,
+    description: 'Resonance score calculated successfully',
+  })
+  async calculateResonance(
+    @Body() body: { description: string },
+    @CurrentUser() user: any,
+  ) {
+    if (!body.description || body.description.trim().length < 15) {
+      throw new BadRequestException(
+        'Description must be at least 15 characters long.',
+      );
+    }
+
+    const result = await this.manifestationService.calculateDetailedResonance(
+      user.id,
+      body.description.trim(),
+    );
+
+    return {
+      success: true,
+      code: 200,
+      message: 'Resonance score calculated.',
+      data: result,
     };
   }
 }

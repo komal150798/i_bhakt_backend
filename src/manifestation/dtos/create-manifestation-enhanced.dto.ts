@@ -20,20 +20,21 @@ export enum EmotionalState {
 }
 
 export class CreateManifestationEnhancedDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Find my dream job in tech',
-    description: 'Manifestation title',
+    description: 'Manifestation title (optional - will be auto-generated from description if not provided)',
     minLength: 3,
     maxLength: 200,
   })
+  @IsOptional()
   @IsString()
   @MinLength(3)
   @MaxLength(200)
-  title: string;
+  title?: string;
 
   @ApiProperty({
     example: 'I want to find a fulfilling job that aligns with my values and allows me to grow professionally while making a positive impact.',
-    description: 'Detailed description of the manifestation intent',
+    description: 'Detailed description of the manifestation intent. Category and title will be auto-detected from this.',
     minLength: 15,
     maxLength: 2000,
   })

@@ -110,7 +110,8 @@ export class ManifestationBackendConfigService {
       ],
       fallback_category: 'other',
       category_keywords: {
-        love: ['love', 'partner', 'relationship', 'marriage', 'dating', 'romance', 'soulmate', 'boyfriend', 'girlfriend', 'husband', 'wife', 'romantic', 'affection'],
+        love: ['love', 'partner', 'relationship', 'marriage', 'dating', 'romance', 'soulmate', 'boyfriend', 'girlfriend', 'husband', 'wife', 'romantic', 'affection', 'marry', 'wedding', 'engaged', 'fiancé', 'fiancée', 'date', 'couple', 'spouse'],
+        relationship: ['love', 'partner', 'relationship', 'marriage', 'dating', 'romance', 'soulmate', 'boyfriend', 'girlfriend', 'husband', 'wife', 'romantic', 'affection', 'marry', 'wedding', 'engaged', 'fiancé', 'fiancée', 'date', 'couple', 'spouse'],
         career: ['job', 'career', 'work', 'employment', 'profession', 'business', 'promotion', 'salary', 'office', 'colleague', 'boss', 'workplace', 'professional'],
         health: ['health', 'healthy', 'fitness', 'exercise', 'weight', 'diet', 'illness', 'disease', 'pain', 'healing', 'recovery', 'wellness', 'wellbeing'],
         wealth: ['money', 'wealth', 'rich', 'financial', 'income', 'salary', 'savings', 'investment', 'debt', 'loan', 'abundance', 'prosperity', 'finances'],

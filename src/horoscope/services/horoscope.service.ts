@@ -1,9 +1,6 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { firstValueFrom } from 'rxjs';
 import { GetHoroscopeDto } from '../dto/get-horoscope.dto';
 import { HoroscopeResponseDto } from '../dto/horoscope-response.dto';
 import { Customer } from '../../users/entities/customer.entity';
@@ -12,9 +9,6 @@ import { SwissEphemerisService } from '../../astrology/services/swiss-ephemeris.
 @Injectable()
 export class HoroscopeService {
   private readonly logger = new Logger(HoroscopeService.name);
-  private readonly prokeralaApiKey: string;
-  private readonly prokeralaBaseUrl = 'https://api.prokerala.com/v2/astrology';
-  private readonly useSwissEphemeris: boolean;
 
   // Zodiac sign mapping
   private readonly zodiacSigns = {
@@ -33,15 +27,10 @@ export class HoroscopeService {
   };
 
   constructor(
-    private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
     private readonly swissEphemerisService: SwissEphemerisService,
-  ) {
-    this.prokeralaApiKey = this.configService.get<string>('PROKERALA_API_KEY') || '';
-    this.useSwissEphemeris = this.configService.get<string>('USE_SWISS_EPHEMERIS') !== 'false';
-  }
+  ) {}
 
   /**
    * Get horoscope for a zodiac sign
@@ -106,8 +95,53 @@ export class HoroscopeService {
   }
 
   /**
-   * Calculate zodiac sign from birth date (using Swiss Ephemeris if available)
-   * Falls back to simple date-based calculation if Swiss Ephemeris is not available
+   * Extract month and day from date (handles both string and Date objects, avoids timezone issues)
+   */
+  private extractDateComponents(birthDate: Date | string): { month: number; day: number; year: number } {
+    if (typeof birthDate === 'string') {
+      // Parse string format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
+      const dateStr = birthDate.split('T')[0]; // Remove time part if present
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10); // 1-12
+        const day = parseInt(parts[2], 10); // 1-31
+        this.logger.debug(`Extracted from string: ${year}-${month}-${day}`);
+        return { year, month, day };
+      }
+    }
+    
+    // For Date objects from database, format as YYYY-MM-DD and parse to avoid timezone issues
+    const date = typeof birthDate === 'string' ? new Date(birthDate) : birthDate;
+    
+    // Method 1: Try to get local date components (for dates stored in local timezone)
+    const localYear = date.getFullYear();
+    const localMonth = date.getMonth() + 1;
+    const localDay = date.getDate();
+    
+    // Method 2: Get UTC components (for dates stored as UTC)
+    const utcYear = date.getUTCFullYear();
+    const utcMonth = date.getUTCMonth() + 1;
+    const utcDay = date.getUTCDate();
+    
+    // Use the date that makes more sense (usually local for DATE columns in PostgreSQL)
+    // But log both for debugging
+    this.logger.debug(`Date object - Local: ${localYear}-${localMonth}-${localDay}, UTC: ${utcYear}-${utcMonth}-${utcDay}`);
+    
+    // For DATE columns in PostgreSQL, TypeORM typically uses local timezone
+    // So use local components
+    return {
+      year: localYear,
+      month: localMonth,
+      day: localDay,
+    };
+  }
+
+  /**
+   * Calculate zodiac sign from birth date
+   * Uses tropical zodiac (calendar-based) for horoscope compatibility
+   * Note: Swiss Ephemeris uses sidereal zodiac (with ayanamsa), which differs from tropical
+   * For horoscope purposes, we use tropical zodiac based on calendar dates
    */
   private async calculateZodiacSign(
     birthDate: Date | string,
@@ -115,40 +149,29 @@ export class HoroscopeService {
     latitude?: number,
     longitude?: number,
   ): Promise<string> {
-    const date = typeof birthDate === 'string' ? new Date(birthDate) : birthDate;
+    // Extract date components (handles timezone issues)
+    const { month, day, year } = this.extractDateComponents(birthDate);
+    
+    this.logger.debug(`Calculating zodiac sign (tropical) for birth date: ${year}-${month}-${day}`);
 
-    // If we have birth time and location, use Swiss Ephemeris for accurate calculation
-    if (this.useSwissEphemeris && birthTime && latitude && longitude) {
-      try {
-        const kundliData = await this.swissEphemerisService.calculateKundli({
-          datetime: new Date(`${birthDate}T${birthTime}`),
-          latitude,
-          longitude,
-          timezone: 'Asia/Kolkata', // Default, can be improved
-        });
-
-        // Get Sun's sign (most accurate for zodiac sign)
-        const sun = kundliData.planets.find((p) => p.name === 'Sun');
-        if (sun) {
-          return sun.sign;
-        }
-      } catch (error) {
-        this.logger.warn('Swiss Ephemeris calculation failed, using date-based calculation', error);
-      }
-    }
-
-    // Fallback to simple date-based calculation
-    const month = date.getMonth() + 1; // 1-12
-    const day = date.getDate(); // 1-31
+    // Always use date-based calculation for horoscope zodiac sign (tropical zodiac)
+    // Swiss Ephemeris uses sidereal zodiac which can differ by ~23 degrees
+    // Horoscope signs are based on tropical zodiac (calendar dates), not sidereal positions
+    this.logger.debug(`Using date-based tropical zodiac calculation for Month=${month}, Day=${day}`);
 
     // Zodiac sign calculation based on month and day
+    // Note: Month is 1-12 (January=1, December=12)
     if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) {
+      this.logger.debug(`Zodiac sign calculated: Aries`);
       return 'Aries';
     } else if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) {
+      this.logger.debug(`Zodiac sign calculated: Taurus`);
       return 'Taurus';
     } else if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) {
+      this.logger.debug(`Zodiac sign calculated: Gemini`);
       return 'Gemini';
     } else if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) {
+      this.logger.debug(`Zodiac sign calculated: Cancer`);
       return 'Cancer';
     } else if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) {
       return 'Leo';
@@ -531,83 +554,6 @@ export class HoroscopeService {
     return 'Balanced';
   }
 
-  /**
-   * Call Prokerala API for horoscope (DEPRECATED - kept for backward compatibility)
-   * @deprecated Use generateHoroscopeWithSwissEphemeris instead
-   */
-  private async callProkeralaAPI(sign: string, type: string): Promise<any> {
-    // If no API key is configured, skip API call and use fallback
-    if (!this.prokeralaApiKey) {
-      this.logger.warn('Prokerala API key not configured, using fallback');
-      throw new Error('API key not configured');
-    }
-
-    const signNumber = this.zodiacSigns[sign];
-    if (!signNumber) {
-      throw new BadRequestException(`Invalid zodiac sign: ${sign}`);
-    }
-
-    const endpoint = type === 'daily' ? 'daily' : type === 'weekly' ? 'weekly' : 'monthly';
-    
-    // Prokerala API typically uses GET with query parameters
-    // Try GET first, if that fails, try POST
-    const url = `${this.prokeralaBaseUrl}/horoscope/${endpoint}`;
-    const params = {
-      sign: signNumber.toString(),
-      datetime: new Date().toISOString(),
-    };
-
-    try {
-      // Try GET request first (most common for Prokerala)
-      const response = await firstValueFrom(
-        this.httpService.get<any>(url, {
-          params,
-          headers: {
-            'Accept': 'application/json',
-            ...(this.prokeralaApiKey && { 
-              'Authorization': `Bearer ${this.prokeralaApiKey}`,
-              'X-API-Key': this.prokeralaApiKey 
-            }),
-          },
-        }),
-      );
-
-      return response.data;
-    } catch (getError: any) {
-      // If GET fails with 404, try POST
-      if (getError?.response?.status === 404) {
-        try {
-          const response = await firstValueFrom(
-            this.httpService.post<any>(
-              url,
-              {
-                sign: signNumber,
-                datetime: new Date().toISOString(),
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                  ...(this.prokeralaApiKey && { 
-                    'Authorization': `Bearer ${this.prokeralaApiKey}`,
-                    'X-API-Key': this.prokeralaApiKey 
-                  }),
-                },
-              },
-            ),
-          );
-
-          return response.data;
-        } catch (postError) {
-          // Both GET and POST failed, throw to trigger fallback
-          throw postError;
-        }
-      }
-      
-      // If it's not a 404, throw the original error
-      throw getError;
-    }
-  }
 
   /**
    * Generate fallback horoscope (when API is not available)

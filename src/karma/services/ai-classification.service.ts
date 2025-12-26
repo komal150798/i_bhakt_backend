@@ -2,11 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
 import { KarmaCategory } from '../entities/karma-category.entity';
 import { KarmaWeightRule } from '../entities/karma-weight-rule.entity';
 import { PromptService } from '../../common/ai/prompt.service';
+import { LLMService } from '../../common/ai/services/llm.service';
 import { ConstantsService } from '../../common/constants/constants.service';
 
 export interface AIClassificationResult {
@@ -24,8 +23,6 @@ export interface AIClassificationResult {
 export class AIClassificationService {
   private readonly logger = new Logger(AIClassificationService.name);
   private readonly useLLM: boolean;
-  private readonly openaiApiKey: string;
-  private readonly openaiBaseUrl: string;
 
   constructor(
     @InjectRepository(KarmaCategory)
@@ -33,13 +30,12 @@ export class AIClassificationService {
     @InjectRepository(KarmaWeightRule)
     private readonly weightRuleRepository: Repository<KarmaWeightRule>,
     private readonly promptService: PromptService,
+    private readonly llmService: LLMService,
     private readonly constantsService: ConstantsService,
     private readonly configService: ConfigService,
-    private readonly httpService: HttpService,
   ) {
-    this.openaiApiKey = this.configService.get<string>('OPENAI_API_KEY') || '';
-    this.openaiBaseUrl = this.configService.get<string>('OPENAI_BASE_URL') || 'https://api.openai.com/v1';
-    this.useLLM = !!this.openaiApiKey;
+    const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY') || '';
+    this.useLLM = !!openaiApiKey;
     
     if (!this.useLLM) {
       this.logger.warn('LLM API key not found. Karma classification will use rule-based fallback only.');
@@ -148,11 +144,16 @@ export class AIClassificationService {
       }
     );
 
-    // Call LLM
-    const response = await this.callLLM(systemPrompt.finalText, userPrompt.finalText);
+    // Call LLM using common LLM service
+    const llmResponse = await this.llmService.callLLMJSON({
+      systemPrompt: systemPrompt.finalText,
+      userPrompt: userPrompt.finalText,
+      maxTokens: 500,
+      temperature: 0.7,
+    });
     
     // Parse response
-    const classification = JSON.parse(response);
+    const classification = llmResponse.data;
     
     // Get habit recommendations
     const habitRecommendations = await this.getHabitRecommendations(classification.pattern_key || classification.emotion);
@@ -212,36 +213,6 @@ export class AIClassificationService {
     };
   }
 
-  /**
-   * Call LLM API for classification
-   */
-  private async callLLM(systemPrompt: string, userPrompt: string): Promise<string> {
-    const model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
-    const apiUrl = `${this.openaiBaseUrl}/chat/completions`;
-
-    const requestBody = {
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-      response_format: { type: 'json_object' },
-    };
-
-    const response = await firstValueFrom(
-      this.httpService.post(apiUrl, requestBody, {
-        headers: {
-          'Authorization': `Bearer ${this.openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 30000,
-      })
-    );
-
-    return response.data.choices[0]?.message?.content || '{}';
-  }
 
   /**
    * Detect emotional tone from text

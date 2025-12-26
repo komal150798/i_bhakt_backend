@@ -10,11 +10,15 @@ import { Customer } from './entities/customer.entity';
 import { AdminUser } from './entities/admin-user.entity';
 import { KarmaEntry } from '../karma/entities/karma-entry.entity';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { KundliModule } from '../kundli/kundli.module';
+import { RepositoriesModule } from '../infrastructure/repositories/repositories.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Customer, AdminUser, KarmaEntry]),
     SubscriptionsModule,
+    KundliModule, // For kundli calculation and update
+    RepositoriesModule, // For kundli repository
   ],
   controllers: [
     AdminUsersController,

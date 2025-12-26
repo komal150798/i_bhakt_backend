@@ -56,6 +56,14 @@ import { CustomerToken } from '../../auth/entities/customer-token.entity';
 import { AdmRole } from '../../admin-rbac/entities/adm-role.entity';
 import { AdmPermission } from '../../admin-rbac/entities/adm-permission.entity';
 import { AdmRolePermission } from '../../admin-rbac/entities/adm-role-permission.entity';
+import { DashaRecord } from '../../database/entities/dasha-record.entity';
+import { AntardashaRecord } from '../../database/entities/antardasha-record.entity';
+import { PratyantarDashaRecord } from '../../database/entities/pratyantar-dasha-record.entity';
+import { SukshmaDashaRecord } from '../../database/entities/sukshma-dasha-record.entity';
+import { SmsTemplate } from '../../common/messaging/entities/sms-template.entity';
+import { EmailTemplate } from '../../common/messaging/entities/email-template.entity';
+import { SmsCredential } from '../../common/messaging/entities/sms-credential.entity';
+import { EmailCredential } from '../../common/messaging/entities/email-credential.entity';
 import { SeedService } from './seeds/seed-admin.service';
 
 // All entities array
@@ -119,6 +127,16 @@ const entities = [
   AIPrompt,
   // Central Constants
   AppConstant,
+  // Dasha Period Entities
+  DashaRecord,
+  AntardashaRecord,
+  PratyantarDashaRecord,
+  SukshmaDashaRecord,
+  // Messaging Entities
+  SmsTemplate,
+  EmailTemplate,
+  SmsCredential,
+  EmailCredential,
 ];
 
 @Module({

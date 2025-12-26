@@ -30,6 +30,7 @@ export interface IKarmaRepository {
   findById(id: number): Promise<KarmaEntry | null>;
   findByUniqueId(uniqueId: string): Promise<KarmaEntry | null>;
   findByUserId(userId: number, options?: { karma_type?: string }): Promise<KarmaEntry[]>;
+  findByUserIdAndDateRange(userId: number, startDate: Date, endDate: Date): Promise<KarmaEntry[]>;
   findAll(options?: { karma_type?: string; is_deleted?: boolean }): Promise<KarmaEntry[]>;
   create(data: CreateKarmaEntryInput): Promise<KarmaEntry>;
   update(karmaEntry: KarmaEntry, data: UpdateKarmaEntryInput): Promise<KarmaEntry>;

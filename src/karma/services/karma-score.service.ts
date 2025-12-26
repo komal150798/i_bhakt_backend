@@ -21,6 +21,13 @@ export interface KarmaScoreResult {
 export class KarmaScoreService {
   private readonly logger = new Logger(KarmaScoreService.name);
 
+  // Constants for karma scoring
+  private static readonly SCORE_NORMALIZATION_DIVISOR = 10;
+  private static readonly BASE_KARMA_SCORE = 50;
+  private static readonly MAX_KARMA_SCORE = 100;
+  private static readonly MIN_KARMA_SCORE = 0;
+  private static readonly TREND_THRESHOLD = 2;
+
   constructor(
     @Inject('IKarmaRepository')
     private readonly karmaRepository: IKarmaRepository,
@@ -62,7 +69,13 @@ export class KarmaScoreService {
     // Base: 50 (neutral)
     // Max positive: 100 (if only good actions)
     // Max negative: 0 (if only bad actions)
-    const normalizedScore = Math.max(0, Math.min(100, 50 + (rawScore / 10)));
+    const normalizedScore = Math.max(
+      KarmaScoreService.MIN_KARMA_SCORE,
+      Math.min(
+        KarmaScoreService.MAX_KARMA_SCORE,
+        KarmaScoreService.BASE_KARMA_SCORE + (rawScore / KarmaScoreService.SCORE_NORMALIZATION_DIVISOR)
+      )
+    );
 
     // Calculate trend by comparing with previous period
     const trend = await this.calculateTrend(userId, normalizedScore);
@@ -89,11 +102,7 @@ export class KarmaScoreService {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const entries = await this.karmaRepository.findByUserId(userId);
-    const dayEntries = entries.filter(
-      (e) =>
-        new Date(e.entry_date) >= startOfDay && new Date(e.entry_date) <= endOfDay,
-    );
+    const dayEntries = await this.karmaRepository.findByUserIdAndDateRange(userId, startOfDay, endOfDay);
 
     return this.createScoreSummary(userId, 'daily', startOfDay, endOfDay, dayEntries);
   }
@@ -106,11 +115,7 @@ export class KarmaScoreService {
     weekEnd.setDate(weekEnd.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
 
-    const entries = await this.karmaRepository.findByUserId(userId);
-    const weekEntries = entries.filter(
-      (e) =>
-        new Date(e.entry_date) >= weekStart && new Date(e.entry_date) <= weekEnd,
-    );
+    const weekEntries = await this.karmaRepository.findByUserIdAndDateRange(userId, weekStart, weekEnd);
 
     return this.createScoreSummary(userId, 'weekly', weekStart, weekEnd, weekEntries);
   }
@@ -124,11 +129,7 @@ export class KarmaScoreService {
     monthEnd.setDate(0); // Last day of month
     monthEnd.setHours(23, 59, 59, 999);
 
-    const entries = await this.karmaRepository.findByUserId(userId);
-    const monthEntries = entries.filter(
-      (e) =>
-        new Date(e.entry_date) >= monthStart && new Date(e.entry_date) <= monthEnd,
-    );
+    const monthEntries = await this.karmaRepository.findByUserIdAndDateRange(userId, monthStart, monthEnd);
 
     return this.createScoreSummary(userId, 'monthly', monthStart, monthEnd, monthEntries);
   }
@@ -164,7 +165,13 @@ export class KarmaScoreService {
     }
 
     const rawScore = totalGoodPoints - totalBadPoints;
-    const normalizedScore = Math.max(0, Math.min(100, 50 + rawScore / 10));
+    const normalizedScore = Math.max(
+      KarmaScoreService.MIN_KARMA_SCORE,
+      Math.min(
+        KarmaScoreService.MAX_KARMA_SCORE,
+        KarmaScoreService.BASE_KARMA_SCORE + rawScore / KarmaScoreService.SCORE_NORMALIZATION_DIVISOR
+      )
+    );
 
     // Check if summary already exists
     const existing = await this.scoreSummaryRepository.findOne({
@@ -213,14 +220,17 @@ export class KarmaScoreService {
     const lastWeek = new Date();
     lastWeek.setDate(lastWeek.getDate() - 7);
 
+    const weekStart = new Date(lastWeek);
+    weekStart.setDate(weekStart.getDate() - 7);
+
+    const weekEnd = new Date(lastWeek);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
     const lastWeekSummary = await this.scoreSummaryRepository.findOne({
       where: {
         user_id: userId,
         period_type: 'weekly',
-        period_start: Between(
-          new Date(lastWeek.setDate(lastWeek.getDate() - 7)),
-          new Date(lastWeek.setDate(lastWeek.getDate() + 7)),
-        ),
+        period_start: Between(weekStart, weekEnd),
       },
       order: { period_start: 'DESC' },
     });
@@ -231,11 +241,13 @@ export class KarmaScoreService {
 
     const previousScore = Number(lastWeekSummary.karma_score);
     const difference = currentScore - previousScore;
-    const percentage = Math.abs((difference / previousScore) * 100);
+    const percentage = previousScore !== 0 
+      ? Math.abs((difference / previousScore) * 100)
+      : 0;
 
-    if (difference > 2) {
+    if (difference > KarmaScoreService.TREND_THRESHOLD) {
       return { direction: 'improving', percentage: Math.round(percentage) };
-    } else if (difference < -2) {
+    } else if (difference < -KarmaScoreService.TREND_THRESHOLD) {
       return { direction: 'declining', percentage: Math.round(percentage) };
     } else {
       return { direction: 'stable', percentage: Math.round(percentage) };

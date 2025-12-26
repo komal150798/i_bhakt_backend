@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
 import {
   IKarmaRepository,
@@ -26,19 +26,38 @@ export class KarmaRepository implements IKarmaRepository {
     });
   }
 
-  async findByUserId(userId: number, options?: { karma_type?: string }): Promise<KarmaEntry[]> {
-    const where: any = { user_id: userId, is_deleted: false };
+  /**
+   * Build where clause to reduce code duplication
+   */
+  private buildWhereClause(userId: number | undefined, options?: { karma_type?: string; is_deleted?: boolean }): any {
+    const where: any = { is_deleted: options?.is_deleted ?? false };
+    if (userId !== undefined) {
+      where.user_id = userId;
+    }
     if (options?.karma_type) {
       where.karma_type = options.karma_type;
     }
+    return where;
+  }
+
+  async findByUserId(userId: number, options?: { karma_type?: string }): Promise<KarmaEntry[]> {
+    const where = this.buildWhereClause(userId, options);
     return this.karmaRepository.find({ where, order: { added_date: 'DESC' } });
   }
 
+  async findByUserIdAndDateRange(userId: number, startDate: Date, endDate: Date): Promise<KarmaEntry[]> {
+    return this.karmaRepository.find({
+      where: {
+        user_id: userId,
+        is_deleted: false,
+        entry_date: Between(startDate, endDate),
+      },
+      order: { added_date: 'DESC' },
+    });
+  }
+
   async findAll(options?: { karma_type?: string; is_deleted?: boolean }): Promise<KarmaEntry[]> {
-    const where: any = { is_deleted: options?.is_deleted ?? false };
-    if (options?.karma_type) {
-      where.karma_type = options.karma_type;
-    }
+    const where = this.buildWhereClause(undefined, options);
     return this.karmaRepository.find({ where, relations: ['customer'], order: { added_date: 'DESC' } });
   }
 

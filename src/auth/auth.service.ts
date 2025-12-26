@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.entity';
 import { Customer } from '../users/entities/customer.entity';
@@ -12,6 +13,7 @@ import { OtpService } from './services/otp.service';
 import { AuthJwtService } from './services/jwt.service';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { UserRole } from '../common/enums/user-role.enum';
+import { HoroscopeService } from '../horoscope/services/horoscope.service';
 
 @Injectable()
 export class AuthService {
@@ -30,7 +32,18 @@ export class AuthService {
     private adminTokenRepository: Repository<AdminToken>,
     private otpService: OtpService,
     private jwtService: AuthJwtService,
+    private configService: ConfigService,
+    private horoscopeService: HoroscopeService,
   ) {}
+
+  /**
+   * Get app session expiration from environment variable
+   * Defaults to 90 days if not set
+   */
+  private getAppSessionExpiration(): string {
+    const days = this.configService.get<number>('APP_SESSION_DAYS', 90);
+    return `${days}d`;
+  }
 
   async sendOtp(phoneNumber: string): Promise<{ message: string; debug_code?: string }> {
     const code = this.otpService.issueOtp(phoneNumber);
@@ -84,7 +97,8 @@ export class AuthService {
       throw new NotFoundException('User not found. Please register first or check your phone number.');
     }
 
-    // Generate tokens
+    // Generate tokens with app session expiration
+    const appSessionExpiration = this.getAppSessionExpiration();
     const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
       sub: user?.id || 0, // Will be set properly when user is created
       phone_number: phoneNumber,
@@ -92,12 +106,12 @@ export class AuthService {
       type: 'user',
     };
 
-    const accessToken = this.jwtService.generateAccessToken(payload);
-    const refreshToken = this.jwtService.generateRefreshToken(payload);
+    const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
+    const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
 
     // Store refresh token if user exists
     if (user) {
-      await this.storeRefreshToken(refreshToken, user.id, null);
+      await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
       payload.sub = user.id;
     }
 
@@ -127,7 +141,8 @@ export class AuthService {
       throw new NotFoundException('User not found. Please register first or check your email.');
     }
 
-    // Generate tokens
+    // Generate tokens with app session expiration
+    const appSessionExpiration = this.getAppSessionExpiration();
     const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
       sub: user?.id || 0,
       email: email,
@@ -135,12 +150,12 @@ export class AuthService {
       type: 'user',
     };
 
-    const accessToken = this.jwtService.generateAccessToken(payload);
-    const refreshToken = this.jwtService.generateRefreshToken(payload);
+    const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
+    const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
 
     // Store refresh token if user exists
     if (user) {
-      await this.storeRefreshToken(refreshToken, user.id, null);
+      await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
       payload.sub = user.id;
     }
 
@@ -190,11 +205,21 @@ export class AuthService {
     token: string,
     userId: number | null,
     adminId: number | null,
+    expiresIn?: string,
   ): Promise<void> {
     const payload = this.jwtService.verifyToken(token);
     if (!payload) return;
 
-    const expiresAt = new Date(payload.exp! * 1000);
+    // If expiresIn is provided, calculate expiration from now
+    // Otherwise, use the expiration from the token payload
+    let expiresAt: Date;
+    if (expiresIn) {
+      // Parse expiresIn (e.g., '90d', '7d', '15m')
+      const expiresInMs = this.parseExpiresIn(expiresIn);
+      expiresAt = new Date(Date.now() + expiresInMs);
+    } else {
+      expiresAt = new Date(payload.exp! * 1000);
+    }
 
     const refreshToken = this.refreshTokenRepository.create({
       token,
@@ -205,6 +230,34 @@ export class AuthService {
     });
 
     await this.refreshTokenRepository.save(refreshToken);
+  }
+
+  /**
+   * Parse expiresIn string to milliseconds
+   * Supports: '90d', '7d', '15m', '1h', etc.
+   */
+  private parseExpiresIn(expiresIn: string): number {
+    const match = expiresIn.match(/^(\d+)([dhms])$/);
+    if (!match) {
+      // Default to 90 days if parsing fails
+      return 90 * 24 * 60 * 60 * 1000;
+    }
+
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+
+    switch (unit) {
+      case 'd':
+        return value * 24 * 60 * 60 * 1000;
+      case 'h':
+        return value * 60 * 60 * 1000;
+      case 'm':
+        return value * 60 * 1000;
+      case 's':
+        return value * 1000;
+      default:
+        return 90 * 24 * 60 * 60 * 1000;
+    }
   }
 
   /**
@@ -357,7 +410,8 @@ export class AuthService {
     user.last_login = new Date();
     await this.userRepository.save(user);
 
-    return this.issueTokens(user);
+    // Use app tokens with 3 months expiration
+    return this.issueAppTokens(user);
   }
 
   /**
@@ -381,6 +435,40 @@ export class AuthService {
 
     // Store refresh token
     await this.storeRefreshToken(refreshToken, user.id, null);
+
+    // Format user response
+    const userResponse = this.formatUserResponse(user);
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user: userResponse,
+    };
+  }
+
+  /**
+   * Issue tokens for app with configurable session expiration (default 90 days)
+   */
+  async issueAppTokens(user: User): Promise<{
+    access_token: string;
+    refresh_token: string;
+    user: any;
+  }> {
+    const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
+      sub: user.id,
+      email: user.email || undefined,
+      phone_number: user.phone_number || undefined,
+      role: user.role,
+      type: 'user',
+    };
+
+    // Get app session expiration from environment variable
+    const appSessionExpiration = this.getAppSessionExpiration();
+    const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
+    const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
+
+    // Store refresh token with app session expiration
+    await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
 
     // Format user response
     const userResponse = this.formatUserResponse(user);
@@ -417,9 +505,13 @@ export class AuthService {
 
     // Create new user
     // Generate a unique phone number placeholder for Google users
-    // Format: google_<first_10_chars_of_googleId>_<timestamp>
+    // Format: g_<hash> where hash is first 17 chars of Google ID + timestamp suffix
+    // This ensures uniqueness while staying within varchar(20) limit
     const nameParts = googleProfile.name.split(' ');
-    const phonePlaceholder = `google_${googleProfile.googleId.substring(0, 10)}_${Date.now()}`;
+    // Use first 8 chars of Google ID + last 9 chars of timestamp to fit in 20 chars (g_ = 2, + 18 = 20)
+    const googleIdShort = googleProfile.googleId.substring(0, 8);
+    const timestampShort = Date.now().toString().slice(-9); // Last 9 digits
+    const phonePlaceholder = `g_${googleIdShort}${timestampShort}`;
     
     user = this.userRepository.create({
       email: googleProfile.email,
@@ -445,6 +537,12 @@ export class AuthService {
     googleId: string;
   } | null> {
     try {
+      // Check if GOOGLE_CLIENT_ID is configured
+      if (!process.env.GOOGLE_CLIENT_ID) {
+        console.error('GOOGLE_CLIENT_ID environment variable is not set');
+        throw new Error('Google OAuth client ID not configured');
+      }
+
       // Try to use google-auth-library if available
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { OAuth2Client } = require('google-auth-library');
@@ -457,6 +555,7 @@ export class AuthService {
 
       const payload = ticket.getPayload();
       if (!payload) {
+        console.error('Google token verification failed: No payload returned');
         return null;
       }
 
@@ -467,11 +566,17 @@ export class AuthService {
         googleId: payload.sub,
       };
     } catch (error) {
-      // If google-auth-library is not installed, log warning and return null
-      console.warn(
-        'Google auth library not installed. Install with: npm install google-auth-library',
-      );
-      console.warn('Google login will not work until library is installed.');
+      // Log the actual error for debugging
+      console.error('Google token verification error:', error);
+      
+      // Check if it's a module not found error
+      if (error instanceof Error && error.message.includes('Cannot find module')) {
+        console.error(
+          'Google auth library not installed. Install with: npm install google-auth-library',
+        );
+        console.error('Google login will not work until library is installed.');
+      }
+      
       return null;
     }
   }
@@ -580,6 +685,19 @@ export class AuthService {
 
     // Format customer response
     const userResponse = this.formatCustomerResponse(customer);
+
+    // Get personalized horoscope for logged-in user based on their birth data
+    try {
+      const personalizedHoroscope = await this.horoscopeService.getHoroscopeForUser(
+        customer.id,
+        'daily',
+      );
+      userResponse.horoscope = personalizedHoroscope;
+    } catch (error) {
+      // If horoscope fails (e.g., no birth date), continue without it (don't block login)
+      // User can update their profile with birth data to get personalized horoscope
+      // No horoscope will be included in the response
+    }
 
     return {
       access_token: accessToken,
@@ -732,6 +850,14 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    // Check if this is an app token by comparing expiration with configured app session duration
+    const appSessionDays = this.configService.get<number>('APP_SESSION_DAYS', 90);
+    const originalExpiration = payload.exp ? payload.exp * 1000 : 0;
+    const now = Date.now();
+    const daysUntilExpiration = (originalExpiration - now) / (1000 * 60 * 60 * 24);
+    // Check if expiration is within 5 days of configured app session duration (with tolerance)
+    const isAppToken = daysUntilExpiration >= (appSessionDays - 5) && daysUntilExpiration <= (appSessionDays + 5);
+
     // Generate new tokens
     const newPayload: Omit<JwtPayload, 'iat' | 'exp'> = {
       sub: payload.sub,
@@ -741,18 +867,21 @@ export class AuthService {
       type: payload.type,
     };
 
-    const newAccessToken = this.jwtService.generateAccessToken(newPayload);
-    const newRefreshToken = this.jwtService.generateRefreshToken(newPayload);
+    // Use app session expiration for app tokens, default for others
+    const expiresIn = isAppToken ? this.getAppSessionExpiration() : undefined;
+    const newAccessToken = this.jwtService.generateAccessToken(newPayload, expiresIn);
+    const newRefreshToken = this.jwtService.generateRefreshToken(newPayload, expiresIn);
 
     // Revoke old token
     tokenRecord.is_revoked = true;
     await this.refreshTokenRepository.save(tokenRecord);
 
-    // Store new refresh token
+    // Store new refresh token with same expiration as original if app token
     await this.storeRefreshToken(
       newRefreshToken,
       payload.type === 'user' ? payload.sub : null,
       payload.type === 'admin' ? payload.sub : null,
+      expiresIn,
     );
 
     return {

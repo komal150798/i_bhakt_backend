@@ -11,6 +11,7 @@ export interface ManifestationScores {
   mahaadha_score: number;
   astro_support_index: number;
   mfp_score: number;
+  coherence_score: number; // NEW: Combined sentiment, confidence & clarity (0-100)
 }
 
 export interface ManifestationTips {
@@ -82,7 +83,12 @@ export class ManifestationAIEvaluationService {
       scores[cat] = (keywords as string[]).filter((kw: string) => text.includes(kw.toLowerCase())).length;
     }
 
-    const maxCategory = Object.entries(scores).reduce((a, b) => (scores[a[0]] > scores[b[0]] ? a : b))[0];
+    const scoreEntries = Object.entries(scores);
+    if (scoreEntries.length === 0) {
+      return undefined; // No categories found, will fallback to backendConfig.fallback_category
+    }
+
+    const maxCategory = scoreEntries.reduce((a, b) => (scores[a[0]] > scores[b[0]] ? a : b))[0];
     
     if (scores[maxCategory] >= 2) {
       return maxCategory;
@@ -165,13 +171,32 @@ export class ManifestationAIEvaluationService {
       const finalCategory = llmAnalysis.detected_category || category || 'other';
       
       // Use scores from LLM analysis if available, otherwise calculate
-      const scores = llmAnalysis.scores || {
+      const baseScores = llmAnalysis.scores || {
         resonance_score: 50,
         alignment_score: 50,
         antrashaakti_score: 50,
         mahaadha_score: 0,
         astro_support_index: 60,
         mfp_score: 50,
+      };
+
+      // Calculate Coherence Score (sentiment + confidence + clarity)
+      // Coherence = (Resonance + Alignment) / 2, adjusted by clarity indicators
+      const baseCoherence = (baseScores.resonance_score + baseScores.alignment_score) / 2;
+      const clarityBonus = description.length > 50 ? 5 : 0; // Bonus for detailed descriptions
+      const confidenceBonus = baseScores.antrashaakti_score > 60 ? 5 : 0; // Bonus for high inner power
+      const blockagePenalty = baseScores.mahaadha_score > 30 ? -10 : 0; // Penalty for high blockages
+      const coherence_score = Math.max(0, Math.min(100, baseCoherence + clarityBonus + confidenceBonus + blockagePenalty));
+
+      // Ensure all scores include coherence_score
+      const scores: ManifestationScores = {
+        resonance_score: baseScores.resonance_score,
+        alignment_score: baseScores.alignment_score,
+        antrashaakti_score: baseScores.antrashaakti_score,
+        mahaadha_score: baseScores.mahaadha_score,
+        astro_support_index: baseScores.astro_support_index,
+        mfp_score: baseScores.mfp_score,
+        coherence_score: Math.round(coherence_score),
       };
 
       // Map LLM tips to existing structure
@@ -281,6 +306,13 @@ export class ManifestationAIEvaluationService {
       astro_support_index,
     );
 
+    // Calculate Coherence Score (sentiment + confidence + clarity)
+    const baseCoherence = (resonance_score + alignment_score) / 2;
+    const clarityBonus = description.length > 50 ? 5 : 0;
+    const confidenceBonus = antrashaakti_score > 60 ? 5 : 0;
+    const blockagePenalty = mahaadha_score > 30 ? -10 : 0;
+    const coherence_score = Math.max(0, Math.min(100, baseCoherence + clarityBonus + confidenceBonus + blockagePenalty));
+
     return {
       scores: {
         resonance_score,
@@ -289,6 +321,7 @@ export class ManifestationAIEvaluationService {
         mahaadha_score,
         astro_support_index,
         mfp_score,
+        coherence_score: Math.round(coherence_score),
       },
       tips,
       insights,

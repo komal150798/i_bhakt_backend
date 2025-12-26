@@ -10,15 +10,15 @@ export class AuthJwtService {
     private configService: ConfigService,
   ) {}
 
-  generateAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+  generateAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>, expiresIn?: string): string {
     return this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRY', '15m'),
+      expiresIn: expiresIn || this.configService.get<string>('JWT_ACCESS_EXPIRY', '15m'),
     });
   }
 
-  generateRefreshToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+  generateRefreshToken(payload: Omit<JwtPayload, 'iat' | 'exp'>, expiresIn?: string): string {
     return this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRY', '7d'),
+      expiresIn: expiresIn || this.configService.get<string>('JWT_REFRESH_EXPIRY', '7d'),
     });
   }
 

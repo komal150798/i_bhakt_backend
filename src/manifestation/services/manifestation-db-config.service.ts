@@ -229,9 +229,13 @@ export class ManifestationDbConfigService {
    */
   private async updateCache(config: any): Promise<void> {
     try {
-      const existing = await this.cacheRepo.findOne({
+      // Use find with take(1) and orderBy instead of findOne without where clause
+      const existingRecords = await this.cacheRepo.find({
+        take: 1,
         order: { updated_at: 'DESC' },
       });
+
+      const existing = existingRecords.length > 0 ? existingRecords[0] : null;
 
       if (existing) {
         existing.config_json = config;

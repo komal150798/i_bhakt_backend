@@ -24,6 +24,7 @@ import { AppManifestationEnhancedController } from './controllers/app-manifestat
 import { CacheModule } from '../cache/cache.module';
 import { AstrologyModule } from '../astrology/astrology.module';
 import { User } from '../users/entities/user.entity';
+import { SwissEphemerisService } from '../astrology/services/swiss-ephemeris.service';
 import { Customer } from '../users/entities/customer.entity';
 import { HttpModule } from '@nestjs/axios';
 import { ManifestationLLMAnalyzerService } from './services/manifestation-llm-analyzer.service';
@@ -31,6 +32,15 @@ import { ManifestationBackendConfigService } from './services/manifestation-back
 import { ManifestationDbConfigService } from './services/manifestation-db-config.service';
 import { ConstantsModule } from '../common/constants/constants.module';
 import { AIPromptModule } from '../common/ai/ai-prompt.module';
+import { DashaRecord } from '../database/entities/dasha-record.entity';
+import { AntardashaRecord } from '../database/entities/antardasha-record.entity';
+import { PratyantarDashaRecord } from '../database/entities/pratyantar-dasha-record.entity';
+import { SukshmaDashaRecord } from '../database/entities/sukshma-dasha-record.entity';
+import { KundliModule } from '../kundli/kundli.module';
+import { Kundli } from '../kundli/entities/kundli.entity';
+import { KundliPlanet } from '../kundli/entities/kundli-planet.entity';
+import { KundliHouse } from '../kundli/entities/kundli-house.entity';
+import { SeedManifestationMasterDataService } from './seeds/seed-manifestation-master-data.service';
 
 @Module({
   imports: [
@@ -39,6 +49,13 @@ import { AIPromptModule } from '../common/ai/ai-prompt.module';
       Manifestation,
       User,
       Customer,
+      DashaRecord, // For Dasha period analysis
+      AntardashaRecord,
+      PratyantarDashaRecord,
+      SukshmaDashaRecord,
+      Kundli, // For kundli data
+      KundliPlanet, // For planetary positions
+      KundliHouse, // For house positions
       // New database-driven AI system entities
       ManifestCategory,
       ManifestSubcategory,
@@ -56,6 +73,7 @@ import { AIPromptModule } from '../common/ai/ai-prompt.module';
     HttpModule, // For LLM API calls
     CacheModule,
     AstrologyModule, // For Swiss Ephemeris service
+    KundliModule, // For kundli calculation
     ConstantsModule, // Central Constants Service
     AIPromptModule, // AI Prompt Service
   ],
@@ -67,6 +85,7 @@ import { AIPromptModule } from '../common/ai/ai-prompt.module';
     ManifestationLLMAnalyzerService,
     ManifestationBackendConfigService,
     ManifestationDbConfigService, // New database-driven config service
+    SeedManifestationMasterDataService, // Seed service for master data
   ],
   exports: [ManifestationService, ManifestationEnhancedService, ManifestationDbConfigService],
 })

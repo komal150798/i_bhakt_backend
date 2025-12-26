@@ -25,10 +25,10 @@ export class AntardashaRecord {
   @Column({ type: 'varchar', length: 20, nullable: false })
   antardasha_lord: string;
 
-  @Column({ type: 'datetime', nullable: false })
+  @Column({ type: 'timestamp', nullable: false })
   start_date: Date;
 
-  @Column({ type: 'datetime', nullable: false })
+  @Column({ type: 'timestamp', nullable: false })
   end_date: Date;
 
   @Column({ type: 'float', nullable: false })

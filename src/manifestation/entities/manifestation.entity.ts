@@ -43,6 +43,33 @@ export class Manifestation extends BaseEntity {
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true, name: 'mfp_score' })
   mfp_score: number | null; // Manifestation Fulfillment Probability
 
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true, name: 'coherence_score' })
+  coherence_score: number | null; // Coherence Score: sentiment + confidence + clarity (0-100)
+
+  @Column({ type: 'jsonb', nullable: true, name: 'action_windows' })
+  action_windows: {
+    optimal_dates?: string[]; // ISO date strings for recommended action windows
+    next_optimal_date?: string; // Next best date for action
+    planetary_influences?: Array<{
+      date: string;
+      planet: string;
+      influence: 'positive' | 'neutral' | 'negative';
+      description: string;
+    }>;
+  } | null;
+
+  @Column({ type: 'jsonb', nullable: true, name: 'progress_tracking' })
+  progress_tracking: {
+    current_progress: number; // 0-100 percentage
+    journal_entries_count: number;
+    last_journal_date?: string;
+    milestones?: Array<{
+      date: string;
+      description: string;
+      progress: number;
+    }>;
+  } | null;
+
   @Column({ type: 'jsonb', nullable: true })
   tips: {
     rituals?: string[];
@@ -66,6 +93,9 @@ export class Manifestation extends BaseEntity {
 
   @Column({ type: 'boolean', default: false, name: 'is_archived' })
   is_archived: boolean;
+
+  @Column({ type: 'boolean', default: false, name: 'is_locked' })
+  is_locked: boolean; // Locked manifestations are used for dashboard calculations
 
   // Note: user_id can reference either users or cst_customer table
   // Foreign key constraint removed to support both tables

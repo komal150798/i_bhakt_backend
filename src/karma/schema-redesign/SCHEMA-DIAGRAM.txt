@@ -1,0 +1,144 @@
+================================================================================
+KARMA & MANIFESTATION SCHEMA - FINAL DESIGN
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ TABLE 1: karma_manifest_master_data                                         │
+│ Purpose: ALL reference/master data                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Columns:                                                                     │
+│   id (BIGSERIAL PK)                                                         │
+│   unique_id (UUID UNIQUE)                                                   │
+│   data_type (VARCHAR) → Discriminator:                                      │
+│     • GOOD_KARMA                                                            │
+│     • BAD_KARMA                                                             │
+│     • HABIT                                                                 │
+│     • KARMA_CATEGORY                                                        │
+│     • MANIFEST_CATEGORY                                                     │
+│     • MANIFEST_SUBCATEGORY                                                  │
+│     • TEMPLATE_RITUAL                                                       │
+│     • TEMPLATE_TO_MANIFEST                                                  │
+│     • TEMPLATE_NOT_TO_MANIFEST                                              │
+│     • TEMPLATE_ALIGNMENT                                                    │
+│     • TEMPLATE_INSIGHT                                                      │
+│     • TEMPLATE_SUMMARY                                                      │
+│     • ENERGY_RULE                                                           │
+│     • KARMA_WEIGHT_RULE                                                     │
+│     • KEYWORD                                                               │
+│   [audit fields: added_date, modify_date, is_enabled, is_deleted, etc.]    │
+│   title, text, slug, description (nullable)                                 │
+│   category_slug, subcategory_slug (nullable)                                │
+│   parent_category_id → FK to self (nullable)                                │
+│   pattern_key, weight, priority, duration_days (nullable)                   │
+│   template_text, pattern, energy_state, karma_type (nullable)               │
+│   metadata (JSONB)                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                            │
+                            │ parent_category_id
+                            │ (self-reference)
+                            ▼
+                    ┌───────────────┐
+                    │  Categories   │
+                    │  Hierarchy    │
+                    └───────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ TABLE 2: user_life_actions                                                  │
+│ Purpose: ALL user-generated content                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Columns:                                                                     │
+│   id (BIGSERIAL PK)                                                         │
+│   unique_id (UUID UNIQUE)                                                   │
+│   user_id (BIGINT)                                                          │
+│   user_uuid (UUID nullable)                                                 │
+│   action_type (VARCHAR) → Discriminator:                                    │
+│     • KARMA_ENTRY                                                           │
+│     • MANIFESTATION                                                         │
+│     • MANIFEST_LOG                                                          │
+│     • KARMA_PATTERN                                                         │
+│     • SCORE_SUMMARY                                                         │
+│   [audit fields]                                                            │
+│   title, text (nullable)                                                    │
+│   entry_date, target_date (nullable)                                        │
+│   category_slug, subcategory_slug (nullable)                                │
+│   karma_type, emotional_state (nullable)                                    │
+│   [scoring fields: score, karma_score, resonance_score, etc.]               │
+│   [pattern fields: pattern_key, frequency_count, etc.]                      │
+│   [period fields: period_type, period_start, period_end]                    │
+│   [status flags: is_archived, is_locked, self_assessment]                   │
+│   ai_analysis, action_windows, progress_tracking (JSONB)                    │
+│   tips, insights, sample_actions, top_patterns (JSONB)                      │
+│   metadata (JSONB)                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ TABLE 3: user_scores_cache                                                  │
+│ Purpose: Denormalized cache for fast score lookups                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Columns:                                                                     │
+│   id (BIGSERIAL PK)                                                         │
+│   user_id (BIGINT UNIQUE)                                                   │
+│   user_uuid (UUID nullable)                                                 │
+│   karma_score, karma_positive_score, karma_negative_score                   │
+│   avg_resonance_score, avg_alignment_score, avg_mfp_score (nullable)        │
+│   last_recalculated_at                                                      │
+│   cache_version                                                             │
+│   observations (nullable)                                                   │
+│   metadata (JSONB nullable)                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+DATA FLOW
+================================================================================
+
+MASTER DATA (karma_manifest_master_data)
+    │
+    │ References
+    │
+    ▼
+USER ACTIONS (user_life_actions)
+    │
+    │ Aggregates
+    │
+    ▼
+SCORE CACHE (user_scores_cache)
+
+
+================================================================================
+QUERY PATTERNS
+================================================================================
+
+1. Get master data by type:
+   SELECT * FROM karma_manifest_master_data 
+   WHERE data_type = 'GOOD_KARMA' AND is_enabled = TRUE;
+
+2. Get user actions by type:
+   SELECT * FROM user_life_actions 
+   WHERE user_id = 123 AND action_type = 'KARMA_ENTRY';
+
+3. Get cached scores:
+   SELECT * FROM user_scores_cache WHERE user_id = 123;
+
+4. Join master data with user actions:
+   SELECT ua.*, md.title as category_name
+   FROM user_life_actions ua
+   LEFT JOIN karma_manifest_master_data md 
+     ON ua.category_slug = md.slug 
+     AND md.data_type = 'KARMA_CATEGORY'
+   WHERE ua.user_id = 123;
+
+================================================================================
+
+
+
+

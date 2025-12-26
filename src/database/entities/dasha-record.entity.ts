@@ -7,7 +7,7 @@ import {
   OneToMany,
   JoinColumn,
 } from 'typeorm';
-import { User } from './user.entity';
+import { User } from '../../users/entities/user.entity';
 import { AntardashaRecord } from './antardasha-record.entity';
 
 @Entity('dasha_records')
@@ -25,10 +25,10 @@ export class DashaRecord {
   @Column({ type: 'varchar', length: 20, nullable: false })
   mahadasha_lord: string;
 
-  @Column({ type: 'datetime', nullable: false })
+  @Column({ type: 'timestamp', nullable: false })
   start_date: Date;
 
-  @Column({ type: 'datetime', nullable: false })
+  @Column({ type: 'timestamp', nullable: false })
   end_date: Date;
 
   @Column({ type: 'float', nullable: false })

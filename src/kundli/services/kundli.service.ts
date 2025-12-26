@@ -1,35 +1,33 @@
 import { Injectable, Logger, BadRequestException, Inject } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { GenerateKundliDto } from '../dto/generate-kundli.dto';
 import { KundliResponseDto } from '../dto/kundli-response.dto';
 import { IKundliRepository } from '../../core/interfaces/repositories/kundli-repository.interface';
 import { Kundli } from '../entities/kundli.entity';
+import { KundliPlanet } from '../entities/kundli-planet.entity';
+import { KundliHouse } from '../entities/kundli-house.entity';
 import { SwissEphemerisService } from '../../astrology/services/swiss-ephemeris.service';
 
 @Injectable()
 export class KundliService {
   private readonly logger = new Logger(KundliService.name);
-  private readonly prokeralaApiKey: string;
-  private readonly prokeralaBaseUrl = 'https://api.prokerala.com/v2/astrology';
-  private readonly useSwissEphemeris: boolean;
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
     @Inject('IKundliRepository')
     private readonly kundliRepository: IKundliRepository,
+    @InjectRepository(KundliPlanet)
+    private readonly kundliPlanetRepository: Repository<KundliPlanet>,
+    @InjectRepository(KundliHouse)
+    private readonly kundliHouseRepository: Repository<KundliHouse>,
     private readonly swissEphemerisService: SwissEphemerisService,
-  ) {
-    // Get API key from environment or use free tier (limited)
-    this.prokeralaApiKey = this.configService.get<string>('PROKERALA_API_KEY') || '';
-    // Use Swiss Ephemeris by default, fallback to Prokerala API if available
-    this.useSwissEphemeris = this.configService.get<string>('USE_SWISS_EPHEMERIS') !== 'false';
-  }
+  ) {}
 
   /**
-   * Generate kundli using Swiss Ephemeris (primary) or Prokerala API (fallback)
+   * Generate kundli using Swiss Ephemeris
    */
   async generateKundli(dto: GenerateKundliDto, userId?: number): Promise<KundliResponseDto> {
     try {
@@ -45,52 +43,24 @@ export class KundliService {
         timezone = coords.timezone || 'Asia/Kolkata';
       }
 
-      let kundliData: any;
-      let transformedData: KundliResponseDto;
+      // Use Swiss Ephemeris for accurate calculations
+      this.logger.log('Using Swiss Ephemeris for kundli calculation');
+      const swissData = await this.swissEphemerisService.calculateKundli({
+        datetime: birthDateTime,
+        latitude,
+        longitude,
+        timezone: timezone || 'Asia/Kolkata',
+        ayanamsa: dto.ayanamsa || 1, // 1 = Lahiri (default)
+      });
 
-      // Use Swiss Ephemeris for accurate calculations (primary method)
-      if (this.useSwissEphemeris) {
-        try {
-          this.logger.log('Using Swiss Ephemeris for kundli calculation');
-          const swissData = await this.swissEphemerisService.calculateKundli({
-            datetime: birthDateTime,
-            latitude,
-            longitude,
-            timezone: timezone || 'Asia/Kolkata',
-            ayanamsa: dto.ayanamsa || 1, // 1 = Lahiri (default)
-          });
+      // Assign planets to houses
+      const planetsWithHouses = this.swissEphemerisService.assignPlanetsToHouses(
+        swissData.planets,
+        swissData.houses,
+      );
 
-          // Assign planets to houses
-          const planetsWithHouses = this.swissEphemerisService.assignPlanetsToHouses(
-            swissData.planets,
-            swissData.houses,
-          );
-
-          // Transform Swiss Ephemeris data to our standard format
-          transformedData = this.transformSwissEphemerisResponse(swissData, dto, planetsWithHouses);
-        } catch (swissError) {
-          this.logger.warn('Swiss Ephemeris calculation failed, falling back to Prokerala API', swissError);
-          // Fallback to Prokerala API
-          kundliData = await this.callProkeralaAPI({
-            datetime: birthDateTime.toISOString(),
-            latitude,
-            longitude,
-            timezone: timezone || 'Asia/Kolkata',
-            ayanamsa: dto.ayanamsa || 1,
-          });
-          transformedData = this.transformProkeralaResponse(kundliData, dto);
-        }
-      } else {
-        // Use Prokerala API directly
-        kundliData = await this.callProkeralaAPI({
-          datetime: birthDateTime.toISOString(),
-          latitude,
-          longitude,
-          timezone: timezone || 'Asia/Kolkata',
-          ayanamsa: dto.ayanamsa || 1,
-        });
-        transformedData = this.transformProkeralaResponse(kundliData, dto);
-      }
+      // Transform Swiss Ephemeris data to our standard format
+      const transformedData = this.transformSwissEphemerisResponse(swissData, dto, planetsWithHouses);
 
       // Save to database if user is authenticated
       if (userId) {
@@ -106,78 +76,6 @@ export class KundliService {
     }
   }
 
-  /**
-   * Call Prokerala API
-   */
-  private async callProkeralaAPI(params: {
-    datetime: string;
-    latitude: number;
-    longitude: number;
-    timezone: string;
-    ayanamsa: number;
-  }): Promise<any> {
-    const url = `${this.prokeralaBaseUrl}/birth-chart`;
-
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post<any>(
-          url,
-          {
-            datetime: params.datetime,
-            coordinates: {
-              latitude: params.latitude,
-              longitude: params.longitude,
-            },
-            timezone: params.timezone,
-            ayanamsa: params.ayanamsa,
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              ...(this.prokeralaApiKey && { Authorization: `Bearer ${this.prokeralaApiKey}` }),
-            },
-          },
-        ),
-      );
-
-      return response.data;
-    } catch (error) {
-      // If Prokerala API fails, use fallback calculation
-      this.logger.warn('Prokerala API failed, using fallback calculation');
-      return this.calculateKundliFallback(params);
-    }
-  }
-
-  /**
-   * Fallback kundli calculation (simplified)
-   */
-  private calculateKundliFallback(params: {
-    datetime: string;
-    latitude: number;
-    longitude: number;
-    timezone: string;
-    ayanamsa: number;
-  }): any {
-    // This is a simplified fallback - in production, use Swiss Ephemeris library
-    const birthDate = new Date(params.datetime);
-    
-    // Basic calculations (simplified - use proper library in production)
-    const julianDay = this.toJulianDay(birthDate);
-    const lagna = this.calculateLagna(birthDate, params.latitude, params.longitude);
-    
-    return {
-      data: {
-        lagna: {
-          longitude: lagna,
-          sign: this.getSignFromLongitude(lagna),
-        },
-        planets: this.calculatePlanets(birthDate),
-        houses: this.calculateHouses(lagna),
-        nakshatra: this.calculateNakshatra(lagna),
-        ayanamsa: params.ayanamsa === 1 ? 23.85 : 23.85, // Approximate Lahiri
-      },
-    };
-  }
 
   /**
    * Transform Swiss Ephemeris data to standard format
@@ -232,70 +130,6 @@ export class KundliService {
     };
   }
 
-  /**
-   * Transform Prokerala response to standard format
-   */
-  private transformProkeralaResponse(apiResponse: any, dto: GenerateKundliDto): KundliResponseDto {
-    const data = apiResponse.data || apiResponse;
-
-    // Extract planets
-    const planets = (data.planets || []).map((planet: any) => ({
-      name: planet.name || planet.id,
-      longitude: planet.longitude || 0,
-      latitude: planet.latitude || 0,
-      sign: planet.sign?.name || this.getSignFromLongitude(planet.longitude || 0),
-      sign_lord: planet.sign?.lord || '',
-      nakshatra: planet.nakshatra?.name || '',
-      nakshatra_lord: planet.nakshatra?.lord || '',
-      nakshatra_pada: planet.nakshatra?.pada || 0,
-      house: planet.house || 0,
-      is_retrograde: planet.isRetrograde || false,
-    }));
-
-    // Extract houses
-    const houses = (data.houses || []).map((house: any, index: number) => ({
-      house_number: index + 1,
-      sign: house.sign?.name || '',
-      sign_lord: house.sign?.lord || '',
-      start_degree: house.start || 0,
-      end_degree: house.end || 0,
-    }));
-
-    // Extract lagna
-    const lagna = data.lagna || data.ascendant || {};
-    const lagnaLongitude = lagna.longitude || 0;
-
-    // Extract nakshatra
-    const moon = planets.find((p: any) => p.name.toLowerCase() === 'moon') || planets[0];
-    const nakshatra = {
-      name: moon.nakshatra || '',
-      pada: moon.nakshatra_pada || 0,
-      lord: moon.nakshatra_lord || '',
-    };
-
-    return {
-      name: dto.name,
-      birth_date: dto.birth_date,
-      birth_time: dto.birth_time,
-      birth_place: dto.birth_place,
-      latitude: dto.latitude || 0,
-      longitude: dto.longitude || 0,
-      timezone: dto.timezone || 'Asia/Kolkata',
-      lagna: {
-        sign: this.getSignFromLongitude(lagnaLongitude),
-        degrees: lagnaLongitude % 30,
-        lord: this.getSignLord(this.getSignFromLongitude(lagnaLongitude)),
-      },
-      nakshatra,
-      planets,
-      houses,
-      ayanamsa: data.ayanamsa || 23.85,
-      tithi: data.tithi?.name || '',
-      yoga: data.yoga?.name || '',
-      karana: data.karana?.name || '',
-      full_data: data,
-    };
-  }
 
   /**
    * Get coordinates from place name (using free geocoding)
@@ -341,7 +175,7 @@ export class KundliService {
   }
 
   /**
-   * Save kundli to database
+   * Save kundli to database with all related data (planets, houses, dasha, navamsa)
    */
   private async saveKundliToDatabase(
     userId: number,
@@ -352,7 +186,22 @@ export class KundliService {
     timezone: string,
   ): Promise<void> {
     try {
-      const kundli = await this.kundliRepository.create({
+      // Calculate dasha timeline
+      const birthDateTime = new Date(`${dto.birth_date}T${dto.birth_time}`);
+      const dashaTimeline = this.calculateVimshottariDasha(
+        birthDateTime,
+        kundliData.nakshatra.name,
+        kundliData.nakshatra.lord,
+      );
+
+      // Create navamsa data placeholder (can be enhanced later)
+      const navamsaData = {
+        d9_chart: {},
+        marriage_strength: '',
+      };
+
+      // Create kundli record
+      const savedKundli = await this.kundliRepository.create({
         user_id: userId,
         birth_date: new Date(dto.birth_date),
         birth_time: dto.birth_time,
@@ -369,14 +218,84 @@ export class KundliService {
         karana: kundliData.karana,
         ayanamsa: kundliData.ayanamsa,
         full_data: kundliData.full_data,
+        dasha_timeline: dashaTimeline,
+        navamsa_data: navamsaData,
       });
 
-      // Save planets and houses (simplified - implement full logic if needed)
-      this.logger.log(`Kundli saved for user ${userId}`);
+      // Save planets to kundli_planets table
+      if (kundliData.planets && kundliData.planets.length > 0) {
+        const planetsToSave = kundliData.planets.map((planet) => {
+          const planetEntity = this.kundliPlanetRepository.create({
+            kundli_id: savedKundli.id,
+            planet_name: planet.name,
+            longitude_degrees: planet.longitude,
+            sign_number: this.getSignNumber(planet.sign),
+            sign_name: planet.sign,
+            house_number: planet.house || 0,
+            nakshatra: planet.nakshatra || null,
+            pada: planet.nakshatra_pada || null,
+            is_retrograde: planet.is_retrograde || false,
+            speed: null, // Can be calculated if needed
+            metadata: {
+              latitude: planet.latitude,
+              sign_lord: planet.sign_lord,
+              nakshatra_lord: planet.nakshatra_lord,
+            },
+          });
+          return planetEntity;
+        });
+
+        await this.kundliPlanetRepository.save(planetsToSave);
+        this.logger.log(`Saved ${planetsToSave.length} planets for kundli ${savedKundli.id}`);
+      }
+
+      // Save houses to kundli_houses table
+      if (kundliData.houses && kundliData.houses.length > 0) {
+        const housesToSave = kundliData.houses.map((house) => {
+          const houseEntity = this.kundliHouseRepository.create({
+            kundli_id: savedKundli.id,
+            house_number: house.house_number,
+            cusp_degrees: house.start_degree || 0,
+            sign_name: house.sign,
+            sign_number: this.getSignNumber(house.sign),
+            metadata: {
+              sign_lord: house.sign_lord,
+              end_degree: house.end_degree,
+            },
+          });
+          return houseEntity;
+        });
+
+        await this.kundliHouseRepository.save(housesToSave);
+        this.logger.log(`Saved ${housesToSave.length} houses for kundli ${savedKundli.id}`);
+      }
+
+      this.logger.log(`Kundli saved for user ${userId} with all related data`);
     } catch (error) {
       this.logger.error('Failed to save kundli to database:', error);
       // Don't throw - kundli generation succeeded even if save failed
     }
+  }
+
+  /**
+   * Get sign number from sign name (1-12)
+   */
+  private getSignNumber(signName: string): number {
+    const signs: Record<string, number> = {
+      Aries: 1,
+      Taurus: 2,
+      Gemini: 3,
+      Cancer: 4,
+      Leo: 5,
+      Virgo: 6,
+      Libra: 7,
+      Scorpio: 8,
+      Sagittarius: 9,
+      Capricorn: 10,
+      Aquarius: 11,
+      Pisces: 12,
+    };
+    return signs[signName] || 0;
   }
 
   // Helper methods for fallback calculation
@@ -468,6 +387,370 @@ export class KundliService {
     return {
       name: nakshatras[nakshatraIndex % 27],
       pada: Math.floor((longitude % 13.333) / 3.333) + 1,
+    };
+  }
+
+  /**
+   * Generate complete kundli update JSON for database update
+   * This method calculates complete Janam Kundli and formats it exactly as required
+   * for updating the kundli table row using user_id
+   */
+  async generateKundliUpdateJSON(params: {
+    user_id: number;
+    birth_date: string; // YYYY-MM-DD
+    birth_time: string; // HH:mm:ss
+    birth_place: string;
+    latitude: number;
+    longitude: number;
+    timezone: string;
+  }): Promise<{
+    kundli_db_update: {
+      where: { user_id: number };
+      update: any;
+    };
+  }> {
+    try {
+      const { user_id, birth_date, birth_time, birth_place, latitude, longitude, timezone } = params;
+
+      // Parse birth date and time
+      const birthDateTime = new Date(`${birth_date}T${birth_time}`);
+
+      // Calculate kundli using Swiss Ephemeris (Lahiri Ayanamsa)
+      const swissData = await this.swissEphemerisService.calculateKundli({
+        datetime: birthDateTime,
+        latitude,
+        longitude,
+        timezone: timezone || 'Asia/Kolkata',
+        ayanamsa: 1, // Lahiri (default)
+      });
+
+      // Assign planets to houses
+      const planetsWithHouses = this.swissEphemerisService.assignPlanetsToHouses(
+        swissData.planets,
+        swissData.houses,
+      );
+
+      // Get Moon for nakshatra
+      const moon = planetsWithHouses.find((p) => p.name === 'Moon');
+      const nakshatraName = swissData.nakshatra.name || '';
+      const nakshatraPada = swissData.nakshatra.pada || 1;
+
+      // Calculate Vimshottari Dasha
+      const dashaData = this.calculateVimshottariDasha(
+        birthDateTime,
+        nakshatraName,
+        swissData.nakshatra.lord,
+      );
+
+      // Calculate Bhav Analysis
+      const bhavAnalysis = this.calculateBhavAnalysis(planetsWithHouses, swissData.houses);
+
+      // Calculate Yog Details
+      const yogDetails = this.calculateYogDetails(planetsWithHouses, swissData.houses);
+
+      // Calculate Dosha Details
+      const doshaDetails = this.calculateDoshaDetails(planetsWithHouses, swissData.houses);
+
+      // Calculate Gochar Analysis
+      const gocharAnalysis = this.calculateGocharAnalysis(planetsWithHouses);
+
+      // Format planetary positions
+      const grahaSthiti: Record<string, any> = {};
+      const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
+      const planetMap: Record<string, string> = {
+        Sun: 'surya',
+        Moon: 'chandra',
+        Mars: 'mangal',
+        Mercury: 'budh',
+        Jupiter: 'guru',
+        Venus: 'shukra',
+        Saturn: 'shani',
+        Rahu: 'rahu',
+        Ketu: 'ketu',
+      };
+
+      planetsWithHouses.forEach((planet) => {
+        const key = planetMap[planet.name] || planet.name.toLowerCase();
+        grahaSthiti[key] = {
+          name: planet.name,
+          longitude: planet.longitude,
+          sign: planet.sign,
+          sign_lord: planet.signLord,
+          nakshatra: planet.nakshatra,
+          nakshatra_lord: planet.nakshatraLord,
+          nakshatra_pada: planet.nakshatraPada,
+          house: planet.house,
+          is_retrograde: planet.isRetrograde,
+        };
+      });
+
+      // Get Lagna sign
+      const lagnaSign = swissData.lagna.sign;
+      const lagnaDegrees = swissData.lagna.degrees;
+
+      // Get Janma Rashi (Moon sign) and Surya Rashi (Sun sign)
+      const moonPlanet = planetsWithHouses.find((p) => p.name === 'Moon');
+      const sunPlanet = planetsWithHouses.find((p) => p.name === 'Sun');
+      const janmaRashi = moonPlanet?.sign || '';
+      const suryaRashi = sunPlanet?.sign || '';
+      const moonLongitudeDeg = moonPlanet?.longitude || 0;
+
+      // Build the update JSON
+      const updateData = {
+        birth_date: birth_date,
+        birth_time: birth_time,
+        birth_place: birth_place,
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+        timezone: timezone || 'Asia/Kolkata',
+
+        lagna_degrees: lagnaDegrees.toString(),
+        lagna_name: lagnaSign,
+
+        nakshatra: nakshatraName,
+        pada: nakshatraPada,
+
+        tithi: swissData.tithi || '',
+        yoga: swissData.yoga || '',
+        karana: swissData.karana || '',
+
+        ayanamsa: swissData.ayanamsa.toString(),
+
+        full_data: {
+          basic_details: {
+            janma_rashi: janmaRashi,
+            surya_rashi: suryaRashi,
+            moon_longitude_deg: moonLongitudeDeg.toString(),
+          },
+          graha_sthiti: grahaSthiti,
+          bhav_analysis: bhavAnalysis,
+          yog_details: yogDetails,
+          dosha_details: doshaDetails,
+          gochar_analysis: gocharAnalysis,
+          health_indicators: {},
+          career_indicators: {},
+          marriage_indicators: {},
+        },
+
+        dasha_timeline: dashaData,
+
+        navamsa_data: {
+          d9_chart: {},
+          marriage_strength: '',
+        },
+
+        modify_date: new Date().toISOString(),
+      };
+
+      return {
+        kundli_db_update: {
+          where: {
+            user_id: user_id,
+          },
+          update: updateData,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error generating kundli update JSON:', error);
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to generate kundli update JSON',
+      );
+    }
+  }
+
+  /**
+   * Calculate Vimshottari Dasha periods
+   */
+  private calculateVimshottariDasha(
+    birthDate: Date,
+    nakshatraName: string,
+    nakshatraLord: string,
+  ): any {
+    const dashaSequence = ['Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury'];
+    const dashaDurations: Record<string, number> = {
+      Ketu: 7,
+      Venus: 20,
+      Sun: 6,
+      Moon: 10,
+      Mars: 7,
+      Rahu: 18,
+      Jupiter: 16,
+      Saturn: 19,
+      Mercury: 17,
+    };
+
+    // Find starting dasha from nakshatra lord
+    const startIndex = dashaSequence.indexOf(nakshatraLord);
+    const actualStartIndex = startIndex !== -1 ? startIndex : dashaSequence.indexOf('Moon');
+
+    // Calculate Mahadasha periods
+    const mahadashas: Array<{ lord: string; start: Date; end: Date }> = [];
+    let currentDate = new Date(birthDate);
+
+    // Calculate next 120 years of dashas (full cycle)
+    for (let i = 0; i < 9; i++) {
+      const lordIndex = (actualStartIndex + i) % 9;
+      const lord = dashaSequence[lordIndex];
+      const duration = dashaDurations[lord];
+      const start = new Date(currentDate);
+      const end = new Date(currentDate);
+      end.setTime(end.getTime() + duration * 365.25 * 24 * 60 * 60 * 1000);
+
+      mahadashas.push({ lord, start, end });
+      currentDate = new Date(end);
+    }
+
+    // Find current mahadasha
+    const now = new Date();
+    const currentMaha = mahadashas.find((m) => now >= m.start && now < m.end) || mahadashas[0];
+
+    // Calculate current antardasha
+    const antaraSequence = dashaSequence;
+    const antaraStartIndex = dashaSequence.indexOf(currentMaha.lord);
+    const antaraStartDate = currentMaha.start;
+    const antaraDuration = (dashaDurations[antaraSequence[antaraStartIndex]] / 120) * dashaDurations[currentMaha.lord];
+    const currentAntara = antaraSequence[antaraStartIndex];
+
+    // Calculate current pratyantar
+    const pratyantarStartIndex = dashaSequence.indexOf(currentAntara);
+    const currentPratyantar = antaraSequence[pratyantarStartIndex];
+
+    return {
+      vimshottari: {
+        mahadasha: mahadashas.map((m) => ({
+          lord: m.lord,
+          start: m.start.toISOString(),
+          end: m.end.toISOString(),
+          duration_years: dashaDurations[m.lord],
+        })),
+        current_mahadasha: currentMaha.lord,
+        current_antardasha: currentAntara,
+        current_pratyantar: currentPratyantar,
+      },
+    };
+  }
+
+  /**
+   * Calculate Bhav (House) Analysis
+   */
+  private calculateBhavAnalysis(planets: any[], houses: any[]): Record<string, string> {
+    const bhavAnalysis: Record<string, string> = {};
+
+    for (let i = 1; i <= 12; i++) {
+      const housePlanets = planets.filter((p) => p.house === i);
+      const house = houses.find((h) => h.houseNumber === i);
+
+      if (housePlanets.length > 0) {
+        const planetNames = housePlanets.map((p) => p.name).join(', ');
+        bhavAnalysis[`bhav_${i}`] = `${house?.sign || ''} sign with ${planetNames}`;
+      } else {
+        bhavAnalysis[`bhav_${i}`] = `${house?.sign || ''} sign - empty`;
+      }
+    }
+
+    return bhavAnalysis;
+  }
+
+  /**
+   * Calculate Yog Details
+   */
+  private calculateYogDetails(planets: any[], houses: any[]): {
+    raj_yog: string[];
+    dhan_yog: string[];
+    vipreet_raj_yog: string[];
+    neecha_bhanga: string[];
+  } {
+    const yogs = {
+      raj_yog: [] as string[],
+      dhan_yog: [] as string[],
+      vipreet_raj_yog: [] as string[],
+      neecha_bhanga: [] as string[],
+    };
+
+    // Simplified yog calculations - can be enhanced with full logic
+    const sun = planets.find((p) => p.name === 'Sun');
+    const moon = planets.find((p) => p.name === 'Moon');
+    const jupiter = planets.find((p) => p.name === 'Jupiter');
+
+    // Raj Yog: Benefic planets in kendras (1, 4, 7, 10) or trikonas (1, 5, 9)
+    if (jupiter && ([1, 4, 7, 10, 5, 9].includes(jupiter.house))) {
+      yogs.raj_yog.push('Jupiter in Kendra/Trikona');
+    }
+
+    // Dhan Yog: 2nd, 5th, 9th, 11th houses with benefic planets
+    const dhanHouses = [2, 5, 9, 11];
+    const benefics = planets.filter((p) => ['Jupiter', 'Venus', 'Mercury'].includes(p.name));
+    benefics.forEach((planet) => {
+      if (dhanHouses.includes(planet.house)) {
+        yogs.dhan_yog.push(`${planet.name} in ${planet.house}th house`);
+      }
+    });
+
+    return yogs;
+  }
+
+  /**
+   * Calculate Dosha Details
+   */
+  private calculateDoshaDetails(planets: any[], houses: any[]): {
+    mangal_dosha: boolean;
+    kaal_sarp_dosha: boolean;
+    pitru_dosha: boolean;
+    guru_chandal_dosha: boolean;
+  } {
+    const mars = planets.find((p) => p.name === 'Mars');
+    const rahu = planets.find((p) => p.name === 'Rahu');
+    const ketu = planets.find((p) => p.name === 'Ketu');
+    const jupiter = planets.find((p) => p.name === 'Jupiter');
+
+    // Mangal Dosha: Mars in 1, 4, 7, 8, 12
+    const mangalDosha = mars && [1, 4, 7, 8, 12].includes(mars.house);
+
+    // Kaal Sarp Dosha: All planets between Rahu and Ketu
+    let kaalSarpDosha = false;
+    if (rahu && ketu) {
+      const rahuHouse = rahu.house;
+      const ketuHouse = ketu.house;
+      const planetsBetween = planets.filter((p) => {
+        if (p.name === 'Rahu' || p.name === 'Ketu') return false;
+        return p.house >= Math.min(rahuHouse, ketuHouse) && p.house <= Math.max(rahuHouse, ketuHouse);
+      });
+      kaalSarpDosha = planetsBetween.length === 7; // All 7 planets between Rahu and Ketu
+    }
+
+    // Pitru Dosha: Simplified - Sun and Rahu in same house or aspect
+    const pitruDosha = false; // Can be enhanced
+
+    // Guru Chandal Dosha: Jupiter and Rahu in same house
+    const guruChandalDosha = jupiter && rahu && jupiter.house === rahu.house;
+
+    return {
+      mangal_dosha: mangalDosha || false,
+      kaal_sarp_dosha: kaalSarpDosha,
+      pitru_dosha: pitruDosha,
+      guru_chandal_dosha: guruChandalDosha || false,
+    };
+  }
+
+  /**
+   * Calculate Gochar (Transit) Analysis
+   */
+  private calculateGocharAnalysis(planets: any[]): {
+    shani_gochar: string;
+    guru_gochar: string;
+    rahu_ketu_gochar: string;
+  } {
+    const saturn = planets.find((p) => p.name === 'Saturn');
+    const jupiter = planets.find((p) => p.name === 'Jupiter');
+    const rahu = planets.find((p) => p.name === 'Rahu');
+    const ketu = planets.find((p) => p.name === 'Ketu');
+
+    return {
+      shani_gochar: saturn ? `Saturn in ${saturn.sign} sign, ${saturn.house}th house` : '',
+      guru_gochar: jupiter ? `Jupiter in ${jupiter.sign} sign, ${jupiter.house}th house` : '',
+      rahu_ketu_gochar: rahu && ketu
+        ? `Rahu in ${rahu.sign}, Ketu in ${ketu.sign}`
+        : '',
     };
   }
 }
