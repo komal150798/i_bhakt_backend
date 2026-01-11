@@ -1,0 +1,30 @@
+import { BaseEntity } from '../../common/entities/base.entity';
+import { PlanType } from '../../common/enums/plan-type.enum';
+import { CustomerToken } from '../../auth/entities/customer-token.entity';
+export declare class Customer extends BaseEntity {
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone_number: string;
+    password: string | null;
+    google_id: string | null;
+    date_of_birth: Date | null;
+    time_of_birth: string | null;
+    place_name: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    timezone: string | null;
+    nakshatra: string | null;
+    pada: number | null;
+    moon_longitude_deg: number | null;
+    dasha_at_birth: string | null;
+    gender: string | null;
+    avatar_url: string | null;
+    current_plan: PlanType;
+    referral_code: string | null;
+    referred_by: number | null;
+    is_verified: boolean;
+    last_login: Date | null;
+    last_login_ip: string | null;
+    tokens: CustomerToken[];
+}

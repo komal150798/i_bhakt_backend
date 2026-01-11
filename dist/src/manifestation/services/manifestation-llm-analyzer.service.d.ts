@@ -1,0 +1,51 @@
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { ManifestationBackendConfig } from './manifestation-backend-config.service';
+import { PromptService } from '../../common/ai/prompt.service';
+export declare class ManifestationLLMAnalyzerService {
+    private readonly configService;
+    private readonly httpService;
+    private readonly promptService;
+    private readonly logger;
+    private readonly openaiApiKey;
+    private readonly openaiBaseUrl;
+    private readonly geminiBaseUrl;
+    private readonly claudeBaseUrl;
+    private readonly useLLM;
+    constructor(configService: ConfigService, httpService: HttpService, promptService: PromptService);
+    analyzeManifestation(title: string, description: string, backendConfig: ManifestationBackendConfig, categoryHint?: string): Promise<{
+        detected_category: string;
+        detected_subcategory: string | null;
+        category_label: string;
+        energy_state: 'aligned' | 'scattered' | 'blocked' | 'doubtful' | 'burned_out';
+        energy_reason: string;
+        suggested_rituals: string[];
+        what_to_manifest: string[];
+        what_not_to_manifest: string[];
+        thought_alignment_tips: string[];
+        insights: string;
+        summary_for_ui: string;
+        scores?: {
+            resonance_score: number;
+            alignment_score: number;
+            antrashaakti_score: number;
+            mahaadha_score: number;
+            astro_support_index: number;
+            mfp_score: number;
+        };
+    }>;
+    private buildUniversalPrompt;
+    private callLLM;
+    private parseLLMResponse;
+    private calculateScoresFromAnalysis;
+    private calculateAstroSupport;
+    private fallbackAnalysis;
+    private detectCategoryFallback;
+    private detectEnergyStateFallback;
+    private generateRitualsFallback;
+    private generateWhatToManifestFallback;
+    private generateWhatNotToManifestFallback;
+    private generateThoughtAlignmentFallback;
+    private generateInsightsFallback;
+    private generateSummaryFallback;
+}

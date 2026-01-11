@@ -1,0 +1,38 @@
+import { Repository } from 'typeorm';
+import { GetHoroscopeDto } from '../dto/get-horoscope.dto';
+import { HoroscopeResponseDto } from '../dto/horoscope-response.dto';
+import { Customer } from '../../users/entities/customer.entity';
+import { SwissEphemerisService } from '../../astrology/services/swiss-ephemeris.service';
+export declare class HoroscopeService {
+    private readonly customerRepository;
+    private readonly swissEphemerisService;
+    private readonly logger;
+    private readonly zodiacSigns;
+    constructor(customerRepository: Repository<Customer>, swissEphemerisService: SwissEphemerisService);
+    getHoroscope(dto: GetHoroscopeDto): Promise<HoroscopeResponseDto>;
+    getHoroscopeForUser(userId: number, type: 'daily' | 'weekly' | 'monthly'): Promise<HoroscopeResponseDto>;
+    private extractDateComponents;
+    private calculateZodiacSign;
+    private generateHoroscopeWithSwissEphemeris;
+    private calculatePlanetaryInfluences;
+    private getPlanetaryInfluence;
+    private generatePredictionsFromPlanets;
+    private buildGeneralPrediction;
+    private getSignGuidance;
+    private buildLovePrediction;
+    private buildCareerPrediction;
+    private buildHealthPrediction;
+    private buildFinancePrediction;
+    private calculateLuckyNumber;
+    private calculateMoodFromPlanets;
+    private generateFallbackHoroscope;
+    private transformHoroscopeResponse;
+    private getPredictionsByType;
+    private getLovePrediction;
+    private getCareerPrediction;
+    private getHealthPrediction;
+    private getFinancePrediction;
+    private getLuckyColor;
+    private getCompatibility;
+    private getMood;
+}
