@@ -28,6 +28,7 @@
     "db:check": "ts-node check-db-status.ts",
     "db:seed": "ts-node -r tsconfig-paths/register run-seeds.ts",
     "db:seed:simple": "ts-node -r tsconfig-paths/register run-seeds-simple.ts",
+    "verify:kundli": "ts-node -r tsconfig-paths/register verify-kundli-rahul.ts",
     "db:update-prompts": "ts-node -r tsconfig-paths/register run-sql-update.ts",
     "seed:manifestation": "ts-node -r tsconfig-paths/register seed-manifestation-data.ts",
     "karma:schema:create": "ts-node -r tsconfig-paths/register run-karma-schema.ts"
@@ -44,6 +45,7 @@
     "@nestjs/swagger": "^7.1.17",
     "@nestjs/typeorm": "^10.0.1",
     "@types/cache-manager": "^4.0.6",
+    "@types/pdfkit": "^0.17.4",
     "axios": "^1.13.2",
     "bcrypt": "^5.1.1",
     "cache-manager": "^5.7.6",
@@ -54,6 +56,7 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
+    "pdfkit": "^0.17.2",
     "pg": "^8.11.3",
     "reflect-metadata": "^0.1.14",
     "rxjs": "^7.8.1",

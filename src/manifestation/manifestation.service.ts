@@ -230,35 +230,80 @@ export class ManifestationService {
 
   /**
    * Calculate astrological resonance index (0-1)
+   * Uses Swiss Ephemeris for accurate planetary calculations
    */
   private async calculateAstroIndex(
     user: User | null,
     desireText: string,
   ): Promise<number> {
-    // TODO: Use Swiss Ephemeris to:
-    // 1. Get current planetary positions
-    // 2. Get user's birth chart (if available)
-    // 3. Calculate transits and aspects
-    // 4. Determine astrological support for manifestation
-
-    // For now, return a placeholder value
-    // In production, this should use the Swiss Ephemeris service
     if (!user) {
       return 0.5; // Default if no user data
     }
 
-    // Stub: Calculate based on current date and desire keywords
-    const currentDate = new Date();
-    const dayOfYear = Math.floor(
-      (currentDate.getTime() - new Date(currentDate.getFullYear(), 0, 0).getTime()) /
-        (1000 * 60 * 60 * 24),
-    );
+    try {
+      // Get user birth data
+      const birthDate = (user as any).date_of_birth || (user as any).birth_date;
+      const latitude = (user as any).latitude;
+      const longitude = (user as any).longitude;
 
-    // Simple calculation based on day of year (placeholder)
-    // Real implementation should use Swiss Ephemeris
-    const baseIndex = 0.4 + (Math.sin((dayOfYear / 365) * 2 * Math.PI) * 0.2);
+      if (!birthDate || !latitude || !longitude) {
+        return 0.5; // Default if incomplete birth data
+      }
 
-    return Math.max(0, Math.min(1, baseIndex));
+      // Calculate current planetary positions using Swiss Ephemeris
+      const now = new Date();
+      const currentKundli = await this.swissEphemerisService.calculateKundli({
+        datetime: now,
+        latitude: latitude,
+        longitude: longitude,
+        timezone: (user as any).timezone || 'Asia/Kolkata',
+      });
+
+      // Analyze beneficial planets for manifestation
+      const jupiter = currentKundli.planets.find(p => p.name === 'Jupiter');
+      const venus = currentKundli.planets.find(p => p.name === 'Venus');
+      const moon = currentKundli.planets.find(p => p.name === 'Moon');
+
+      let astroScore = 0.5; // Base score
+
+      // Jupiter influence (expansion, growth)
+      if (jupiter) {
+        const beneficialSigns = ['Sagittarius', 'Pisces', 'Cancer'];
+        if (beneficialSigns.includes(jupiter.sign)) {
+          astroScore += 0.15;
+        } else if (!jupiter.isRetrograde) {
+          astroScore += 0.08;
+        }
+      }
+
+      // Venus influence (desires, attraction)
+      if (venus) {
+        const beneficialSigns = ['Taurus', 'Libra', 'Pisces'];
+        if (beneficialSigns.includes(venus.sign)) {
+          astroScore += 0.12;
+        } else if (!venus.isRetrograde) {
+          astroScore += 0.06;
+        }
+      }
+
+      // Moon influence (emotions, manifestation power)
+      if (moon) {
+        // Waxing moon (first half) is better for manifestation
+        const moonPhase = (moon.longitude % 360) / 360;
+        if (moonPhase >= 0 && moonPhase <= 0.5) {
+          astroScore += 0.1; // Waxing moon bonus
+        }
+        // Full moon area gives extra boost
+        if (moonPhase >= 0.45 && moonPhase <= 0.55) {
+          astroScore += 0.05;
+        }
+      }
+
+      return Math.max(0, Math.min(1, astroScore));
+    } catch (error) {
+      // Fallback to default if Swiss Ephemeris fails
+      return 0.5;
+    }
   }
 
   /**

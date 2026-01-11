@@ -1,4 +1,84 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class MahadashaDto {
+  @ApiProperty()
+  lord: string;
+
+  @ApiProperty()
+  start: string;
+
+  @ApiProperty()
+  end: string;
+
+  @ApiProperty()
+  duration_years: number;
+
+  @ApiProperty()
+  duration_days: number;
+
+  @ApiProperty()
+  is_balance: boolean;
+
+  @ApiPropertyOptional()
+  is_shadow_planet?: boolean;
+}
+
+export class DetailedDashaPeriodDto {
+  @ApiProperty()
+  mahadasha: string;
+
+  @ApiProperty()
+  antardasha: string;
+
+  @ApiProperty()
+  pratyantar: string;
+
+  @ApiProperty()
+  start_date: string;
+
+  @ApiProperty()
+  end_date: string;
+
+  @ApiProperty()
+  duration_years: number;
+
+  @ApiProperty()
+  duration_days: number;
+
+  @ApiPropertyOptional()
+  is_shadow_planet?: boolean;
+}
+
+export class VimshottariDashaDto {
+  @ApiProperty({ description: 'Birth Dasha Lord (determined from Moon Nakshatra)' })
+  birth_dasha_lord: string;
+
+  @ApiProperty({ description: 'Balance years remaining in birth Mahadasha' })
+  balance_years: number;
+
+  @ApiProperty({ description: 'Balance days remaining in birth Mahadasha' })
+  balance_days: number;
+
+  @ApiPropertyOptional({ type: [MahadashaDto] })
+  mahadasha?: MahadashaDto[];
+
+  @ApiPropertyOptional()
+  current_mahadasha?: string;
+
+  @ApiPropertyOptional()
+  current_antardasha?: string;
+
+  @ApiPropertyOptional()
+  current_pratyantar?: string;
+
+  @ApiPropertyOptional({ type: [DetailedDashaPeriodDto], description: 'Full detailed timeline with Mahadasha, Antardasha, and Pratyantar' })
+  detailed_timeline?: DetailedDashaPeriodDto[];
+}
+
+export class DashaTimelineDto {
+  @ApiPropertyOptional({ type: VimshottariDashaDto })
+  vimshottari?: VimshottariDashaDto;
+}
 
 export class PlanetPositionDto {
   @ApiProperty()
@@ -102,6 +182,9 @@ export class KundliResponseDto {
 
   @ApiProperty()
   karana: string;
+
+  @ApiPropertyOptional({ type: DashaTimelineDto, description: 'Vimshottari Dasha timeline with current periods' })
+  dasha_timeline?: DashaTimelineDto;
 
   @ApiProperty()
   full_data: Record<string, any>;

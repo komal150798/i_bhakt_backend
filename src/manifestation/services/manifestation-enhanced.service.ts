@@ -610,6 +610,7 @@ export class ManifestationEnhancedService {
 
   /**
    * Calculate Vimshottari Dasha periods from nakshatra and birth date
+   * IMPORTANT: Includes proper balance calculation for the first Mahadasha
    */
   private async calculateAndStoreDashaPeriods(userId: number, user: User | Customer): Promise<void> {
     try {
@@ -627,6 +628,7 @@ export class ManifestationEnhancedService {
       const nakshatra = (user as any).nakshatra;
       const dashaAtBirth = (user as any).dasha_at_birth;
       const birthDate = (user as any).date_of_birth || (user as any).birth_date;
+      const moonLongitude = (user as any).moon_longitude;
 
       if (!nakshatra || !dashaAtBirth || !birthDate) {
         this.logger.warn(`User ${userId} missing nakshatra or birth data for Dasha calculation`);
@@ -647,14 +649,41 @@ export class ManifestationEnhancedService {
         Mercury: 17,
       };
 
+      // Nakshatra data with start and end degrees for balance calculation
+      const nakshatraData: Record<string, { start: number; end: number; lord: string }> = {
+        'Ashwini': { start: 0, end: 13.333, lord: 'Ketu' },
+        'Bharani': { start: 13.333, end: 26.667, lord: 'Venus' },
+        'Krittika': { start: 26.667, end: 40, lord: 'Sun' },
+        'Rohini': { start: 40, end: 53.333, lord: 'Moon' },
+        'Mrigashira': { start: 53.333, end: 66.667, lord: 'Mars' },
+        'Ardra': { start: 66.667, end: 80, lord: 'Rahu' },
+        'Punarvasu': { start: 80, end: 93.333, lord: 'Jupiter' },
+        'Pushya': { start: 93.333, end: 106.667, lord: 'Saturn' },
+        'Ashlesha': { start: 106.667, end: 120, lord: 'Mercury' },
+        'Magha': { start: 120, end: 133.333, lord: 'Ketu' },
+        'Purva Phalguni': { start: 133.333, end: 146.667, lord: 'Venus' },
+        'Uttara Phalguni': { start: 146.667, end: 160, lord: 'Sun' },
+        'Hasta': { start: 160, end: 173.333, lord: 'Moon' },
+        'Chitra': { start: 173.333, end: 186.667, lord: 'Mars' },
+        'Swati': { start: 186.667, end: 200, lord: 'Rahu' },
+        'Vishakha': { start: 200, end: 213.333, lord: 'Jupiter' },
+        'Anuradha': { start: 213.333, end: 226.667, lord: 'Saturn' },
+        'Jyeshtha': { start: 226.667, end: 240, lord: 'Mercury' },
+        'Mula': { start: 240, end: 253.333, lord: 'Ketu' },
+        'Purva Ashadha': { start: 253.333, end: 266.667, lord: 'Venus' },
+        'Uttara Ashadha': { start: 266.667, end: 280, lord: 'Sun' },
+        'Shravana': { start: 280, end: 293.333, lord: 'Moon' },
+        'Dhanishta': { start: 293.333, end: 306.667, lord: 'Mars' },
+        'Shatabhisha': { start: 306.667, end: 320, lord: 'Rahu' },
+        'Purva Bhadrapada': { start: 320, end: 333.333, lord: 'Jupiter' },
+        'Uttara Bhadrapada': { start: 333.333, end: 346.667, lord: 'Saturn' },
+        'Revati': { start: 346.667, end: 360, lord: 'Mercury' },
+      };
+
       // Find starting position in sequence
       const startIndex = dashaSequence.indexOf(dashaAtBirth);
       if (startIndex === -1) {
         this.logger.warn(`Invalid dasha_at_birth: ${dashaAtBirth}, using Moon as default`);
-        // Default to Moon if invalid
-        const moonIndex = dashaSequence.indexOf('Moon');
-        if (moonIndex === -1) return;
-        // Will use Moon index below
       }
 
       const birthDateTime = new Date(birthDate);
@@ -668,8 +697,24 @@ export class ManifestationEnhancedService {
         birthDateTime.setHours(12, 0, 0, 0); // Default to noon if no time
       }
 
+      // Calculate balance for the first Mahadasha
+      const nakshatraSpan = 13.333333; // Each nakshatra spans 13°20'
+      let balanceYears = dashaDurations[dashaAtBirth]; // Default to full duration
+
+      // Calculate proper balance if Moon longitude is available
+      if (moonLongitude !== undefined && moonLongitude >= 0) {
+        const nakshatraInfo = nakshatraData[nakshatra];
+        if (nakshatraInfo) {
+          const degreesRemaining = nakshatraInfo.end - moonLongitude;
+          const balanceRatio = Math.max(0, Math.min(1, degreesRemaining / nakshatraSpan));
+          balanceYears = balanceRatio * dashaDurations[dashaAtBirth];
+          this.logger.log(`Dasha balance calculation: Moon at ${moonLongitude}°, Nakshatra end ${nakshatraInfo.end}°, Balance ${balanceYears.toFixed(2)} years`);
+        }
+      } else {
+        this.logger.warn(`Moon longitude not available for user ${userId}, using full dasha duration for first period`);
+      }
+
       // Calculate Mahadasha periods (starting from birth)
-      // Use the actual startIndex (or Moon if invalid was provided)
       const actualStartIndex = startIndex !== -1 ? startIndex : dashaSequence.indexOf('Moon');
       let currentDate = new Date(birthDateTime);
       const mahadashas: Array<{ lord: string; start: Date; end: Date; duration: number }> = [];
@@ -678,7 +723,8 @@ export class ManifestationEnhancedService {
       for (let i = 0; i < 4; i++) {
         const lordIndex = (actualStartIndex + i) % 9;
         const lord = dashaSequence[lordIndex];
-        const duration = dashaDurations[lord];
+        // Use balance for first dasha, full duration for subsequent
+        const duration = (i === 0) ? balanceYears : dashaDurations[lord];
         const start = new Date(currentDate);
         const end = new Date(currentDate);
         // Add years properly accounting for leap years
@@ -707,7 +753,9 @@ export class ManifestationEnhancedService {
         for (let j = 0; j < 9; j++) {
           const antaraLordIndex = (antaraStartIndex + j) % 9;
           const antaraLord = antaraSequence[antaraLordIndex];
-          const antaraDuration = (dashaDurations[antaraLord] / 120) * maha.duration;
+          // Correct formula: (Antardasha lord years × Mahadasha lord years) / 120
+          const mahaLord = maha.lord;
+          const antaraDuration = (dashaDurations[antaraLord] * dashaDurations[mahaLord]) / 120;
           const antaraStart = new Date(antaraCurrentDate);
           const antaraEnd = new Date(antaraCurrentDate);
           // Add years properly accounting for leap years
@@ -733,7 +781,8 @@ export class ManifestationEnhancedService {
           for (let k = 0; k < 9; k++) {
             const pratyantarLordIndex = (pratyantarStartIndex + k) % 9;
             const pratyantarLord = antaraSequence[pratyantarLordIndex];
-            const pratyantarDuration = (dashaDurations[pratyantarLord] / 120) * antaraDuration;
+            // Correct formula: (Pratyantar lord years × Antardasha lord years) / 120
+            const pratyantarDuration = (dashaDurations[pratyantarLord] * dashaDurations[antaraLord]) / 120;
             const pratyantarStart = new Date(pratyantarCurrentDate);
             const pratyantarEnd = new Date(pratyantarCurrentDate);
             // Add years properly accounting for leap years
@@ -759,7 +808,8 @@ export class ManifestationEnhancedService {
             for (let l = 0; l < 9; l++) {
               const sukshmaLordIndex = (sukshmaStartIndex + l) % 9;
               const sukshmaLord = antaraSequence[sukshmaLordIndex];
-              const sukshmaDuration = (dashaDurations[sukshmaLord] / 120) * pratyantarDuration;
+              // Correct formula: (Sukshma lord years × Pratyantar lord years) / 120
+              const sukshmaDuration = (dashaDurations[sukshmaLord] * dashaDurations[pratyantarLord]) / 120;
               const sukshmaStart = new Date(sukshmaCurrentDate);
               const sukshmaEnd = new Date(sukshmaCurrentDate);
               // Add years properly accounting for leap years

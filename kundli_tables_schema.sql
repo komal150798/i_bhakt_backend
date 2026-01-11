@@ -170,3 +170,6 @@ COMMENT ON COLUMN kundli_houses.metadata IS 'Additional house metadata in JSON f
 -- =====================================================
 
 
+
+
+

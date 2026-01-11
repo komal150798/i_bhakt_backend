@@ -72,11 +72,12 @@ export class HoroscopeService {
       }
 
       // Calculate zodiac sign from birth date (using Swiss Ephemeris if available)
+      // Note: PostgreSQL decimal columns return strings, so we need to convert them
       const zodiacSign = await this.calculateZodiacSign(
         customer.date_of_birth,
         customer.time_of_birth || undefined,
-        customer.latitude || undefined,
-        customer.longitude || undefined,
+        customer.latitude ? Number(customer.latitude) : undefined,
+        customer.longitude ? Number(customer.longitude) : undefined,
       );
 
       // Get horoscope for calculated sign
@@ -139,9 +140,8 @@ export class HoroscopeService {
 
   /**
    * Calculate zodiac sign from birth date
-   * Uses tropical zodiac (calendar-based) for horoscope compatibility
-   * Note: Swiss Ephemeris uses sidereal zodiac (with ayanamsa), which differs from tropical
-   * For horoscope purposes, we use tropical zodiac based on calendar dates
+   * Uses Sidereal zodiac (Moon sign/Rashi) for Vedic astrology horoscope
+   * This is more accurate for Indian astrology as it uses the actual Moon position
    */
   private async calculateZodiacSign(
     birthDate: Date | string,
@@ -151,27 +151,49 @@ export class HoroscopeService {
   ): Promise<string> {
     // Extract date components (handles timezone issues)
     const { month, day, year } = this.extractDateComponents(birthDate);
-    
-    this.logger.debug(`Calculating zodiac sign (tropical) for birth date: ${year}-${month}-${day}`);
 
-    // Always use date-based calculation for horoscope zodiac sign (tropical zodiac)
-    // Swiss Ephemeris uses sidereal zodiac which can differ by ~23 degrees
-    // Horoscope signs are based on tropical zodiac (calendar dates), not sidereal positions
-    this.logger.debug(`Using date-based tropical zodiac calculation for Month=${month}, Day=${day}`);
+    this.logger.debug(`Calculating zodiac sign (sidereal Moon sign) for birth date: ${year}-${month}-${day}`);
 
-    // Zodiac sign calculation based on month and day
+    // Try to use Swiss Ephemeris for accurate Moon sign calculation (Sidereal/Vedic)
+    if (birthTime && latitude && longitude) {
+      try {
+        // Parse birth date and time
+        const dateStr = typeof birthDate === 'string' ? birthDate.split('T')[0] : birthDate.toISOString().split('T')[0];
+        const datetime = new Date(`${dateStr}T${birthTime}`);
+
+        if (!isNaN(datetime.getTime())) {
+          const kundliData = await this.swissEphemerisService.calculateKundli({
+            datetime,
+            latitude,
+            longitude,
+            timezone: 'Asia/Kolkata', // Default timezone for India
+          });
+
+          // Get Moon sign from Swiss Ephemeris (this is Sidereal/Vedic)
+          const moon = kundliData.planets.find((p) => p.name === 'Moon');
+          if (moon && moon.sign) {
+            this.logger.debug(`Moon sign (Sidereal) from Swiss Ephemeris: ${moon.sign}`);
+            return moon.sign;
+          }
+        }
+      } catch (error) {
+        this.logger.warn('Swiss Ephemeris calculation failed, falling back to tropical zodiac:', error.message);
+      }
+    }
+
+    // Fallback to tropical zodiac based on Sun sign (calendar dates)
+    // This is used when birth time/location is not available
+    this.logger.debug(`Falling back to tropical zodiac for Month=${month}, Day=${day}`);
+
+    // Zodiac sign calculation based on month and day (Tropical/Western)
     // Note: Month is 1-12 (January=1, December=12)
     if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) {
-      this.logger.debug(`Zodiac sign calculated: Aries`);
       return 'Aries';
     } else if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) {
-      this.logger.debug(`Zodiac sign calculated: Taurus`);
       return 'Taurus';
     } else if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) {
-      this.logger.debug(`Zodiac sign calculated: Gemini`);
       return 'Gemini';
     } else if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) {
-      this.logger.debug(`Zodiac sign calculated: Cancer`);
       return 'Cancer';
     } else if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) {
       return 'Leo';
@@ -196,16 +218,19 @@ export class HoroscopeService {
    * Generate horoscope using Swiss Ephemeris
    * Calculates current planetary positions and generates predictions
    */
-  private async generateHoroscopeWithSwissEphemeris(sign: string, type: string): Promise<any> {
+  private async generateHoroscopeWithSwissEphemeris(sign: string, type: string, userLatitude?: number, userLongitude?: number): Promise<any> {
     try {
       const now = new Date();
-      
+
+      // Use user's location if available, otherwise default to a central India location
+      const latitude = userLatitude || 20.5937; // Central India (Nagpur area)
+      const longitude = userLongitude || 78.9629;
+
       // Calculate current planetary positions using Swiss Ephemeris
-      // For horoscope, we use current date/time and approximate location (can be improved)
       const kundliData = await this.swissEphemerisService.calculateKundli({
         datetime: now,
-        latitude: 28.6139, // Default to Delhi, India (can be made configurable)
-        longitude: 77.2090,
+        latitude,
+        longitude,
         timezone: 'Asia/Kolkata',
       });
 

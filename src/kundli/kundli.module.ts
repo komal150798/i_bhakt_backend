@@ -11,6 +11,7 @@ import { CacheModule } from '../cache/cache.module';
 import { RepositoriesModule } from '../infrastructure/repositories/repositories.module';
 import { AstrologyModule } from '../astrology/astrology.module';
 import { KundliService } from './services/kundli.service';
+import { KundliPdfService } from './services/kundli-pdf.service';
 import { KundliController } from './controllers/kundli.controller';
 
 @Module({
@@ -29,8 +30,8 @@ import { KundliController } from './controllers/kundli.controller';
     AstrologyModule,
   ],
   controllers: [KundliController],
-  providers: [KundliService],
-  exports: [KundliService],
+  providers: [KundliService, KundliPdfService],
+  exports: [KundliService, KundliPdfService],
 })
 export class KundliModule {}
 

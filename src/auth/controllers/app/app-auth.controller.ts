@@ -5,6 +5,8 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from '../../auth.service';
@@ -12,6 +14,8 @@ import { SendOtpDto } from '../../dto/send-otp.dto';
 import { VerifyOtpDto } from '../../dto/verify-otp.dto';
 import { RefreshTokenDto } from '../../dto/refresh-token.dto';
 import { LoginGoogleDto } from '../../dto/login-google.dto';
+import { SendForgotPasswordOtpDto, ResetPasswordDto } from '../../dto/forgot-password.dto';
+import { LoginPasswordDto } from '../../dto/login-password.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { Public } from '../../../common/decorators/public.decorator';
 import { IsEmail, IsString } from 'class-validator';
@@ -37,6 +41,28 @@ class VerifyEmailOtpDto {
 export class AppAuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Post('login')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with username/email and password (Mobile App)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful, returns access_token, refresh_token, and user',
+  })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async login(@Body() dto: LoginPasswordDto) {
+    const result = await this.authService.loginWithPassword(dto.username, dto.password);
+    
+    return {
+      success: true,
+      data: {
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+        user: result.user,
+      },
+    };
+  }
+
   @Post('otp/send')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -49,6 +75,24 @@ export class AppAuthController {
     return {
       success: true,
       message: result.message,
+      ...(result.debug_code && { debug_code: result.debug_code }),
+    };
+  }
+
+  @Post('otp/resend')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend OTP to phone number (Mobile App)' })
+  @ApiResponse({ status: 200, description: 'OTP resent successfully' })
+  @ApiResponse({ status: 429, description: 'Too many requests. Please wait before requesting again.' })
+  async resendOtp(@Body() dto: SendOtpDto) {
+    // Reuse the same sendOtp service method (it generates a new OTP each time)
+    const result = await this.authService.sendOtp(dto.phone_number);
+    
+    // App-specific response format
+    return {
+      success: true,
+      message: 'OTP resent successfully',
       ...(result.debug_code && { debug_code: result.debug_code }),
     };
   }
@@ -88,6 +132,23 @@ export class AppAuthController {
     return {
       success: true,
       message: result.message,
+      ...(result.debug_code && { debug_code: result.debug_code }),
+    };
+  }
+
+  @Post('otp/email/resend')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend OTP to email address (Mobile App)' })
+  @ApiResponse({ status: 200, description: 'OTP resent successfully' })
+  @ApiResponse({ status: 429, description: 'Too many requests. Please wait before requesting again.' })
+  async resendEmailOtp(@Body() dto: SendEmailOtpDto) {
+    // Reuse the same sendEmailOtp service method (it generates a new OTP each time)
+    const result = await this.authService.sendEmailOtp(dto.email);
+    
+    return {
+      success: true,
+      message: 'OTP resent successfully',
       ...(result.debug_code && { debug_code: result.debug_code }),
     };
   }
@@ -162,6 +223,104 @@ export class AppAuthController {
     return {
       success: true,
       message: 'Logged out successfully',
+    };
+  }
+
+  @Post('forgot-password/send-otp')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send OTP for password reset (Mobile App)' })
+  @ApiResponse({ status: 200, description: 'OTP sent successfully' })
+  @ApiResponse({ status: 400, description: 'Either phone_number or email is required' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async sendForgotPasswordOtp(@Body() dto: SendForgotPasswordOtpDto) {
+    // Validate that either phone or email is provided
+    if (!dto.phone_number && !dto.email) {
+      throw new BadRequestException('Either phone_number or email is required');
+    }
+
+    // Check if user exists first (security: don't send OTP to non-existent users)
+    const userExists = await this.authService.checkUserExists(
+      dto.phone_number || null,
+      dto.email || null,
+    );
+
+    if (!userExists) {
+      throw new NotFoundException('User not found. Please check your phone number or email.');
+    }
+
+    // Send OTP to phone or email
+    let result;
+    if (dto.phone_number) {
+      result = await this.authService.sendOtp(dto.phone_number);
+    } else if (dto.email) {
+      result = await this.authService.sendEmailOtp(dto.email);
+    }
+
+    return {
+      success: true,
+      message: result.message,
+      ...(result.debug_code && { debug_code: result.debug_code }),
+    };
+  }
+
+  @Post('forgot-password/resend-otp')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend OTP for password reset (Mobile App)' })
+  @ApiResponse({ status: 200, description: 'OTP resent successfully' })
+  @ApiResponse({ status: 400, description: 'Either phone_number or email is required' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 429, description: 'Too many requests. Please wait before requesting again.' })
+  async resendForgotPasswordOtp(@Body() dto: SendForgotPasswordOtpDto) {
+    // Validate that either phone or email is provided
+    if (!dto.phone_number && !dto.email) {
+      throw new BadRequestException('Either phone_number or email is required');
+    }
+
+    // Check if user exists first (security: don't send OTP to non-existent users)
+    const userExists = await this.authService.checkUserExists(
+      dto.phone_number || null,
+      dto.email || null,
+    );
+
+    if (!userExists) {
+      throw new NotFoundException('User not found. Please check your phone number or email.');
+    }
+
+    // Resend OTP to phone or email (reuses sendOtp/sendEmailOtp which generate new OTP)
+    let result;
+    if (dto.phone_number) {
+      result = await this.authService.sendOtp(dto.phone_number);
+    } else if (dto.email) {
+      result = await this.authService.sendEmailOtp(dto.email);
+    }
+
+    return {
+      success: true,
+      message: 'OTP resent successfully',
+      ...(result.debug_code && { debug_code: result.debug_code }),
+    };
+  }
+
+  @Post('forgot-password/reset')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using OTP (Mobile App)' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired OTP' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    const result = await this.authService.resetPasswordWithOtp(
+      dto.phone_number || null,
+      dto.email || null,
+      dto.otp_code,
+      dto.new_password,
+    );
+
+    return {
+      success: result.success,
+      message: result.message,
     };
   }
 }

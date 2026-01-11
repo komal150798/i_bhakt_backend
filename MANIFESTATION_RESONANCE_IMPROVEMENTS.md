@@ -223,3 +223,6 @@ The API now returns:
 - All planetary analysis is based on actual positions from kundli
 - Tips are dynamically generated based on current dasha and planetary positions
 
+
+
+

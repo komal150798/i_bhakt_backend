@@ -8,6 +8,8 @@ import {
   UseGuards,
   Request,
   UnauthorizedException,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,6 +24,7 @@ import { SendOtpDto } from '../dto/send-otp.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { RegisterDto } from '../dto/register.dto';
+import { SendForgotPasswordOtpDto, ResetPasswordDto } from '../dto/forgot-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 
@@ -136,6 +139,65 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getCurrentUser(@Request() req: any) {
     return this.authService.getCurrentUser(req.user);
+  }
+
+  @Post('forgot-password/send-otp')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send OTP for password reset' })
+  @ApiResponse({ status: 200, description: 'OTP sent successfully' })
+  @ApiResponse({ status: 400, description: 'Either phone_number or email is required' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async sendForgotPasswordOtp(@Body() dto: SendForgotPasswordOtpDto) {
+    // Validate that either phone or email is provided
+    if (!dto.phone_number && !dto.email) {
+      throw new BadRequestException('Either phone_number or email is required');
+    }
+
+    // Check if user exists first (security: don't send OTP to non-existent users)
+    const userExists = await this.authService.checkUserExists(
+      dto.phone_number || null,
+      dto.email || null,
+    );
+
+    if (!userExists) {
+      throw new NotFoundException('User not found. Please check your phone number or email.');
+    }
+
+    // Send OTP to phone or email
+    let result;
+    if (dto.phone_number) {
+      result = await this.authService.sendOtp(dto.phone_number);
+    } else if (dto.email) {
+      result = await this.authService.sendEmailOtp(dto.email);
+    }
+
+    return {
+      success: true,
+      message: result.message,
+      ...(result.debug_code && { debug_code: result.debug_code }),
+    };
+  }
+
+  @Post('forgot-password/reset')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using OTP' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired OTP' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    const result = await this.authService.resetPasswordWithOtp(
+      dto.phone_number || null,
+      dto.email || null,
+      dto.otp_code,
+      dto.new_password,
+    );
+
+    return {
+      success: result.success,
+      message: result.message,
+    };
   }
 }
 

@@ -50,5 +50,15 @@ export class GenerateKundliDto {
   @Min(1)
   @Max(4)
   ayanamsa?: number;
+
+  @ApiPropertyOptional({
+    description: 'Override calculated dasha balance with exact value from reference (in years). Use this if your reference astrology software shows a different balance.',
+    example: 9.5,
+  })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(20)
+  dasha_balance_years?: number;
 }
 

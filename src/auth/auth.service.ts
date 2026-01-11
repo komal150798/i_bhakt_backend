@@ -89,37 +89,61 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Find user by phone number
-    const user = await this.findUserByPhone(phoneNumber);
+    // Check Customer table first (new normalized structure)
+    let customer = await this.findCustomerByPhone(phoneNumber);
+    
+    // Fallback to User table for backward compatibility
+    let user = customer ? null : await this.findUserByPhone(phoneNumber);
 
-    // If login attempt, user must exist
-    if (isLogin && !user) {
+    // If login attempt, customer/user must exist
+    if (isLogin && !customer && !user) {
       throw new NotFoundException('User not found. Please register first or check your phone number.');
     }
 
     // Generate tokens with app session expiration
     const appSessionExpiration = this.getAppSessionExpiration();
+    let userId: number | null = null;
+    let role = UserRole.USER;
+
+    if (customer) {
+      // Use customer
+      userId = customer.id;
+      role = UserRole.USER;
+      // Update last login
+      customer.last_login = new Date();
+      await this.customerRepository.save(customer);
+    } else if (user) {
+      // Use legacy user
+      userId = user.id;
+      role = user.role;
+      // Update last login
+      user.last_login = new Date();
+      await this.userRepository.save(user);
+    }
+    // If neither exists and not login, userId remains null (for registration flow)
+
     const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
-      sub: user?.id || 0, // Will be set properly when user is created
+      sub: userId || 0,
       phone_number: phoneNumber,
-      role: user?.role || UserRole.USER,
+      role: role,
       type: 'user',
     };
 
     const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
     const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
 
-    // Store refresh token if user exists
-    if (user) {
+    // Store refresh token if customer/user exists
+    if (customer) {
+      await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration);
+    } else if (user) {
       await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
-      payload.sub = user.id;
     }
 
     return {
       success: true,
       access_token: accessToken,
       refresh_token: refreshToken,
-      user_id: user?.id,
+      user_id: userId || undefined,
     };
   }
 
@@ -133,37 +157,145 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Find user by email
-    const user = await this.findUserByEmail(email);
+    // Check Customer table first (new normalized structure)
+    let customer = await this.findCustomerByEmail(email);
+    
+    // Fallback to User table for backward compatibility
+    let user = customer ? null : await this.findUserByEmail(email);
 
-    // If login attempt, user must exist
-    if (isLogin && !user) {
+    // If login attempt, customer/user must exist
+    if (isLogin && !customer && !user) {
       throw new NotFoundException('User not found. Please register first or check your email.');
     }
 
     // Generate tokens with app session expiration
     const appSessionExpiration = this.getAppSessionExpiration();
+    let userId: number | null = null;
+    let role = UserRole.USER;
+
+    if (customer) {
+      // Use customer
+      userId = customer.id;
+      role = UserRole.USER;
+      // Update last login
+      customer.last_login = new Date();
+      await this.customerRepository.save(customer);
+    } else if (user) {
+      // Use legacy user
+      userId = user.id;
+      role = user.role;
+      // Update last login
+      user.last_login = new Date();
+      await this.userRepository.save(user);
+    }
+    // If neither exists and not login, userId remains null (for registration flow)
+
     const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
-      sub: user?.id || 0,
+      sub: userId || 0,
       email: email,
-      role: user?.role || UserRole.USER,
+      role: role,
       type: 'user',
     };
 
     const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
     const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
 
-    // Store refresh token if user exists
-    if (user) {
+    // Store refresh token if customer/user exists
+    if (customer) {
+      await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration);
+    } else if (user) {
       await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
-      payload.sub = user.id;
     }
 
     return {
       success: true,
       access_token: accessToken,
       refresh_token: refreshToken,
-      user_id: user?.id,
+      user_id: userId || undefined,
+    };
+  }
+
+  /**
+   * Check if user exists by phone or email
+   * Used for forgot password flow to verify user exists before sending OTP
+   */
+  async checkUserExists(phoneNumber: string | null, email: string | null): Promise<boolean> {
+    // Check Customer table first
+    if (phoneNumber) {
+      const customer = await this.findCustomerByPhone(phoneNumber);
+      if (customer) return true;
+      const user = await this.findUserByPhone(phoneNumber);
+      if (user) return true;
+    }
+
+    if (email) {
+      const customer = await this.findCustomerByEmail(email);
+      if (customer) return true;
+      const user = await this.findUserByEmail(email);
+      if (user) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Reset password using OTP verification
+   * Used for forgot password flow
+   */
+  async resetPasswordWithOtp(
+    phoneNumber: string | null,
+    email: string | null,
+    otpCode: string,
+    newPassword: string,
+  ): Promise<{ success: boolean; message: string }> {
+    // Validate that either phone or email is provided
+    if (!phoneNumber && !email) {
+      throw new BadRequestException('Either phone_number or email is required');
+    }
+
+    // Verify OTP
+    const otpIdentifier = phoneNumber || email!;
+    if (!this.otpService.verifyOtp(otpIdentifier, otpCode)) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    // Find customer first
+    let customer: Customer | null = null;
+    if (phoneNumber) {
+      customer = await this.findCustomerByPhone(phoneNumber);
+    } else if (email) {
+      customer = await this.findCustomerByEmail(email);
+    }
+
+    // If customer not found, try User table for backward compatibility
+    let user: User | null = null;
+    if (!customer) {
+      if (phoneNumber) {
+        user = await this.findUserByPhone(phoneNumber);
+      } else if (email) {
+        user = await this.findUserByEmail(email);
+      }
+    }
+
+    if (!customer && !user) {
+      throw new NotFoundException('User not found. Please check your phone number or email.');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    if (customer) {
+      customer.password = hashedPassword;
+      await this.customerRepository.save(customer);
+    } else if (user) {
+      user.password = hashedPassword;
+      await this.userRepository.save(user);
+    }
+
+    return {
+      success: true,
+      message: 'Password reset successfully',
     };
   }
 
@@ -528,6 +660,7 @@ export class AuthService {
 
   /**
    * Verify Google ID token
+   * Supports multiple client IDs (Web, iOS, Android) - comma-separated in GOOGLE_CLIENT_ID
    * Note: Install google-auth-library: npm install google-auth-library
    */
   private async verifyGoogleToken(idToken: string): Promise<{
@@ -543,28 +676,58 @@ export class AuthService {
         throw new Error('Google OAuth client ID not configured');
       }
 
+      // Support multiple client IDs (comma-separated) for Web, iOS, Android
+      const clientIds = process.env.GOOGLE_CLIENT_ID.split(',').map((id) => id.trim()).filter((id) => id.length > 0);
+
+      if (clientIds.length === 0) {
+        throw new Error('No valid Google OAuth client IDs configured');
+      }
+
       // Try to use google-auth-library if available
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { OAuth2Client } = require('google-auth-library');
-      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-      const ticket = await client.verifyIdToken({
-        idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
+      // Try to verify against each client ID (supports Web, iOS, Android)
+      let lastError: Error | null = null;
 
-      const payload = ticket.getPayload();
-      if (!payload) {
-        console.error('Google token verification failed: No payload returned');
-        return null;
+      for (const clientId of clientIds) {
+        try {
+          const client = new OAuth2Client(clientId);
+
+          const ticket = await client.verifyIdToken({
+            idToken,
+            audience: clientId,
+          });
+
+          const payload = ticket.getPayload();
+          if (!payload) {
+            console.warn(`Google token verification failed for client ID ${clientId}: No payload returned`);
+            continue;
+          }
+
+          // Successfully verified with this client ID
+          console.debug(`Google token verified successfully with client ID: ${clientId.substring(0, 20)}...`);
+
+          return {
+            email: payload.email || '',
+            name: payload.name || payload.email || '',
+            picture: payload.picture,
+            googleId: payload.sub,
+          };
+        } catch (error) {
+          // Store error but continue trying other client IDs
+          lastError = error instanceof Error ? error : new Error(String(error));
+          console.debug(`Token verification failed for client ID ${clientId}: ${lastError.message}`);
+          continue;
+        }
       }
 
-      return {
-        email: payload.email || '',
-        name: payload.name || payload.email || '',
-        picture: payload.picture,
-        googleId: payload.sub,
-      };
+      // If we get here, all client IDs failed
+      if (lastError) {
+        throw lastError;
+      }
+
+      throw new Error('Google token verification failed for all configured client IDs');
     } catch (error) {
       // Log the actual error for debugging
       console.error('Google token verification error:', error);
@@ -721,6 +884,39 @@ export class AuthService {
       expires_at: expiresAt,
       is_revoked: false,
       login_method: 'password',
+    });
+
+    await this.customerTokenRepository.save(customerToken);
+  }
+
+  /**
+   * Store customer refresh token with custom expiration (for app sessions)
+   */
+  private async storeCustomerRefreshToken(
+    token: string,
+    customerId: number,
+    expiresIn?: string,
+  ): Promise<void> {
+    const payload = this.jwtService.verifyToken(token);
+    if (!payload) return;
+
+    // If expiresIn is provided, calculate expiration from now
+    // Otherwise, use the expiration from the token payload
+    let expiresAt: Date;
+    if (expiresIn) {
+      // Parse expiresIn (e.g., '90d', '7d', '15m')
+      const expiresInMs = this.parseExpiresIn(expiresIn);
+      expiresAt = new Date(Date.now() + expiresInMs);
+    } else {
+      expiresAt = new Date(payload.exp! * 1000);
+    }
+
+    const customerToken = this.customerTokenRepository.create({
+      token,
+      customer_id: customerId,
+      expires_at: expiresAt,
+      is_revoked: false,
+      login_method: 'otp',
     });
 
     await this.customerTokenRepository.save(customerToken);
@@ -891,6 +1087,46 @@ export class AuthService {
     };
   }
 
+  /**
+   * Find customer by phone number (checks Customer table first)
+   */
+  private async findCustomerByPhone(phoneNumber: string): Promise<Customer | null> {
+    // Normalize phone number (remove non-digits, handle variations)
+    const normalized = phoneNumber.replace(/\D+/g, '');
+    
+    // Try multiple variations
+    const variations = [
+      phoneNumber.trim(),
+      normalized,
+      normalized.slice(-10), // Last 10 digits
+    ];
+
+    for (const variation of variations) {
+      const customer = await this.customerRepository.findOne({
+        where: { phone_number: variation, is_deleted: false },
+      });
+      if (customer) return customer;
+    }
+
+    return null;
+  }
+
+  /**
+   * Find customer by email (checks Customer table first)
+   */
+  private async findCustomerByEmail(email: string): Promise<Customer | null> {
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    const customer = await this.customerRepository.findOne({
+      where: { email: normalizedEmail, is_deleted: false },
+    });
+
+    return customer || null;
+  }
+
+  /**
+   * Find user by phone number (legacy User table)
+   */
   private async findUserByPhone(phoneNumber: string): Promise<User | null> {
     // Normalize phone number (remove non-digits, handle variations)
     const normalized = phoneNumber.replace(/\D+/g, '');
@@ -904,7 +1140,7 @@ export class AuthService {
 
     for (const variation of variations) {
       const user = await this.userRepository.findOne({
-        where: { phone_number: variation },
+        where: { phone_number: variation, is_deleted: false },
       });
       if (user) return user;
     }
@@ -912,6 +1148,9 @@ export class AuthService {
     return null;
   }
 
+  /**
+   * Find user by email (legacy User table)
+   */
   private async findUserByEmail(email: string): Promise<User | null> {
     const normalizedEmail = email.trim().toLowerCase();
     

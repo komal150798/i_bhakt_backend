@@ -43,3 +43,6 @@ WHERE id = 1  -- Replace with actual customer id
 --   AND is_deleted = false;
 
 
+
+
+
