@@ -16,7 +16,6 @@ const manifestation_service_1 = require("./manifestation.service");
 const manifestation_enhanced_service_1 = require("./services/manifestation-enhanced.service");
 const manifestation_ai_evaluation_service_1 = require("./services/manifestation-ai-evaluation.service");
 const app_manifestation_controller_1 = require("./controllers/app-manifestation.controller");
-const app_manifestation_enhanced_controller_1 = require("./controllers/app-manifestation-enhanced.controller");
 const cache_module_1 = require("../cache/cache.module");
 const astrology_module_1 = require("../astrology/astrology.module");
 const user_entity_1 = require("../users/entities/user.entity");
@@ -74,7 +73,7 @@ exports.ManifestationModule = ManifestationModule = __decorate([
             constants_module_1.ConstantsModule,
             ai_prompt_module_1.AIPromptModule,
         ],
-        controllers: [app_manifestation_controller_1.AppManifestationController, app_manifestation_enhanced_controller_1.AppManifestationEnhancedController],
+        controllers: [app_manifestation_controller_1.AppManifestationController],
         providers: [
             manifestation_service_1.ManifestationService,
             manifestation_enhanced_service_1.ManifestationEnhancedService,

@@ -68,6 +68,23 @@ export class Manifestation extends BaseEntity {
       description: string;
       progress: number;
     }>;
+    // Alignment actions tracking
+    alignment_actions?: Array<{
+      id: number;
+      title: string;
+      description: string;
+      icon: string;
+      effort_level: string;
+      karma_score: number;
+      category: string;
+      added_at: string;
+      manifestation_id: number;
+    }>;
+    total_alignment_karma?: number;
+    // Commitment tracking
+    is_committed?: boolean;
+    committed_at?: string;
+    commitment_message?: string;
   } | null;
 
   @Column({ type: 'jsonb', nullable: true })

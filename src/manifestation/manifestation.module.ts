@@ -20,7 +20,6 @@ import { ManifestationService } from './manifestation.service';
 import { ManifestationEnhancedService } from './services/manifestation-enhanced.service';
 import { ManifestationAIEvaluationService } from './services/manifestation-ai-evaluation.service';
 import { AppManifestationController } from './controllers/app-manifestation.controller';
-import { AppManifestationEnhancedController } from './controllers/app-manifestation-enhanced.controller';
 import { CacheModule } from '../cache/cache.module';
 import { AstrologyModule } from '../astrology/astrology.module';
 import { User } from '../users/entities/user.entity';
@@ -77,7 +76,7 @@ import { SeedManifestationMasterDataService } from './seeds/seed-manifestation-m
     ConstantsModule, // Central Constants Service
     AIPromptModule, // AI Prompt Service
   ],
-  controllers: [AppManifestationController, AppManifestationEnhancedController],
+  controllers: [AppManifestationController],
   providers: [
     ManifestationService,
     ManifestationEnhancedService,

@@ -51,22 +51,20 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         if (dto.description.trim().length < 15) {
             throw new common_1.BadRequestException('Description must be at least 15 characters long. Please provide more details about your manifestation intent.');
         }
-        let title = dto.title?.trim();
-        if (!title || title.length === 0) {
-            const description = dto.description.trim();
-            const firstSentence = description.split(/[.!?]/)[0].trim();
-            if (firstSentence.length > 0 && firstSentence.length <= 200) {
-                title = firstSentence;
+        const description = dto.description.trim();
+        const firstSentence = description.split(/[.!?]/)[0].trim();
+        let title;
+        if (firstSentence.length > 0 && firstSentence.length <= 200) {
+            title = firstSentence;
+        }
+        else {
+            title = description.substring(0, 50).trim();
+            if (title.length < description.length) {
+                title += '...';
             }
-            else {
-                title = description.substring(0, 50).trim();
-                if (title.length < description.length) {
-                    title += '...';
-                }
-            }
-            if (title.length > 200) {
-                title = title.substring(0, 197) + '...';
-            }
+        }
+        if (title.length > 200) {
+            title = title.substring(0, 197) + '...';
         }
         let user = null;
         user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
@@ -76,8 +74,8 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         if (!user) {
             throw new common_1.NotFoundException('User not found');
         }
-        const evaluation = await this.aiEvaluationService.evaluateManifestation(title, dto.description, dto.category, user);
-        const finalCategory = dto.category || evaluation.detectedCategory || null;
+        const evaluation = await this.aiEvaluationService.evaluateManifestation(title, dto.description, undefined, user);
+        const finalCategory = evaluation.detectedCategory || null;
         const actionWindows = await this.calculateActionWindows(finalCategory, user);
         const manifestation = this.manifestationRepository.create({
             user_id: userId,
@@ -1329,6 +1327,576 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             insights.push(`Key planetary influences: ${planetInfo}.`);
         }
         return insights.join(' ') || 'Astrological analysis based on your birth chart supports this manifestation.';
+    }
+    async getResonanceScoreBreakdown(manifestationId, userId) {
+        const manifestation = await this.getManifestationById(manifestationId, userId);
+        const clarityScore = manifestation.coherence_score
+            ? Number(manifestation.coherence_score)
+            : Math.round((manifestation.resonance_score || 0) * 1.1);
+        const emotionalCoherence = manifestation.alignment_score
+            ? Number(manifestation.alignment_score)
+            : Math.round((manifestation.resonance_score || 0) * 0.9);
+        const karmaInfluence = manifestation.mahaadha_score
+            ? Math.round(100 - Number(manifestation.mahaadha_score))
+            : 50;
+        const astrologicalSupport = manifestation.astro_support_index
+            ? Number(manifestation.astro_support_index)
+            : 50;
+        const overallScore = manifestation.resonance_score
+            ? Number(manifestation.resonance_score)
+            : 0;
+        let insight = '';
+        if (overallScore >= 70) {
+            insight = 'Your intention is strongly aligned. Maintain emotional consistency to optimize outcomes.';
+        }
+        else if (overallScore >= 50) {
+            insight = 'Your intention is moderately aligned. Emotional consistency can improve outcomes.';
+        }
+        else {
+            insight = 'Your intention needs more clarity. Focus on aligning your thoughts and emotions.';
+        }
+        return {
+            overall_score: Math.round(overallScore),
+            clarity_score: Math.min(100, Math.max(0, Math.round(clarityScore))),
+            emotional_coherence: Math.min(100, Math.max(0, Math.round(emotionalCoherence))),
+            karma_influence: Math.min(100, Math.max(0, karmaInfluence)),
+            astrological_support: Math.min(100, Math.max(0, Math.round(astrologicalSupport))),
+            insight,
+        };
+    }
+    async getAlignmentActions(manifestationId, userId) {
+        const manifestation = await this.getManifestationById(manifestationId, userId);
+        const category = manifestation.category || 'general';
+        const actions = this.generateAlignmentActions(category, manifestation.tips);
+        return { actions };
+    }
+    generateAlignmentActions(category, tips) {
+        const baseActions = [
+            {
+                id: 1,
+                title: 'Gratitude Practice',
+                description: 'Write down three things you are grateful for daily.',
+                icon: 'lotus',
+                effort_level: 'Low',
+                karma_score: 5,
+                category: 'mindfulness',
+            },
+            {
+                id: 2,
+                title: 'Emotional Regulation Suggestion',
+                description: 'Practice deep breathing for 5 mins when stressed.',
+                icon: 'meditation',
+                effort_level: 'Low',
+                karma_score: 7,
+                category: 'wellness',
+            },
+            {
+                id: 3,
+                title: 'Simple Ritual',
+                description: 'Light a candle and set your intention each morning.',
+                icon: 'candle',
+                effort_level: 'Medium',
+                karma_score: 10,
+                category: 'ritual',
+            },
+            {
+                id: 4,
+                title: 'Behavioral Adjustment',
+                description: 'Avoid negative talk and gossip for the next 48 hours.',
+                icon: 'prayer',
+                effort_level: 'Medium',
+                karma_score: 15,
+                category: 'behavior',
+            },
+        ];
+        const categoryActions = {
+            career: [
+                {
+                    id: 5,
+                    title: 'Professional Visualization',
+                    description: 'Spend 10 minutes visualizing your ideal career outcome.',
+                    icon: 'briefcase',
+                    effort_level: 'Low',
+                    karma_score: 8,
+                    category: 'visualization',
+                },
+                {
+                    id: 6,
+                    title: 'Skill Development',
+                    description: 'Dedicate 30 minutes daily to learning a new skill.',
+                    icon: 'book',
+                    effort_level: 'Medium',
+                    karma_score: 12,
+                    category: 'growth',
+                },
+            ],
+            relationship: [
+                {
+                    id: 5,
+                    title: 'Heart Opening Practice',
+                    description: 'Practice loving-kindness meditation for 10 minutes.',
+                    icon: 'heart',
+                    effort_level: 'Low',
+                    karma_score: 8,
+                    category: 'meditation',
+                },
+                {
+                    id: 6,
+                    title: 'Connection Ritual',
+                    description: 'Express genuine appreciation to someone you care about.',
+                    icon: 'connection',
+                    effort_level: 'Low',
+                    karma_score: 10,
+                    category: 'relationship',
+                },
+            ],
+            love: [
+                {
+                    id: 5,
+                    title: 'Self-Love Practice',
+                    description: 'Practice self-compassion affirmations in the mirror.',
+                    icon: 'heart',
+                    effort_level: 'Low',
+                    karma_score: 8,
+                    category: 'self-care',
+                },
+                {
+                    id: 6,
+                    title: 'Venus Ritual',
+                    description: 'Wear white on Fridays and offer white flowers.',
+                    icon: 'flower',
+                    effort_level: 'Medium',
+                    karma_score: 12,
+                    category: 'ritual',
+                },
+            ],
+            wealth: [
+                {
+                    id: 5,
+                    title: 'Abundance Affirmation',
+                    description: 'Recite abundance affirmations for 5 minutes daily.',
+                    icon: 'coin',
+                    effort_level: 'Low',
+                    karma_score: 7,
+                    category: 'affirmation',
+                },
+                {
+                    id: 6,
+                    title: 'Generosity Practice',
+                    description: 'Donate a small amount to charity this week.',
+                    icon: 'giving',
+                    effort_level: 'Medium',
+                    karma_score: 15,
+                    category: 'charity',
+                },
+            ],
+            money: [
+                {
+                    id: 5,
+                    title: 'Financial Clarity',
+                    description: 'Review and organize your finances for 15 minutes.',
+                    icon: 'calculator',
+                    effort_level: 'Medium',
+                    karma_score: 10,
+                    category: 'planning',
+                },
+                {
+                    id: 6,
+                    title: 'Jupiter Mantra',
+                    description: 'Chant "Om Gurave Namah" 108 times on Thursdays.',
+                    icon: 'om',
+                    effort_level: 'Medium',
+                    karma_score: 12,
+                    category: 'mantra',
+                },
+            ],
+            health: [
+                {
+                    id: 5,
+                    title: 'Morning Movement',
+                    description: 'Practice 15 minutes of gentle yoga or stretching.',
+                    icon: 'yoga',
+                    effort_level: 'Low',
+                    karma_score: 8,
+                    category: 'exercise',
+                },
+                {
+                    id: 6,
+                    title: 'Mindful Eating',
+                    description: 'Eat one meal mindfully without distractions.',
+                    icon: 'food',
+                    effort_level: 'Low',
+                    karma_score: 7,
+                    category: 'nutrition',
+                },
+            ],
+            spiritual: [
+                {
+                    id: 5,
+                    title: 'Meditation Practice',
+                    description: 'Meditate for 20 minutes focusing on your intention.',
+                    icon: 'meditation',
+                    effort_level: 'Medium',
+                    karma_score: 12,
+                    category: 'meditation',
+                },
+                {
+                    id: 6,
+                    title: 'Sacred Reading',
+                    description: 'Read spiritual texts for 15 minutes daily.',
+                    icon: 'book',
+                    effort_level: 'Low',
+                    karma_score: 8,
+                    category: 'study',
+                },
+            ],
+        };
+        const categorySpecific = categoryActions[category.toLowerCase()] || [];
+        return [...baseActions, ...categorySpecific];
+    }
+    async addAlignmentActionsToKarma(manifestationId, actionIds, userId) {
+        const manifestation = await this.getManifestationById(manifestationId, userId);
+        const category = manifestation.category || 'general';
+        const allActions = this.generateAlignmentActions(category, manifestation.tips);
+        const selectedActions = allActions.filter((action) => actionIds.includes(action.id));
+        const totalKarmaScore = selectedActions.reduce((sum, action) => sum + action.karma_score, 0);
+        const currentProgress = manifestation.progress_tracking || {
+            current_progress: 0,
+            journal_entries_count: 0,
+        };
+        const alignmentActions = currentProgress.alignment_actions || [];
+        const newActions = selectedActions.map((action) => ({
+            ...action,
+            added_at: new Date().toISOString(),
+            manifestation_id: manifestationId,
+        }));
+        manifestation.progress_tracking = {
+            ...currentProgress,
+            alignment_actions: [...alignmentActions, ...newActions],
+            total_alignment_karma: (currentProgress.total_alignment_karma || 0) + totalKarmaScore,
+        };
+        await this.manifestationRepository.save(manifestation);
+        return {
+            added_count: selectedActions.length,
+            total_karma_score: totalKarmaScore,
+            actions_added: selectedActions.map((a) => ({
+                id: a.id,
+                title: a.title,
+                karma_score: a.karma_score,
+            })),
+        };
+    }
+    async commitIntention(manifestationId, userId, commitmentMessage, targetDate) {
+        const manifestation = await this.getManifestationById(manifestationId, userId);
+        manifestation.is_locked = true;
+        const currentProgress = manifestation.progress_tracking || {
+            current_progress: 0,
+            journal_entries_count: 0,
+        };
+        const committedAt = new Date().toISOString();
+        const commitMessage = commitmentMessage || 'I choose to commit consciously.';
+        manifestation.progress_tracking = {
+            ...currentProgress,
+            is_committed: true,
+            committed_at: committedAt,
+            commitment_message: commitMessage,
+        };
+        if (targetDate) {
+            manifestation.target_date = new Date(targetDate);
+        }
+        await this.manifestationRepository.save(manifestation);
+        return {
+            id: manifestation.id,
+            title: manifestation.title,
+            is_committed: true,
+            committed_at: committedAt,
+            commitment_message: commitMessage,
+            target_date: manifestation.target_date
+                ? manifestation.target_date.toISOString().split('T')[0]
+                : null,
+        };
+    }
+    async getCosmicSupportIndex(manifestationId, userId) {
+        const manifestation = await this.getManifestationById(manifestationId, userId);
+        const category = manifestation.category || 'general';
+        const kundli = await this.kundliRepository.findOne({
+            where: { user_id: userId, is_deleted: false },
+        });
+        const currentDate = new Date();
+        let dashaData = null;
+        if (kundli && kundli.nakshatra) {
+            const birthDate = kundli.birth_date instanceof Date
+                ? kundli.birth_date
+                : new Date(kundli.birth_date);
+            dashaData = this.calculateDashaFromBirthDateAndNakshatra(birthDate, kundli.nakshatra, currentDate);
+        }
+        const calculateStatus = (lord) => {
+            if (!lord)
+                return 'Neutral';
+            const categoryPlanets = {
+                career: {
+                    supportive: ['Mercury', 'Jupiter', 'Sun'],
+                    challenging: ['Saturn', 'Rahu', 'Ketu'],
+                },
+                relationship: {
+                    supportive: ['Venus', 'Jupiter', 'Moon'],
+                    challenging: ['Saturn', 'Rahu', 'Mars'],
+                },
+                love: {
+                    supportive: ['Venus', 'Jupiter', 'Moon'],
+                    challenging: ['Saturn', 'Mars', 'Rahu'],
+                },
+                wealth: {
+                    supportive: ['Jupiter', 'Venus', 'Mercury'],
+                    challenging: ['Saturn', 'Rahu', 'Ketu'],
+                },
+                money: {
+                    supportive: ['Jupiter', 'Venus', 'Mercury'],
+                    challenging: ['Saturn', 'Rahu', 'Ketu'],
+                },
+                health: {
+                    supportive: ['Sun', 'Moon', 'Mars'],
+                    challenging: ['Saturn', 'Rahu', 'Ketu'],
+                },
+                spiritual: {
+                    supportive: ['Jupiter', 'Ketu', 'Saturn'],
+                    challenging: ['Mars', 'Rahu'],
+                },
+            };
+            const alignment = categoryPlanets[category.toLowerCase()] || categoryPlanets.career;
+            if (alignment.supportive.includes(lord))
+                return 'Supportive';
+            if (alignment.challenging.includes(lord))
+                return 'Challenging';
+            return 'Neutral';
+        };
+        const getDescription = (lord, status) => {
+            if (!lord)
+                return 'Unable to determine current period.';
+            const descriptions = {
+                Jupiter: {
+                    Supportive: 'Jupiter period enhances growth and opportunity. Favorable for new ventures.',
+                    Neutral: 'Jupiter brings moderate support. Focus on learning and expansion.',
+                    Challenging: 'Jupiter period may bring over-expansion. Stay grounded.',
+                },
+                Saturn: {
+                    Supportive: 'Saturn supports discipline and structure. Good for long-term goals.',
+                    Neutral: 'Saturn period requires patience. Progress is slow but steady.',
+                    Challenging: 'Saturn period may bring delays. Patience and perseverance required.',
+                },
+                Venus: {
+                    Supportive: 'Venus period enhances relationships and creativity. Favorable for manifestation.',
+                    Neutral: 'Venus brings harmony. Focus on balance and beauty.',
+                    Challenging: 'Venus period may bring indulgence. Practice moderation.',
+                },
+                Mars: {
+                    Supportive: 'Mars period brings energy and action. Great for initiative.',
+                    Neutral: 'Mars brings drive. Channel energy constructively.',
+                    Challenging: 'Mars period may bring impatience or conflict. Stay grounded.',
+                },
+                Mercury: {
+                    Supportive: 'Mercury period enhances communication and intellect. Great for learning.',
+                    Neutral: 'Mercury brings mental activity. Stay focused.',
+                    Challenging: 'Mercury period may bring restlessness. Practice stillness.',
+                },
+                Moon: {
+                    Supportive: 'Moon period enhances intuition and emotional alignment.',
+                    Neutral: 'Moon brings emotional awareness. Honor your feelings.',
+                    Challenging: 'Moon period may bring emotional fluctuations. Practice stability.',
+                },
+                Sun: {
+                    Supportive: 'Sun period enhances leadership and confidence. Shine bright.',
+                    Neutral: 'Sun brings vitality. Focus on self-expression.',
+                    Challenging: 'Sun period may bring ego challenges. Practice humility.',
+                },
+                Rahu: {
+                    Supportive: 'Rahu period brings unconventional opportunities. Stay discerning.',
+                    Neutral: 'Rahu brings transformation. Embrace change mindfully.',
+                    Challenging: 'Rahu period may bring confusion or illusion. Seek clarity.',
+                },
+                Ketu: {
+                    Supportive: 'Ketu period enhances spiritual growth and detachment.',
+                    Neutral: 'Ketu brings introspection. Look within.',
+                    Challenging: 'Ketu period may bring isolation or loss. Practice acceptance.',
+                },
+            };
+            return descriptions[lord]?.[status] || `${lord} period influences your manifestation journey.`;
+        };
+        const mahadashaLord = dashaData?.mahadasha?.lord || 'Unknown';
+        const antardashaLord = dashaData?.antardasha?.lord || 'Unknown';
+        const pratyantarLord = dashaData?.pratyantar?.lord || 'Unknown';
+        const mahadashaStatus = calculateStatus(mahadashaLord);
+        const antardashaStatus = calculateStatus(antardashaLord);
+        const pratyantarStatus = calculateStatus(pratyantarLord);
+        let guidanceMessage = 'This guidance helps with timing, not fate.';
+        if (mahadashaStatus === 'Supportive' && antardashaStatus === 'Supportive') {
+            guidanceMessage = 'Excellent cosmic support! This is an auspicious time for your manifestation.';
+        }
+        else if (mahadashaStatus === 'Challenging' || antardashaStatus === 'Challenging') {
+            guidanceMessage = 'Current cosmic energies suggest patience. Focus on inner alignment and preparation.';
+        }
+        else {
+            guidanceMessage = 'Moderate cosmic support. Stay consistent with your alignment practices.';
+        }
+        return {
+            current_mahadasha: {
+                lord: mahadashaLord,
+                description: getDescription(mahadashaLord, mahadashaStatus),
+                status: mahadashaStatus,
+            },
+            current_antardasha: {
+                lord: antardashaLord,
+                description: getDescription(antardashaLord, antardashaStatus),
+                status: antardashaStatus,
+            },
+            current_pratyantar: {
+                lord: pratyantarLord,
+                description: getDescription(pratyantarLord, pratyantarStatus),
+                status: pratyantarStatus,
+            },
+            guidance_message: guidanceMessage,
+        };
+    }
+    async getAlignmentSummary(manifestationId, userId) {
+        const manifestation = await this.getManifestationById(manifestationId, userId);
+        const cosmicSupport = await this.getCosmicSupportIndex(manifestationId, userId);
+        const resonanceScore = manifestation.resonance_score
+            ? Number(manifestation.resonance_score)
+            : 0;
+        let resonanceLabel = 'Low Alignment';
+        if (resonanceScore >= 70) {
+            resonanceLabel = 'Highly Aligned';
+        }
+        else if (resonanceScore >= 50) {
+            resonanceLabel = 'Moderately Aligned';
+        }
+        else if (resonanceScore >= 30) {
+            resonanceLabel = 'Partially Aligned';
+        }
+        const today = new Date();
+        const periodEnd = new Date(today);
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+        const cosmicSupportPeriod = `${today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${periodEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+        const progressTracking = manifestation.progress_tracking || {
+            current_progress: 0,
+            journal_entries_count: 0,
+        };
+        const commitmentStatus = progressTracking.is_committed
+            ? 'Consciously Committed'
+            : 'Not Committed';
+        const alignmentActions = progressTracking.alignment_actions || [];
+        const activeActions = alignmentActions.slice(-4).map((action) => ({
+            id: action.id,
+            title: action.title,
+            icon: action.icon,
+            karma_score: action.karma_score,
+        }));
+        return {
+            manifestation_title: manifestation.title,
+            resonance_score: Math.round(resonanceScore),
+            resonance_label: resonanceLabel,
+            cosmic_support_status: cosmicSupport.current_mahadasha.status,
+            cosmic_support_period: cosmicSupportPeriod,
+            commitment_status: commitmentStatus,
+            active_alignment_actions: activeActions,
+        };
+    }
+    async getJourneyTimeline(manifestationId, userId) {
+        const manifestation = await this.getManifestationById(manifestationId, userId);
+        const progressTracking = manifestation.progress_tracking || {};
+        const createdDate = manifestation.added_date || new Date();
+        const targetDate = manifestation.target_date || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+        const totalDays = Math.ceil((targetDate.getTime() - new Date(createdDate).getTime()) / (24 * 60 * 60 * 1000));
+        const elapsedDays = Math.ceil((Date.now() - new Date(createdDate).getTime()) / (24 * 60 * 60 * 1000));
+        const totalProgress = Math.min(100, Math.round((elapsedDays / totalDays) * 100));
+        const phases = this.generateJourneyPhases(createdDate, targetDate);
+        const currentPhaseIndex = phases.findIndex((p) => p.status === 'In Progress');
+        const currentPhase = phases[currentPhaseIndex] || phases[0];
+        const resonanceScore = manifestation.resonance_score
+            ? Number(manifestation.resonance_score)
+            : 0;
+        let insight = 'Continue your alignment practices.';
+        if (currentPhase.id === 'intention_locked') {
+            insight = 'Your intention is set. Focus on emotional alignment.';
+        }
+        else if (currentPhase.id === 'karma_action') {
+            insight = 'Complete your daily karma actions for best results.';
+        }
+        else if (currentPhase.id === 'karma_consistency') {
+            insight = 'Maintain daily gratitude to align your emotions.';
+        }
+        else if (currentPhase.id === 'astrological_support') {
+            insight = 'Favorable cosmic window for decision making.';
+        }
+        return {
+            total_progress: totalProgress,
+            phases,
+            current_phase: {
+                id: currentPhase.id,
+                title: currentPhase.title,
+                insight,
+                resonance_score: Math.round(resonanceScore),
+            },
+        };
+    }
+    generateJourneyPhases(startDate, endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const now = new Date();
+        const totalDays = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+        const phaseDuration = Math.ceil(totalDays / 5);
+        const phases = [
+            {
+                id: 'intention_locked',
+                title: 'Intention Locked',
+                description: 'Your manifestation intention has been set.',
+            },
+            {
+                id: 'karma_action',
+                title: 'Karma Action Phase',
+                description: 'Complete your daily karma actions.',
+            },
+            {
+                id: 'karma_consistency',
+                title: 'Karma Consistency Check',
+                description: 'Maintain consistency in your practices.',
+            },
+            {
+                id: 'astrological_support',
+                title: 'Astrological Support Phase',
+                description: 'Favorable cosmic window for decision making.',
+            },
+            {
+                id: 'manifestation_window',
+                title: 'Manifestation Window',
+                description: 'Peak alignment period for manifestation.',
+            },
+        ];
+        return phases.map((phase, index) => {
+            const phaseStart = new Date(start);
+            phaseStart.setDate(phaseStart.getDate() + index * phaseDuration);
+            const phaseEnd = new Date(phaseStart);
+            phaseEnd.setDate(phaseEnd.getDate() + phaseDuration);
+            let status = 'Upcoming';
+            let progressPercentage;
+            if (now >= phaseEnd) {
+                status = 'Completed';
+            }
+            else if (now >= phaseStart && now < phaseEnd) {
+                status = 'In Progress';
+                const phaseElapsed = now.getTime() - phaseStart.getTime();
+                const phaseDurationMs = phaseEnd.getTime() - phaseStart.getTime();
+                progressPercentage = Math.round((phaseElapsed / phaseDurationMs) * 100);
+            }
+            return {
+                id: phase.id,
+                title: phase.title,
+                description: phase.description,
+                date_range: `${phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+                status,
+                progress_percentage: progressPercentage,
+            };
+        });
     }
 };
 exports.ManifestationEnhancedService = ManifestationEnhancedService;

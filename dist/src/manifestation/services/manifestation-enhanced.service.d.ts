@@ -129,4 +129,91 @@ export declare class ManifestationEnhancedService {
     private getDashaAlignmentTips;
     private getDailyActions;
     private generateAstroInsights;
+    getResonanceScoreBreakdown(manifestationId: number, userId: number): Promise<{
+        overall_score: number;
+        clarity_score: number;
+        emotional_coherence: number;
+        karma_influence: number;
+        astrological_support: number;
+        insight: string;
+    }>;
+    getAlignmentActions(manifestationId: number, userId: number): Promise<{
+        actions: Array<{
+            id: number;
+            title: string;
+            description: string;
+            icon: string;
+            effort_level: 'Low' | 'Medium' | 'High';
+            karma_score: number;
+            category: string;
+        }>;
+    }>;
+    private generateAlignmentActions;
+    addAlignmentActionsToKarma(manifestationId: number, actionIds: number[], userId: number): Promise<{
+        added_count: number;
+        total_karma_score: number;
+        actions_added: Array<{
+            id: number;
+            title: string;
+            karma_score: number;
+        }>;
+    }>;
+    commitIntention(manifestationId: number, userId: number, commitmentMessage?: string, targetDate?: string): Promise<{
+        id: number;
+        title: string;
+        is_committed: boolean;
+        committed_at: string;
+        commitment_message: string | null;
+        target_date: string | null;
+    }>;
+    getCosmicSupportIndex(manifestationId: number, userId: number): Promise<{
+        current_mahadasha: {
+            lord: string;
+            description: string;
+            status: 'Supportive' | 'Neutral' | 'Challenging';
+        };
+        current_antardasha: {
+            lord: string;
+            description: string;
+            status: 'Supportive' | 'Neutral' | 'Challenging';
+        };
+        current_pratyantar: {
+            lord: string;
+            description: string;
+            status: 'Supportive' | 'Neutral' | 'Challenging';
+        };
+        guidance_message: string;
+    }>;
+    getAlignmentSummary(manifestationId: number, userId: number): Promise<{
+        manifestation_title: string;
+        resonance_score: number;
+        resonance_label: string;
+        cosmic_support_status: 'Supportive' | 'Neutral' | 'Challenging';
+        cosmic_support_period: string;
+        commitment_status: 'Not Committed' | 'Consciously Committed';
+        active_alignment_actions: Array<{
+            id: number;
+            title: string;
+            icon: string;
+            karma_score: number;
+        }>;
+    }>;
+    getJourneyTimeline(manifestationId: number, userId: number): Promise<{
+        total_progress: number;
+        phases: Array<{
+            id: string;
+            title: string;
+            description: string;
+            date_range: string;
+            status: 'Completed' | 'In Progress' | 'Upcoming';
+            progress_percentage?: number;
+        }>;
+        current_phase: {
+            id: string;
+            title: string;
+            insight: string;
+            resonance_score: number;
+        };
+    }>;
+    private generateJourneyPhases;
 }

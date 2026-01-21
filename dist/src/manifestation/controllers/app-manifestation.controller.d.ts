@@ -1,65 +1,346 @@
-import { ManifestationService } from '../manifestation.service';
-import { CreateManifestationDto } from '../dto/create-manifestation.dto';
+import { ManifestationEnhancedService } from '../services/manifestation-enhanced.service';
+import { CreateManifestationEnhancedDto } from '../dtos/create-manifestation-enhanced.dto';
+import { AddAlignmentActionsDto, CommitIntentionDto } from '../dtos/alignment-action.dto';
 export declare class AppManifestationController {
     private readonly manifestationService;
-    constructor(manifestationService: ManifestationService);
-    createManifestation(dto: CreateManifestationDto, user: any): Promise<{
+    constructor(manifestationService: ManifestationEnhancedService);
+    createManifestation(dto: CreateManifestationEnhancedDto, user: any): Promise<{
         success: boolean;
+        code: number;
+        message: string;
         data: {
             id: number;
+            unique_id: string;
             title: string;
-            clarity: number;
-            coherence: number;
+            category: string;
+            category_label: string;
+            resonance_score: number;
+            alignment_score: number;
+            antrashaakti_score: number;
+            mahaadha_score: number;
+            astro_support_index: number;
             mfp_score: number;
-            astro_index: number;
-            best_manifestation_date: Date;
-            analysis_data: Record<string, any>;
-            created_at: Date;
+            tips: {
+                rituals?: string[];
+                what_to_manifest?: string[];
+                what_not_to_manifest?: string[];
+                thought_alignment?: string[];
+                daily_actions?: string[];
+            };
+            insights: {
+                ai_narrative?: string;
+                astro_insights?: string;
+                energy_state?: "aligned" | "unstable" | "blocked";
+                keyword_analysis?: Record<string, any>;
+                emotional_charge?: string;
+                category_label?: string;
+                summary_for_ui?: string;
+                energy_reason?: string;
+            };
+            summary_for_ui: string;
+            added_date: Date;
         };
     }>;
-    getManifestations(user: any): Promise<{
+    getDashboard(user: any): Promise<{
         success: boolean;
+        code: number;
+        message: string;
+        data: {
+            summary: {
+                top_resonance: number;
+                alignment_score: number;
+                astro_support: number;
+                energy_state: "aligned" | "unstable" | "blocked";
+            };
+            manifestations: Array<{
+                id: number;
+                title: string;
+                description: string;
+                resonance_score: number | null;
+                alignment_score: number | null;
+                coherence_score: number | null;
+                mfp_score: number | null;
+                astro_support_index: number | null;
+                is_archived: boolean;
+                is_locked: boolean;
+                added_date: Date;
+                category: string | null;
+                category_label: string | null;
+                action_windows: any;
+                progress_tracking: any;
+            }>;
+        };
+    }>;
+    getAllManifestations(user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            id: number;
+            unique_id: string;
+            title: string;
+            description: string;
+            category: string;
+            resonance_score: number;
+            mfp_score: number;
+            is_archived: boolean;
+            is_locked: boolean;
+            added_date: Date;
+        }[];
+    }>;
+    calculateResonance(body: {
+        description: string;
+    }, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            resonance_score: number;
+            category: string;
+            category_label: string;
+            manifestation_class: string;
+            manifestation_class_label: string;
+            supportive_factors: Array<{
+                type: string;
+                description: string;
+                score: number;
+                weightage: number;
+                period?: string;
+            }>;
+            challenging_factors: Array<{
+                type: string;
+                description: string;
+                impact: number;
+                weightage: number;
+            }>;
+            dasha_resonance: {
+                mahadasha: {
+                    lord: string;
+                    supportive: number;
+                    challenging: number;
+                    period: string;
+                };
+                antardasha: {
+                    lord: string;
+                    supportive: number;
+                    challenging: number;
+                    period: string;
+                };
+                pratyantar: {
+                    lord: string;
+                    supportive: number;
+                    challenging: number;
+                    period: string;
+                };
+                sukshma: {
+                    lord: string;
+                    supportive: number;
+                    challenging: number;
+                    period: string;
+                };
+            };
+            tips: any;
+            insights: any;
+        };
+    }>;
+    addAlignmentActionsToKarma(dto: AddAlignmentActionsDto, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            added_count: number;
+            total_karma_score: number;
+            actions_added: Array<{
+                id: number;
+                title: string;
+                karma_score: number;
+            }>;
+        };
+    }>;
+    commitIntention(dto: CommitIntentionDto, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
         data: {
             id: number;
             title: string;
-            clarity: number;
-            coherence: number;
-            mfp_score: number;
-            astro_index: number;
-            best_manifestation_date: Date;
-            is_locked: any;
-            created_at: Date;
-        }[];
+            is_committed: boolean;
+            committed_at: string;
+            commitment_message: string | null;
+            target_date: string | null;
+        };
     }>;
     getManifestation(id: number, user: any): Promise<{
         success: boolean;
+        code: number;
+        message: string;
         data: {
             id: number;
+            unique_id: string;
             title: string;
-            clarity: number;
-            coherence: number;
+            description: string;
+            category: string;
+            category_label: string;
+            emotional_state: string;
+            target_date: Date;
+            resonance_score: number;
+            alignment_score: number;
+            antrashaakti_score: number;
+            mahaadha_score: number;
+            astro_support_index: number;
             mfp_score: number;
-            astro_index: number;
-            best_manifestation_date: Date;
-            analysis_data: Record<string, any>;
-            is_locked: any;
-            created_at: Date;
-            updated_at: Date;
+            tips: {
+                rituals?: string[];
+                what_to_manifest?: string[];
+                what_not_to_manifest?: string[];
+                thought_alignment?: string[];
+                daily_actions?: string[];
+            };
+            insights: {
+                ai_narrative?: string;
+                astro_insights?: string;
+                energy_state?: "aligned" | "unstable" | "blocked";
+                keyword_analysis?: Record<string, any>;
+                emotional_charge?: string;
+                category_label?: string;
+                summary_for_ui?: string;
+                energy_reason?: string;
+            };
+            summary_for_ui: string;
+            is_archived: boolean;
+            is_locked: boolean;
+            added_date: Date;
+            modify_date: Date;
         };
     }>;
-    updateManifestation(id: number, body: {
-        is_locked?: boolean;
-        metadata?: Record<string, any>;
-    }, user: any): Promise<{
+    archiveManifestation(id: number, user: any): Promise<{
         success: boolean;
+        code: number;
+        message: string;
         data: {
             id: number;
-            is_locked: any;
-            updated_at: Date;
+            is_archived: boolean;
+        };
+    }>;
+    toggleLockManifestation(id: number, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            id: number;
+            is_locked: boolean;
+        };
+    }>;
+    getTips(id: number, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            tips: {
+                rituals?: string[];
+                what_to_manifest?: string[];
+                what_not_to_manifest?: string[];
+                thought_alignment?: string[];
+                daily_actions?: string[];
+            };
+        };
+    }>;
+    getResonanceScoreBreakdown(id: number, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            overall_score: number;
+            clarity_score: number;
+            emotional_coherence: number;
+            karma_influence: number;
+            astrological_support: number;
+            insight: string;
+        };
+    }>;
+    getAlignmentActions(id: number, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            actions: Array<{
+                id: number;
+                title: string;
+                description: string;
+                icon: string;
+                effort_level: "Low" | "Medium" | "High";
+                karma_score: number;
+                category: string;
+            }>;
+        };
+    }>;
+    getCosmicSupportIndex(id: number, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            current_mahadasha: {
+                lord: string;
+                description: string;
+                status: "Supportive" | "Neutral" | "Challenging";
+            };
+            current_antardasha: {
+                lord: string;
+                description: string;
+                status: "Supportive" | "Neutral" | "Challenging";
+            };
+            current_pratyantar: {
+                lord: string;
+                description: string;
+                status: "Supportive" | "Neutral" | "Challenging";
+            };
+            guidance_message: string;
+        };
+    }>;
+    getAlignmentSummary(id: number, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            manifestation_title: string;
+            resonance_score: number;
+            resonance_label: string;
+            cosmic_support_status: "Supportive" | "Neutral" | "Challenging";
+            cosmic_support_period: string;
+            commitment_status: "Not Committed" | "Consciously Committed";
+            active_alignment_actions: Array<{
+                id: number;
+                title: string;
+                icon: string;
+                karma_score: number;
+            }>;
+        };
+    }>;
+    getJourneyTimeline(id: number, user: any): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            total_progress: number;
+            phases: Array<{
+                id: string;
+                title: string;
+                description: string;
+                date_range: string;
+                status: "Completed" | "In Progress" | "Upcoming";
+                progress_percentage?: number;
+            }>;
+            current_phase: {
+                id: string;
+                title: string;
+                insight: string;
+                resonance_score: number;
+            };
         };
     }>;
     deleteManifestation(id: number, user: any): Promise<{
         success: boolean;
+        code: number;
         message: string;
     }>;
 }
