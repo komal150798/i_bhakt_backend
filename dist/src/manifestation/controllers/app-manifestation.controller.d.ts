@@ -20,25 +20,6 @@ export declare class AppManifestationController {
             mahaadha_score: number;
             astro_support_index: number;
             mfp_score: number;
-            tips: {
-                rituals?: string[];
-                what_to_manifest?: string[];
-                what_not_to_manifest?: string[];
-                thought_alignment?: string[];
-                daily_actions?: string[];
-            };
-            insights: {
-                ai_narrative?: string;
-                astro_insights?: string;
-                energy_state?: "aligned" | "unstable" | "blocked";
-                keyword_analysis?: Record<string, any>;
-                emotional_charge?: string;
-                category_label?: string;
-                summary_for_ui?: string;
-                energy_reason?: string;
-            };
-            summary_for_ui: string;
-            added_date: Date;
         };
     }>;
     getDashboard(user: any): Promise<{

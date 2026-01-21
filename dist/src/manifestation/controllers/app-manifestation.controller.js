@@ -42,10 +42,6 @@ let AppManifestationController = class AppManifestationController {
                 mahaadha_score: manifestation.mahaadha_score,
                 astro_support_index: manifestation.astro_support_index,
                 mfp_score: manifestation.mfp_score,
-                tips: manifestation.tips,
-                insights: manifestation.insights,
-                summary_for_ui: manifestation.insights?.summary_for_ui || null,
-                added_date: manifestation.added_date,
             },
         };
     }

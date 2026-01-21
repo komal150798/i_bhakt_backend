@@ -30,6 +30,8 @@ export declare class ManifestationEnhancedService {
     private readonly logger;
     constructor(manifestationRepository: Repository<Manifestation>, userRepository: Repository<User>, customerRepository: Repository<Customer>, dashaRepository: Repository<DashaRecord>, antardashaRepository: Repository<AntardashaRecord>, pratyantarRepository: Repository<PratyantarDashaRecord>, sukshmaRepository: Repository<SukshmaDashaRecord>, kundliRepository: Repository<Kundli>, kundliPlanetRepository: Repository<KundliPlanet>, kundliHouseRepository: Repository<KundliHouse>, aiEvaluationService: ManifestationAIEvaluationService, swissEphemerisService: SwissEphemerisService, kundliService: KundliService);
     createManifestation(userId: number, dto: CreateManifestationEnhancedDto): Promise<Manifestation>;
+    private getQuickScores;
+    private enhanceManifestationAsync;
     getDashboard(userId: number): Promise<{
         summary: {
             top_resonance: number;
@@ -69,6 +71,8 @@ export declare class ManifestationEnhancedService {
     }>;
     private calculateActionWindows;
     getAllManifestations(userId: number, includeArchived?: boolean): Promise<Manifestation[]>;
+    private calculateKundliBasedScores;
+    private computeMFPScore;
     private ensureKundliExists;
     private calculateAndStoreDashaPeriods;
     calculateDetailedResonance(userId: number, description: string): Promise<{

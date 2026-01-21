@@ -64,6 +64,8 @@ export class AppManifestationController {
       dto,
     );
 
+    // Return only essential data for fast response
+    // Other details (tips, insights, etc.) can be fetched via /:id endpoint
     return {
       success: true,
       code: 201,
@@ -80,10 +82,6 @@ export class AppManifestationController {
         mahaadha_score: manifestation.mahaadha_score,
         astro_support_index: manifestation.astro_support_index,
         mfp_score: manifestation.mfp_score,
-        tips: manifestation.tips,
-        insights: manifestation.insights,
-        summary_for_ui: manifestation.insights?.summary_for_ui || null,
-        added_date: manifestation.added_date,
       },
     };
   }

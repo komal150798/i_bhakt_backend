@@ -80,61 +80,259 @@ export class ManifestationEnhancedService {
 
     // Get user - check Customer table first (new normalized structure), then fallback to User table
     let user: User | Customer | null = null;
-    
+
     // Try Customer table first
     user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
-    
+
     // Fallback to legacy User table
     if (!user) {
       user = await this.userRepository.findOne({ where: { id: userId, is_deleted: false } });
     }
-    
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    // Run AI + Swiss Ephemeris evaluation (category will be auto-detected from description)
-    // Pass user as User type (both Customer and User have compatible fields for this)
-    const evaluation = await this.aiEvaluationService.evaluateManifestation(
-      title,
-      dto.description,
-      undefined, // Category will be auto-detected
-      user as User,
-    );
+    // FAST PATH: Get quick scores from rule-based analysis (no LLM, no kundli lookup)
+    const quickScores = await this.getQuickScores(title, description);
 
-    // Use detected category from AI evaluation
-    const finalCategory = evaluation.detectedCategory || null;
-
-    // Calculate Recommended Action Windows (optimal dates based on astrological influences)
-    const actionWindows = await this.calculateActionWindows(finalCategory, user as User);
-
-    // Create manifestation entity
+    // Create manifestation with quick scores first (fast response)
     const manifestation = this.manifestationRepository.create({
       user_id: userId,
       title: title,
       description: dto.description.trim(),
-      category: finalCategory,
-      emotional_state: null, // Auto-detected from content, not user input
-      target_date: null, // Removed from form
-      resonance_score: evaluation.scores.resonance_score,
-      alignment_score: evaluation.scores.alignment_score,
-      antrashaakti_score: evaluation.scores.antrashaakti_score,
-      mahaadha_score: evaluation.scores.mahaadha_score,
-      astro_support_index: evaluation.scores.astro_support_index,
-      mfp_score: evaluation.scores.mfp_score,
-      coherence_score: evaluation.scores.coherence_score,
-      action_windows: actionWindows,
+      category: quickScores.category,
+      emotional_state: null,
+      target_date: null,
+      resonance_score: quickScores.resonance_score,
+      alignment_score: quickScores.alignment_score,
+      antrashaakti_score: quickScores.antrashaakti_score,
+      mahaadha_score: quickScores.mahaadha_score,
+      astro_support_index: quickScores.astro_support_index,
+      mfp_score: quickScores.mfp_score,
+      coherence_score: quickScores.coherence_score,
+      action_windows: null, // Will be calculated async
       progress_tracking: {
         current_progress: 0,
         journal_entries_count: 0,
         milestones: [],
       },
-      tips: evaluation.tips,
-      insights: evaluation.insights,
+      tips: null, // Will be calculated async
+      insights: {
+        ai_narrative: '',
+        astro_insights: '',
+        energy_state: quickScores.energy_state,
+        keyword_analysis: {},
+        emotional_charge: 'neutral',
+        category_label: quickScores.category_label,
+      },
       is_archived: false,
     });
 
-    return await this.manifestationRepository.save(manifestation);
+    // Save immediately for fast response
+    const savedManifestation = await this.manifestationRepository.save(manifestation);
+
+    // ASYNC PATH: Calculate kundli-based scores and enhanced data in background
+    // Don't await - let it run asynchronously
+    this.enhanceManifestationAsync(savedManifestation.id, userId, title, description, user).catch(error => {
+      this.logger.error(`Async enhancement failed for manifestation ${savedManifestation.id}:`, error);
+    });
+
+    return savedManifestation;
+  }
+
+  /**
+   * Get quick scores using rule-based analysis (no LLM, no kundli)
+   * This is fast and returns immediately
+   */
+  private async getQuickScores(title: string, description: string): Promise<{
+    category: string;
+    category_label: string;
+    resonance_score: number;
+    alignment_score: number;
+    antrashaakti_score: number;
+    mahaadha_score: number;
+    astro_support_index: number;
+    mfp_score: number;
+    coherence_score: number;
+    energy_state: 'aligned' | 'unstable' | 'blocked';
+  }> {
+    const text = `${title} ${description}`.toLowerCase();
+
+    // Quick category detection using keywords
+    const categoryKeywords: Record<string, string[]> = {
+      career: ['job', 'career', 'work', 'promotion', 'business', 'office', 'salary', 'profession', 'position', 'cm', 'minister', 'election', 'political', 'government', 'sarpanch', 'mla', 'mp'],
+      relationship: ['love', 'relationship', 'marriage', 'partner', 'spouse', 'family', 'friend', 'dating'],
+      money: ['money', 'wealth', 'rich', 'income', 'financial', 'earning', 'profit', 'investment'],
+      health: ['health', 'fitness', 'weight', 'body', 'disease', 'cure', 'medical', 'wellness'],
+      spiritual: ['spiritual', 'meditation', 'peace', 'enlightenment', 'soul', 'divine', 'god', 'prayer'],
+    };
+
+    let detectedCategory = 'other';
+    let maxScore = 0;
+    for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+      const score = keywords.filter(kw => text.includes(kw)).length;
+      if (score > maxScore) {
+        maxScore = score;
+        detectedCategory = cat;
+      }
+    }
+
+    const categoryLabels: Record<string, string> = {
+      career: 'Career & Work',
+      relationship: 'Relationships',
+      money: 'Wealth & Finance',
+      health: 'Health & Wellness',
+      spiritual: 'Spirituality',
+      other: 'General',
+    };
+
+    // Quick resonance score based on positive/negative words
+    const positiveWords = ['want', 'wish', 'desire', 'hope', 'dream', 'achieve', 'success', 'happy', 'love', 'grow', 'improve', 'best'];
+    const negativeWords = ['not', 'never', 'can\'t', 'won\'t', 'fear', 'worry', 'doubt', 'fail', 'hate', 'problem'];
+
+    const positiveCount = positiveWords.filter(w => text.includes(w)).length;
+    const negativeCount = negativeWords.filter(w => text.includes(w)).length;
+
+    let resonance_score = 50 + (positiveCount * 8) - (negativeCount * 10);
+    resonance_score = Math.max(20, Math.min(85, resonance_score));
+
+    // Quick alignment score based on specificity
+    let alignment_score = 40;
+    if (/\d{4}/.test(text)) alignment_score += 15; // Has year
+    if (/\d+/.test(text)) alignment_score += 10; // Has numbers
+    if (text.length > 50) alignment_score += 10;
+    if (text.length > 100) alignment_score += 5;
+    alignment_score = Math.min(80, alignment_score);
+
+    // Quick antrashaakti score
+    const powerWords = ['will', 'can', 'able', 'strong', 'confident', 'believe', 'certain'];
+    const powerCount = powerWords.filter(w => text.includes(w)).length;
+    let antrashaakti_score = 45 + (powerCount * 8);
+    antrashaakti_score = Math.min(75, antrashaakti_score);
+
+    // Quick mahaadha score (blockages)
+    let mahaadha_score = negativeCount * 15;
+    mahaadha_score = Math.min(50, mahaadha_score);
+
+    // Default astro support (will be updated async with real kundli data)
+    const astro_support_index = 60;
+
+    // Calculate MFP
+    const mahaadhaInfluence = 100 - mahaadha_score;
+    const mfp_score = Math.round(
+      resonance_score * 0.25 +
+      alignment_score * 0.20 +
+      antrashaakti_score * 0.20 +
+      mahaadhaInfluence * 0.15 +
+      astro_support_index * 0.20
+    );
+
+    // Quick coherence score
+    const coherence_score = Math.round((resonance_score + alignment_score) / 2);
+
+    // Energy state
+    let energy_state: 'aligned' | 'unstable' | 'blocked' = 'aligned';
+    if (mfp_score < 45) energy_state = 'blocked';
+    else if (mfp_score < 60) energy_state = 'unstable';
+
+    return {
+      category: detectedCategory,
+      category_label: categoryLabels[detectedCategory] || 'General',
+      resonance_score: Math.round(resonance_score),
+      alignment_score: Math.round(alignment_score),
+      antrashaakti_score: Math.round(antrashaakti_score),
+      mahaadha_score: Math.round(mahaadha_score),
+      astro_support_index,
+      mfp_score,
+      coherence_score,
+      energy_state,
+    };
+  }
+
+  /**
+   * Enhance manifestation with full AI and kundli analysis (runs async in background)
+   */
+  private async enhanceManifestationAsync(
+    manifestationId: number,
+    userId: number,
+    title: string,
+    description: string,
+    user: User | Customer,
+  ): Promise<void> {
+    try {
+      this.logger.log(`Starting async enhancement for manifestation ${manifestationId}`);
+
+      // Ensure kundli exists
+      await this.ensureKundliExists(user);
+
+      // Run full AI evaluation
+      const evaluation = await this.aiEvaluationService.evaluateManifestation(
+        title,
+        description,
+        undefined,
+        user as User,
+      );
+
+      const finalCategory = evaluation.detectedCategory || null;
+
+      // Calculate kundli-based scores
+      const kundliBasedScores = await this.calculateKundliBasedScores(userId, finalCategory);
+
+      let astro_support_index = evaluation.scores.astro_support_index;
+      let mahaadha_score = evaluation.scores.mahaadha_score;
+      let antrashaakti_score = evaluation.scores.antrashaakti_score;
+
+      if (kundliBasedScores) {
+        astro_support_index = kundliBasedScores.astro_support_index;
+        if (kundliBasedScores.dasha_challenging > 50) {
+          mahaadha_score = Math.min(100, evaluation.scores.mahaadha_score + Math.round(kundliBasedScores.dasha_challenging * 0.3));
+        }
+        if (kundliBasedScores.dasha_supportive > 70) {
+          antrashaakti_score = Math.min(100, evaluation.scores.antrashaakti_score + Math.round((kundliBasedScores.dasha_supportive - 50) * 0.2));
+        }
+      }
+
+      const mfp_score = this.computeMFPScore({
+        resonance_score: evaluation.scores.resonance_score,
+        alignment_score: evaluation.scores.alignment_score,
+        antrashaakti_score: antrashaakti_score,
+        mahaadha_score: mahaadha_score,
+        astro_support_index: astro_support_index,
+      });
+
+      // Calculate action windows
+      const actionWindows = await this.calculateActionWindows(finalCategory, user as User);
+
+      // Enhance insights
+      const enhancedInsights = { ...evaluation.insights };
+      if (kundliBasedScores && kundliBasedScores.currentDasha) {
+        const mahaLord = kundliBasedScores.currentDasha.mahadasha?.lord || 'Unknown';
+        const antaraLord = kundliBasedScores.currentDasha.antardasha?.lord || 'Unknown';
+        enhancedInsights.astro_insights = `Current Dasha: ${mahaLord}-${antaraLord}. ${kundliBasedScores.dasha_supportive > 60
+          ? `This period is favorable (${Math.round(kundliBasedScores.dasha_supportive)}% supportive) for ${finalCategory || 'your'} manifestations.`
+          : `This period has some challenges (${Math.round(kundliBasedScores.dasha_challenging)}% challenging). Focus on inner alignment and patience.`}`;
+      }
+
+      // Update manifestation with enhanced data
+      await this.manifestationRepository.update(manifestationId, {
+        category: finalCategory,
+        resonance_score: evaluation.scores.resonance_score,
+        alignment_score: evaluation.scores.alignment_score,
+        antrashaakti_score: antrashaakti_score,
+        mahaadha_score: mahaadha_score,
+        astro_support_index: astro_support_index,
+        mfp_score: mfp_score,
+        coherence_score: evaluation.scores.coherence_score,
+        action_windows: actionWindows,
+        tips: evaluation.tips,
+        insights: enhancedInsights,
+      });
+
+      this.logger.log(`Async enhancement completed for manifestation ${manifestationId}`);
+    } catch (error) {
+      this.logger.error(`Async enhancement failed for manifestation ${manifestationId}:`, error);
+    }
   }
 
   /**
@@ -552,6 +750,270 @@ export class ManifestationEnhancedService {
       where,
       order: { added_date: 'DESC' },
     });
+  }
+
+  /**
+   * Calculate kundli-based scores using user's actual dasha periods
+   * Returns astro_support_index based on current dasha alignment with manifestation category
+   */
+  private async calculateKundliBasedScores(
+    userId: number,
+    category: string | null,
+  ): Promise<{
+    astro_support_index: number;
+    dasha_supportive: number;
+    dasha_challenging: number;
+    currentDasha: {
+      mahadasha: { lord: string; start: Date; end: Date } | null;
+      antardasha: { lord: string; start: Date; end: Date } | null;
+      pratyantar: { lord: string; start: Date; end: Date } | null;
+    } | null;
+  } | null> {
+    try {
+      // Get user's kundli
+      const kundli = await this.kundliRepository.findOne({
+        where: { user_id: userId, is_deleted: false },
+      });
+
+      if (!kundli) {
+        this.logger.warn(`No kundli found for user ${userId}, using default astro scores`);
+        return null;
+      }
+
+      const currentDate = new Date();
+      let currentMahadasha: any = null;
+      let currentAntardasha: any = null;
+      let currentPratyantar: any = null;
+
+      // Try to get dasha from kundli's dasha_timeline
+      if (kundli.dasha_timeline) {
+        const dashaTimeline = kundli.dasha_timeline as any;
+
+        if (!Array.isArray(dashaTimeline) && dashaTimeline.vimshottari && dashaTimeline.vimshottari.mahadasha) {
+          // Nested vimshottari structure
+          const mahadashas = dashaTimeline.vimshottari.mahadasha;
+          const birthDate = kundli.birth_date instanceof Date ? kundli.birth_date : new Date(kundli.birth_date);
+          const dashaData = this.calculateCurrentDashaFromTimeline(mahadashas, currentDate, birthDate);
+          if (dashaData) {
+            currentMahadasha = dashaData.mahadasha;
+            currentAntardasha = dashaData.antardasha;
+            currentPratyantar = dashaData.pratyantar;
+          }
+        } else if (Array.isArray(dashaTimeline)) {
+          // Direct array format
+          const birthDate = kundli.birth_date instanceof Date ? kundli.birth_date : new Date(kundli.birth_date);
+          const dashaData = this.calculateCurrentDashaFromTimeline(dashaTimeline, currentDate, birthDate);
+          if (dashaData) {
+            currentMahadasha = dashaData.mahadasha;
+            currentAntardasha = dashaData.antardasha;
+            currentPratyantar = dashaData.pratyantar;
+          }
+        }
+      }
+
+      // If dasha_timeline doesn't work, calculate from birth date and nakshatra
+      if (!currentMahadasha && kundli.nakshatra) {
+        const birthDate = kundli.birth_date instanceof Date ? kundli.birth_date : new Date(kundli.birth_date);
+        const birthTime = kundli.birth_time ? `${kundli.birth_date}T${kundli.birth_time}` : kundli.birth_date;
+        const birthDateTime = new Date(birthTime);
+        const dashaData = this.calculateDashaFromBirthDateAndNakshatra(
+          birthDateTime,
+          kundli.nakshatra,
+          currentDate,
+        );
+        if (dashaData) {
+          currentMahadasha = dashaData.mahadasha;
+          currentAntardasha = dashaData.antardasha;
+          currentPratyantar = dashaData.pratyantar;
+        }
+      }
+
+      // Fallback: Try dasha_records table
+      if (!currentMahadasha) {
+        try {
+          const dashaRecords = await this.dashaRepository.find({
+            where: { user_id: userId },
+            relations: ['antardashas', 'antardashas.pratyantardashas'],
+            order: { start_date: 'ASC' },
+          });
+
+          for (const dasha of dashaRecords) {
+            if (new Date(dasha.start_date) <= currentDate && new Date(dasha.end_date) >= currentDate) {
+              currentMahadasha = {
+                lord: dasha.mahadasha_lord,
+                start: new Date(dasha.start_date),
+                end: new Date(dasha.end_date),
+              };
+              for (const antara of dasha.antardashas || []) {
+                if (new Date(antara.start_date) <= currentDate && new Date(antara.end_date) >= currentDate) {
+                  currentAntardasha = {
+                    lord: antara.antardasha_lord,
+                    start: new Date(antara.start_date),
+                    end: new Date(antara.end_date),
+                  };
+                  for (const pratyantar of antara.pratyantardashas || []) {
+                    if (new Date(pratyantar.start_date) <= currentDate && new Date(pratyantar.end_date) >= currentDate) {
+                      currentPratyantar = {
+                        lord: pratyantar.pratyantar_lord,
+                        start: new Date(pratyantar.start_date),
+                        end: new Date(pratyantar.end_date),
+                      };
+                      break;
+                    }
+                  }
+                  break;
+                }
+              }
+              break;
+            }
+          }
+        } catch (error) {
+          this.logger.warn('Could not fetch Dasha records:', error.message);
+        }
+      }
+
+      if (!currentMahadasha) {
+        this.logger.warn(`Could not calculate dasha for user ${userId}`);
+        return null;
+      }
+
+      // Calculate dasha resonance based on category alignment
+      const categoryPlanets: Record<string, { primary: string[]; secondary: string[]; neutral: string[]; challenging: string[] }> = {
+        relationship: {
+          primary: ['Venus', 'Jupiter'],
+          secondary: ['Moon', 'Mercury'],
+          neutral: ['Sun', 'Mars'],
+          challenging: ['Saturn', 'Rahu', 'Ketu'],
+        },
+        love: {
+          primary: ['Venus', 'Jupiter'],
+          secondary: ['Moon'],
+          neutral: ['Mercury', 'Sun'],
+          challenging: ['Saturn', 'Mars', 'Rahu', 'Ketu'],
+        },
+        career: {
+          primary: ['Mercury', 'Jupiter', 'Sun'],
+          secondary: ['Venus', 'Moon'],
+          neutral: ['Mars'],
+          challenging: ['Saturn', 'Rahu', 'Ketu'],
+        },
+        wealth: {
+          primary: ['Jupiter', 'Venus'],
+          secondary: ['Mercury', 'Moon'],
+          neutral: ['Sun'],
+          challenging: ['Saturn', 'Mars', 'Rahu', 'Ketu'],
+        },
+        money: {
+          primary: ['Jupiter', 'Venus'],
+          secondary: ['Mercury'],
+          neutral: ['Sun', 'Moon'],
+          challenging: ['Saturn', 'Mars', 'Rahu', 'Ketu'],
+        },
+        health: {
+          primary: ['Mars', 'Sun', 'Moon'],
+          secondary: ['Jupiter'],
+          neutral: ['Mercury', 'Venus'],
+          challenging: ['Saturn', 'Rahu', 'Ketu'],
+        },
+        spiritual: {
+          primary: ['Jupiter', 'Ketu', 'Saturn'],
+          secondary: ['Moon', 'Sun'],
+          neutral: ['Mercury', 'Venus'],
+          challenging: ['Mars', 'Rahu'],
+        },
+        other: {
+          primary: ['Jupiter', 'Venus'],
+          secondary: ['Mercury', 'Moon'],
+          neutral: ['Sun', 'Mars'],
+          challenging: ['Saturn', 'Rahu', 'Ketu'],
+        },
+      };
+
+      const planetAlignment = categoryPlanets[category?.toLowerCase() || 'other'] || categoryPlanets.other;
+
+      const calculateDashaResonance = (lord: string | null): { supportive: number; challenging: number } => {
+        if (!lord) return { supportive: 50, challenging: 50 };
+
+        if (planetAlignment.primary.includes(lord)) {
+          return { supportive: 90, challenging: 10 };
+        } else if (planetAlignment.secondary.includes(lord)) {
+          return { supportive: 75, challenging: 25 };
+        } else if (planetAlignment.neutral.includes(lord)) {
+          return { supportive: 55, challenging: 45 };
+        } else if (planetAlignment.challenging.includes(lord)) {
+          return { supportive: 30, challenging: 70 };
+        }
+        return { supportive: 50, challenging: 50 };
+      };
+
+      const mahaResonance = calculateDashaResonance(currentMahadasha?.lord);
+      const antaraResonance = calculateDashaResonance(currentAntardasha?.lord);
+      const pratyantarResonance = calculateDashaResonance(currentPratyantar?.lord);
+
+      // Weighted average: Mahadasha 50%, Antardasha 35%, Pratyantar 15%
+      const dasha_supportive = Math.round(
+        mahaResonance.supportive * 0.50 +
+        antaraResonance.supportive * 0.35 +
+        pratyantarResonance.supportive * 0.15
+      );
+      const dasha_challenging = Math.round(
+        mahaResonance.challenging * 0.50 +
+        antaraResonance.challenging * 0.35 +
+        pratyantarResonance.challenging * 0.15
+      );
+
+      // Calculate astro_support_index based on dasha alignment
+      const astro_support_index = dasha_supportive;
+
+      this.logger.log(`Kundli-based scores for user ${userId}: astro_support=${astro_support_index}, dasha_supportive=${dasha_supportive}, Mahadasha=${currentMahadasha?.lord}, Antardasha=${currentAntardasha?.lord}`);
+
+      return {
+        astro_support_index,
+        dasha_supportive,
+        dasha_challenging,
+        currentDasha: {
+          mahadasha: currentMahadasha,
+          antardasha: currentAntardasha,
+          pratyantar: currentPratyantar,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error calculating kundli-based scores for user ${userId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Calculate MFP Score: Manifestation Fulfillment Probability
+   * Weighted average of all scores
+   */
+  private computeMFPScore(scores: {
+    resonance_score: number;
+    alignment_score: number;
+    antrashaakti_score: number;
+    mahaadha_score: number;
+    astro_support_index: number;
+  }): number {
+    // Weights
+    const weights = {
+      resonance: 0.25,
+      alignment: 0.20,
+      antrashaakti: 0.20,
+      mahaadha: 0.15, // Inverted (lower blockage = higher MFP)
+      astro: 0.20,
+    };
+
+    // Convert mahaadha (blockage) to positive influence (inverted)
+    const mahaadhaInfluence = 100 - scores.mahaadha_score;
+
+    const mfp =
+      scores.resonance_score * weights.resonance +
+      scores.alignment_score * weights.alignment +
+      scores.antrashaakti_score * weights.antrashaakti +
+      mahaadhaInfluence * weights.mahaadha +
+      scores.astro_support_index * weights.astro;
+
+    return Math.max(0, Math.min(100, Math.round(mfp)));
   }
 
   /**
