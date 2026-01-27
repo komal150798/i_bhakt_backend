@@ -66,6 +66,30 @@ let AppKarmaController = class AppKarmaController {
             },
         };
     }
+    async recordKarma(body, user) {
+        const dto = {
+            user_id: user.id,
+            action_text: body.action_text,
+            karma_type: body.karma_type,
+            timestamp: body.timestamp ? new Date(body.timestamp) : new Date(),
+        };
+        const entry = await this.karmaService.addKarmaAction(dto);
+        const insight = await this.karmaService.getKarmaInsight(entry.id, user.id);
+        return {
+            success: true,
+            message: 'Your action has been noted.',
+            data: {
+                id: entry.id,
+                action_text: entry.text,
+                karma_type: body.karma_type,
+                karma_type_internal: entry.karma_type,
+                score: entry.score,
+                category: entry.category_name,
+                created_at: entry.added_date,
+                insight: insight,
+            },
+        };
+    }
     async getKarmaScores(user) {
         const userId = user.id;
         const summary = await this.karmaService.getUserKarmaSummary(userId);
@@ -108,6 +132,54 @@ let AppKarmaController = class AppKarmaController {
             },
         };
     }
+    async getKarmaLedger(user) {
+        const userId = user.id;
+        const ledger = await this.karmaService.getKarmaLedger(userId);
+        return {
+            success: true,
+            data: ledger,
+        };
+    }
+    async getKarmaList(filter = 'all', limit = '50', offset = '0', user) {
+        const userId = user.id;
+        const validFilters = ['all', 'good', 'neutral', 'challenging'];
+        const karmaFilter = validFilters.includes(filter?.toLowerCase())
+            ? filter.toLowerCase()
+            : 'all';
+        const result = await this.karmaService.getKarmaList(userId, karmaFilter, parseInt(limit, 10) || 50, parseInt(offset, 10) || 0);
+        return {
+            success: true,
+            data: result,
+        };
+    }
+    async getKarmaPatterns(filter = 'week', user) {
+        const userId = user.id;
+        const validFilters = ['week', 'month', 'year'];
+        const patternFilter = validFilters.includes(filter?.toLowerCase())
+            ? filter.toLowerCase()
+            : 'week';
+        const patterns = await this.karmaService.getKarmaPatterns(userId, patternFilter);
+        return {
+            success: true,
+            data: patterns,
+        };
+    }
+    async getKarmaInsight(id, user) {
+        const userId = user.id;
+        const insight = await this.karmaService.getKarmaInsight(id, userId);
+        return {
+            success: true,
+            data: insight,
+        };
+    }
+    async getKarmaEntry(id, user) {
+        const userId = user.id;
+        const entry = await this.karmaService.getKarmaEntryById(id, userId);
+        return {
+            success: true,
+            data: entry,
+        };
+    }
     getKarmaGrade(score) {
         if (score >= 80)
             return 'Excellent';
@@ -137,7 +209,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('input'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    (0, swagger_1.ApiOperation)({ summary: 'Add karma input/action (Mobile App)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Add karma input/action (Mobile App - Auto-classified)' }),
     (0, swagger_1.ApiResponse)({
         status: 201,
         description: 'Karma input added successfully',
@@ -148,6 +220,20 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], AppKarmaController.prototype, "addKarmaInput", null);
+__decorate([
+    (0, common_1.Post)('record'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    (0, swagger_1.ApiOperation)({ summary: 'Record karma with selected type (Mobile App)' }),
+    (0, swagger_1.ApiResponse)({
+        status: 201,
+        description: 'Karma recorded successfully',
+    }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AppKarmaController.prototype, "recordKarma", null);
 __decorate([
     (0, common_1.Get)('scores'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
@@ -174,6 +260,85 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AppKarmaController.prototype, "getDashboard", null);
+__decorate([
+    (0, common_1.Get)('ledger'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Get karma ledger summary (Mobile App)' }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Karma ledger retrieved successfully',
+    }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AppKarmaController.prototype, "getKarmaLedger", null);
+__decorate([
+    (0, common_1.Get)('list'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Get karma list with filters (Mobile App)' }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Karma list retrieved successfully',
+    }),
+    __param(0, (0, common_1.Query)('filter')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('offset')),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, Object]),
+    __metadata("design:returntype", Promise)
+], AppKarmaController.prototype, "getKarmaList", null);
+__decorate([
+    (0, common_1.Get)('patterns'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Get karma patterns with time filter (Mobile App)' }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Karma patterns retrieved successfully',
+    }),
+    __param(0, (0, common_1.Query)('filter')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], AppKarmaController.prototype, "getKarmaPatterns", null);
+__decorate([
+    (0, common_1.Get)(':id/insight'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Get karma insight for an entry (Mobile App)' }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Karma insight retrieved successfully',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 404,
+        description: 'Karma entry not found',
+    }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
+], AppKarmaController.prototype, "getKarmaInsight", null);
+__decorate([
+    (0, common_1.Get)(':id'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Get karma entry details (Mobile App)' }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Karma entry retrieved successfully',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 404,
+        description: 'Karma entry not found',
+    }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
+], AppKarmaController.prototype, "getKarmaEntry", null);
 exports.AppKarmaController = AppKarmaController = __decorate([
     (0, swagger_1.ApiTags)('Karma (App)'),
     (0, common_1.Controller)('app/karma'),
