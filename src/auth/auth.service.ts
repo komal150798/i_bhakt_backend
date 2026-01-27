@@ -399,13 +399,28 @@ export class AuthService {
     username: string,
     password: string,
   ): Promise<Customer | null> {
-    // Find customer by email or phone_number
-    const customer = await this.customerRepository.findOne({
-      where: [
-        { email: username, is_deleted: false },
-        { phone_number: username, is_deleted: false },
-      ],
-    });
+    // Normalize email if it looks like an email (contains @)
+    const normalizedUsername = username.includes('@') 
+      ? username.trim().toLowerCase() 
+      : username.trim();
+    
+    // Find customer by email (case-insensitive) or phone_number
+    // Use query builder for case-insensitive email search to handle existing users
+    let customer: Customer | null = null;
+    
+    if (normalizedUsername.includes('@')) {
+      // For email, use case-insensitive search
+      customer = await this.customerRepository
+        .createQueryBuilder('customer')
+        .where('LOWER(customer.email) = LOWER(:email)', { email: normalizedUsername })
+        .andWhere('customer.is_deleted = :isDeleted', { isDeleted: false })
+        .getOne();
+    } else {
+      // For phone number, use exact match
+      customer = await this.customerRepository.findOne({
+        where: { phone_number: normalizedUsername, is_deleted: false },
+      });
+    }
 
     if (!customer || !customer.password) {
       return null;
@@ -427,13 +442,27 @@ export class AuthService {
     username: string,
     password: string,
   ): Promise<User | null> {
-    // Find user by email or username (assuming email can be used as username)
-    const user = await this.userRepository.findOne({
-      where: [
-        { email: username, is_deleted: false },
-        // If you have a username field, add it here
-      ],
-    });
+    // Normalize email if it looks like an email (contains @)
+    const normalizedUsername = username.includes('@') 
+      ? username.trim().toLowerCase() 
+      : username.trim();
+    
+    // Find user by email (case-insensitive) for backward compatibility
+    let user: User | null = null;
+    
+    if (normalizedUsername.includes('@')) {
+      // For email, use case-insensitive search
+      user = await this.userRepository
+        .createQueryBuilder('user')
+        .where('LOWER(user.email) = LOWER(:email)', { email: normalizedUsername })
+        .andWhere('user.is_deleted = :isDeleted', { isDeleted: false })
+        .getOne();
+    } else {
+      // For username (if not email), use exact match
+      user = await this.userRepository.findOne({
+        where: { email: normalizedUsername, is_deleted: false },
+      });
+    }
 
     if (!user || !user.password) {
       return null;
@@ -762,17 +791,21 @@ export class AuthService {
       throw new BadRequestException('Either email or phone_number is required');
     }
 
+    // Normalize email (trim and lowercase) for consistency
+    const normalizedEmail = email ? email.trim().toLowerCase() : null;
+    const normalizedPhoneNumber = phone_number ? phone_number.trim() : null;
+
     // Check if customer already exists
     const existingCustomer = await this.customerRepository.findOne({
       where: [
-        ...(email ? [{ email, is_deleted: false }] : []),
-        ...(phone_number ? [{ phone_number, is_deleted: false }] : []),
+        ...(normalizedEmail ? [{ email: normalizedEmail, is_deleted: false }] : []),
+        ...(normalizedPhoneNumber ? [{ phone_number: normalizedPhoneNumber, is_deleted: false }] : []),
       ],
     });
 
     if (existingCustomer) {
       throw new ConflictException(
-        email && existingCustomer.email === email
+        normalizedEmail && existingCustomer.email === normalizedEmail
           ? 'Email already registered'
           : 'Phone number already registered',
       );
@@ -793,11 +826,11 @@ export class AuthService {
 
     // Generate phone_number placeholder if only email provided
     // Customer entity requires phone_number, so we create a unique placeholder
-    let finalPhoneNumber = phone_number;
-    if (!finalPhoneNumber && email) {
+    let finalPhoneNumber = normalizedPhoneNumber;
+    if (!finalPhoneNumber && normalizedEmail) {
       // Create a shorter unique placeholder: e_<hash>_<timestamp>
       // Hash email to first 8 chars, use shorter timestamp
-      const emailHash = Buffer.from(email)
+      const emailHash = Buffer.from(normalizedEmail)
         .toString('base64')
         .slice(0, 8)
         .replace(/[^a-zA-Z0-9]/g, '');
@@ -811,10 +844,10 @@ export class AuthService {
     const customer = this.customerRepository.create({
       first_name,
       last_name,
-      email: email || null,
+      email: normalizedEmail,
       phone_number: finalPhoneNumber,
       password: hashedPassword,
-      is_verified: email ? true : false, // Email registration is considered verified
+      is_verified: normalizedEmail ? true : false, // Email registration is considered verified
       last_login: new Date(),
     });
 

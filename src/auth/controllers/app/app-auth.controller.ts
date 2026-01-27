@@ -16,6 +16,7 @@ import { RefreshTokenDto } from '../../dto/refresh-token.dto';
 import { LoginGoogleDto } from '../../dto/login-google.dto';
 import { SendForgotPasswordOtpDto, ResetPasswordDto } from '../../dto/forgot-password.dto';
 import { LoginPasswordDto } from '../../dto/login-password.dto';
+import { RegisterDto } from '../../dto/register.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { Public } from '../../../common/decorators/public.decorator';
 import { IsEmail, IsString } from 'class-validator';
@@ -40,6 +41,34 @@ class VerifyEmailOtpDto {
 @Controller('app/auth')
 export class AppAuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  @Public()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register a new customer account (Mobile App)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Registration successful, returns access_token, refresh_token, and user',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - missing required fields' })
+  @ApiResponse({ status: 409, description: 'Email or phone number already registered' })
+  async register(@Body() dto: RegisterDto) {
+    const result = await this.authService.register(
+      dto.name,
+      dto.email,
+      dto.phone_number,
+      dto.password,
+    );
+    
+    return {
+      success: true,
+      data: {
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+        user: result.user,
+      },
+    };
+  }
 
   @Post('login')
   @Public()

@@ -22,6 +22,7 @@ const refresh_token_dto_1 = require("../../dto/refresh-token.dto");
 const login_google_dto_1 = require("../../dto/login-google.dto");
 const forgot_password_dto_1 = require("../../dto/forgot-password.dto");
 const login_password_dto_1 = require("../../dto/login-password.dto");
+const register_dto_1 = require("../../dto/register.dto");
 const jwt_auth_guard_1 = require("../../../common/guards/jwt-auth.guard");
 const public_decorator_1 = require("../../../common/decorators/public.decorator");
 const class_validator_1 = require("class-validator");
@@ -44,6 +45,17 @@ __decorate([
 let AppAuthController = class AppAuthController {
     constructor(authService) {
         this.authService = authService;
+    }
+    async register(dto) {
+        const result = await this.authService.register(dto.name, dto.email, dto.phone_number, dto.password);
+        return {
+            success: true,
+            data: {
+                access_token: result.access_token,
+                refresh_token: result.refresh_token,
+                user: result.user,
+            },
+        };
     }
     async login(dto) {
         const result = await this.authService.loginWithPassword(dto.username, dto.password);
@@ -189,6 +201,22 @@ let AppAuthController = class AppAuthController {
     }
 };
 exports.AppAuthController = AppAuthController;
+__decorate([
+    (0, common_1.Post)('register'),
+    (0, public_decorator_1.Public)(),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    (0, swagger_1.ApiOperation)({ summary: 'Register a new customer account (Mobile App)' }),
+    (0, swagger_1.ApiResponse)({
+        status: 201,
+        description: 'Registration successful, returns access_token, refresh_token, and user',
+    }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Bad request - missing required fields' }),
+    (0, swagger_1.ApiResponse)({ status: 409, description: 'Email or phone number already registered' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [register_dto_1.RegisterDto]),
+    __metadata("design:returntype", Promise)
+], AppAuthController.prototype, "register", null);
 __decorate([
     (0, common_1.Post)('login'),
     (0, public_decorator_1.Public)(),

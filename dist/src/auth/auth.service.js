@@ -282,12 +282,22 @@ let AuthService = class AuthService {
         }
     }
     async validateCustomerByPassword(username, password) {
-        const customer = await this.customerRepository.findOne({
-            where: [
-                { email: username, is_deleted: false },
-                { phone_number: username, is_deleted: false },
-            ],
-        });
+        const normalizedUsername = username.includes('@')
+            ? username.trim().toLowerCase()
+            : username.trim();
+        let customer = null;
+        if (normalizedUsername.includes('@')) {
+            customer = await this.customerRepository
+                .createQueryBuilder('customer')
+                .where('LOWER(customer.email) = LOWER(:email)', { email: normalizedUsername })
+                .andWhere('customer.is_deleted = :isDeleted', { isDeleted: false })
+                .getOne();
+        }
+        else {
+            customer = await this.customerRepository.findOne({
+                where: { phone_number: normalizedUsername, is_deleted: false },
+            });
+        }
         if (!customer || !customer.password) {
             return null;
         }
@@ -298,11 +308,22 @@ let AuthService = class AuthService {
         return customer;
     }
     async validateUserByPassword(username, password) {
-        const user = await this.userRepository.findOne({
-            where: [
-                { email: username, is_deleted: false },
-            ],
-        });
+        const normalizedUsername = username.includes('@')
+            ? username.trim().toLowerCase()
+            : username.trim();
+        let user = null;
+        if (normalizedUsername.includes('@')) {
+            user = await this.userRepository
+                .createQueryBuilder('user')
+                .where('LOWER(user.email) = LOWER(:email)', { email: normalizedUsername })
+                .andWhere('user.is_deleted = :isDeleted', { isDeleted: false })
+                .getOne();
+        }
+        else {
+            user = await this.userRepository.findOne({
+                where: { email: normalizedUsername, is_deleted: false },
+            });
+        }
         if (!user || !user.password) {
             return null;
         }
@@ -476,14 +497,16 @@ let AuthService = class AuthService {
         if (!email && !phone_number) {
             throw new common_1.BadRequestException('Either email or phone_number is required');
         }
+        const normalizedEmail = email ? email.trim().toLowerCase() : null;
+        const normalizedPhoneNumber = phone_number ? phone_number.trim() : null;
         const existingCustomer = await this.customerRepository.findOne({
             where: [
-                ...(email ? [{ email, is_deleted: false }] : []),
-                ...(phone_number ? [{ phone_number, is_deleted: false }] : []),
+                ...(normalizedEmail ? [{ email: normalizedEmail, is_deleted: false }] : []),
+                ...(normalizedPhoneNumber ? [{ phone_number: normalizedPhoneNumber, is_deleted: false }] : []),
             ],
         });
         if (existingCustomer) {
-            throw new common_1.ConflictException(email && existingCustomer.email === email
+            throw new common_1.ConflictException(normalizedEmail && existingCustomer.email === normalizedEmail
                 ? 'Email already registered'
                 : 'Phone number already registered');
         }
@@ -496,9 +519,9 @@ let AuthService = class AuthService {
             first_name = nameParts[0] || null;
             last_name = nameParts.slice(1).join(' ') || null;
         }
-        let finalPhoneNumber = phone_number;
-        if (!finalPhoneNumber && email) {
-            const emailHash = Buffer.from(email)
+        let finalPhoneNumber = normalizedPhoneNumber;
+        if (!finalPhoneNumber && normalizedEmail) {
+            const emailHash = Buffer.from(normalizedEmail)
                 .toString('base64')
                 .slice(0, 8)
                 .replace(/[^a-zA-Z0-9]/g, '');
@@ -511,10 +534,10 @@ let AuthService = class AuthService {
         const customer = this.customerRepository.create({
             first_name,
             last_name,
-            email: email || null,
+            email: normalizedEmail,
             phone_number: finalPhoneNumber,
             password: hashedPassword,
-            is_verified: email ? true : false,
+            is_verified: normalizedEmail ? true : false,
             last_login: new Date(),
         });
         const savedCustomer = await this.customerRepository.save(customer);
