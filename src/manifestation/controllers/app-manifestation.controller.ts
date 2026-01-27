@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -236,7 +237,6 @@ export class AppManifestationController {
       dto.manifestation_id,
       user.id,
       dto.commitment_message,
-      dto.target_date,
     );
 
     return {
@@ -539,10 +539,14 @@ export class AppManifestationController {
   /**
    * GET /api/v1/app/manifestation/:id/journey-timeline
    * Get journey timeline for a manifestation (Screen 6)
+   * @param filter - Optional filter: 'weekly', 'monthly', or 'quarterly' (default: 'monthly')
    */
   @Get(':id/journey-timeline')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get journey timeline for a manifestation' })
+  @ApiOperation({ 
+    summary: 'Get journey timeline for a manifestation',
+    description: 'Get manifestation journey timeline with optional filter (weekly, monthly, quarterly)'
+  })
   @ApiResponse({
     status: 200,
     description: 'Journey timeline retrieved successfully',
@@ -553,11 +557,19 @@ export class AppManifestationController {
   })
   async getJourneyTimeline(
     @Param('id', ParseIntPipe) id: number,
+    @Query('filter') filter: string = 'monthly',
     @CurrentUser() user: any,
   ) {
+    // Validate filter
+    const validFilters: Array<'weekly' | 'monthly' | 'quarterly'> = ['weekly', 'monthly', 'quarterly'];
+    const timelineFilter: 'weekly' | 'monthly' | 'quarterly' = validFilters.includes(filter?.toLowerCase() as 'weekly' | 'monthly' | 'quarterly') 
+      ? (filter.toLowerCase() as 'weekly' | 'monthly' | 'quarterly')
+      : 'monthly';
+
     const result = await this.manifestationService.getJourneyTimeline(
       id,
       user.id,
+      timelineFilter,
     );
 
     return {

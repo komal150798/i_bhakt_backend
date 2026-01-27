@@ -5,5 +5,4 @@ export declare class AddAlignmentActionsDto {
 export declare class CommitIntentionDto {
     manifestation_id: number;
     commitment_message?: string;
-    target_date?: string;
 }

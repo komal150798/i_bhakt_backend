@@ -162,7 +162,7 @@ export declare class ManifestationEnhancedService {
             karma_score: number;
         }>;
     }>;
-    commitIntention(manifestationId: number, userId: number, commitmentMessage?: string, targetDate?: string): Promise<{
+    commitIntention(manifestationId: number, userId: number, commitmentMessage?: string): Promise<{
         id: number;
         title: string;
         is_committed: boolean;
@@ -202,22 +202,60 @@ export declare class ManifestationEnhancedService {
             karma_score: number;
         }>;
     }>;
-    getJourneyTimeline(manifestationId: number, userId: number): Promise<{
-        total_progress: number;
-        phases: Array<{
-            id: string;
+    getJourneyTimeline(manifestationId: number, userId: number, filter?: 'weekly' | 'monthly' | 'quarterly'): Promise<{
+        manifestation_id: string;
+        manifestation_category: string;
+        user_id: string;
+        alignment_summary: {
+            alignment_score: number;
+            status: string;
+            timeline_completion_percentage: number;
+        };
+        timeline_start_date: string;
+        timeline_end_date: string;
+        current_phase_id: string;
+        timeline_events: Array<{
+            phase_id: string;
+            phase_type: string;
             title: string;
             description: string;
-            date_range: string;
-            status: 'Completed' | 'In Progress' | 'Upcoming';
-            progress_percentage?: number;
+            start_date: string;
+            end_date: string;
+            status: string;
+            is_locked: boolean;
+            icon: string;
+            visual_state: {
+                node_state: string;
+                card_highlight: boolean;
+            };
+            actions?: Array<{
+                action_id: string;
+                action_type: string;
+                label: string;
+                frequency: string;
+                completion_required: boolean;
+            }>;
+            astrological_context: {
+                moon_phase?: string;
+                dasha_influence?: string;
+                confidence_level?: string;
+                planetary_support?: string[];
+                energy_level?: string;
+                recommended_effort?: string;
+                planetary_alignment?: string;
+                dasha_support?: boolean;
+                risk_level?: string;
+                planetary_pressure?: string;
+                risk_flag?: string;
+            };
+            evaluation_rules?: {
+                minimum_days_completed: number;
+                minimum_intent_score: number;
+            };
+            recommended_actions?: string[];
         }>;
-        current_phase: {
-            id: string;
-            title: string;
-            insight: string;
-            resonance_score: number;
-        };
     }>;
-    private generateJourneyPhases;
+    private generateTimelineEvents;
+    private getMoonPhase;
+    private getPlanetarySupport;
 }

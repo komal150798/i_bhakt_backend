@@ -28,13 +28,11 @@ export class CommitIntentionDto {
   @IsNotEmpty()
   manifestation_id: number;
 
-  @ApiPropertyOptional({ description: 'Optional commitment message' })
+  @ApiPropertyOptional({ 
+    description: 'Optional commitment message. If not provided, defaults to "I choose to commit consciously."',
+    example: 'I choose to commit consciously.'
+  })
   @IsOptional()
   @IsString()
   commitment_message?: string;
-
-  @ApiPropertyOptional({ description: 'Target date for manifestation (YYYY-MM-DD)' })
-  @IsOptional()
-  @IsString()
-  target_date?: string;
 }
