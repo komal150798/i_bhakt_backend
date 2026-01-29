@@ -29,9 +29,12 @@ export declare class AuthController {
         user: any;
     }>;
     loginWithGoogle(dto: LoginGoogleDto): Promise<{
-        access_token: string;
-        refresh_token: string;
-        user: any;
+        success: boolean;
+        data: {
+            access_token: string;
+            refresh_token: string;
+            user: any;
+        };
     }>;
     refreshToken(dto: RefreshTokenDto): Promise<{
         access_token: string;

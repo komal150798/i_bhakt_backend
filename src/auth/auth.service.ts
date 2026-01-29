@@ -134,7 +134,7 @@ export class AuthService {
 
     // Store refresh token if customer/user exists
     if (customer) {
-      await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration);
+      await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'otp');
     } else if (user) {
       await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
     }
@@ -202,7 +202,7 @@ export class AuthService {
 
     // Store refresh token if customer/user exists
     if (customer) {
-      await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration);
+      await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'otp');
     } else if (user) {
       await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
     }
@@ -399,28 +399,13 @@ export class AuthService {
     username: string,
     password: string,
   ): Promise<Customer | null> {
-    // Normalize email if it looks like an email (contains @)
-    const normalizedUsername = username.includes('@') 
-      ? username.trim().toLowerCase() 
-      : username.trim();
-    
-    // Find customer by email (case-insensitive) or phone_number
-    // Use query builder for case-insensitive email search to handle existing users
-    let customer: Customer | null = null;
-    
-    if (normalizedUsername.includes('@')) {
-      // For email, use case-insensitive search
-      customer = await this.customerRepository
-        .createQueryBuilder('customer')
-        .where('LOWER(customer.email) = LOWER(:email)', { email: normalizedUsername })
-        .andWhere('customer.is_deleted = :isDeleted', { isDeleted: false })
-        .getOne();
-    } else {
-      // For phone number, use exact match
-      customer = await this.customerRepository.findOne({
-        where: { phone_number: normalizedUsername, is_deleted: false },
-      });
-    }
+    // Find customer by email or phone_number
+    const customer = await this.customerRepository.findOne({
+      where: [
+        { email: username, is_deleted: false },
+        { phone_number: username, is_deleted: false },
+      ],
+    });
 
     if (!customer || !customer.password) {
       return null;
@@ -442,27 +427,13 @@ export class AuthService {
     username: string,
     password: string,
   ): Promise<User | null> {
-    // Normalize email if it looks like an email (contains @)
-    const normalizedUsername = username.includes('@') 
-      ? username.trim().toLowerCase() 
-      : username.trim();
-    
-    // Find user by email (case-insensitive) for backward compatibility
-    let user: User | null = null;
-    
-    if (normalizedUsername.includes('@')) {
-      // For email, use case-insensitive search
-      user = await this.userRepository
-        .createQueryBuilder('user')
-        .where('LOWER(user.email) = LOWER(:email)', { email: normalizedUsername })
-        .andWhere('user.is_deleted = :isDeleted', { isDeleted: false })
-        .getOne();
-    } else {
-      // For username (if not email), use exact match
-      user = await this.userRepository.findOne({
-        where: { email: normalizedUsername, is_deleted: false },
-      });
-    }
+    // Find user by email or username (assuming email can be used as username)
+    const user = await this.userRepository.findOne({
+      where: [
+        { email: username, is_deleted: false },
+        // If you have a username field, add it here
+      ],
+    });
 
     if (!user || !user.password) {
       return null;
@@ -550,6 +521,7 @@ export class AuthService {
 
   /**
    * Login with Google ID token
+   * Checks Customer table first, then falls back to User table for backward compatibility
    */
   async loginWithGoogle(
     idToken: string,
@@ -564,15 +536,45 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Google ID token');
     }
 
-    // Find or create user
-    const user = await this.findOrCreateGoogleUser(googleProfile);
+    // Check Customer table first (new normalized structure)
+    let customer = await this.findCustomerByEmail(googleProfile.email);
+    
+    if (customer) {
+      // Update avatar if provided and different
+      if (googleProfile.picture && customer.avatar_url !== googleProfile.picture) {
+        customer.avatar_url = googleProfile.picture;
+      }
+      // Update last login
+      customer.last_login = new Date();
+      await this.customerRepository.save(customer);
+      
+      // Use app tokens with configurable session expiration
+      return this.issueCustomerAppTokens(customer);
+    }
 
-    // Update last login
-    user.last_login = new Date();
-    await this.userRepository.save(user);
+    // Fallback to legacy User table for backward compatibility
+    let user = await this.findUserByEmail(googleProfile.email);
+    
+    if (user) {
+      // Update avatar if provided and different
+      if (googleProfile.picture && user.avatar_url !== googleProfile.picture) {
+        user.avatar_url = googleProfile.picture;
+      }
+      // Update last login
+      user.last_login = new Date();
+      await this.userRepository.save(user);
+      
+      // Use app tokens with configurable session expiration
+      return this.issueAppTokens(user);
+    }
 
-    // Use app tokens with 3 months expiration
-    return this.issueAppTokens(user);
+    // Create new customer (prefer Customer table for new users)
+    customer = await this.findOrCreateGoogleCustomer(googleProfile);
+    customer.last_login = new Date();
+    await this.customerRepository.save(customer);
+    
+    // Use app tokens with configurable session expiration
+    return this.issueCustomerAppTokens(customer);
   }
 
   /**
@@ -642,31 +644,16 @@ export class AuthService {
   }
 
   /**
-   * Find or create user from Google profile
+   * Find or create customer from Google profile (for new Google logins)
    */
-  async findOrCreateGoogleUser(googleProfile: {
+  async findOrCreateGoogleCustomer(googleProfile: {
     email: string;
     name: string;
     picture?: string;
     googleId: string;
-  }): Promise<User> {
-    // Try to find user by email
-    let user = await this.userRepository.findOne({
-      where: { email: googleProfile.email, is_deleted: false },
-    });
-
-    if (user) {
-      // Update avatar if provided and different
-      if (googleProfile.picture && user.avatar_url !== googleProfile.picture) {
-        user.avatar_url = googleProfile.picture;
-        await this.userRepository.save(user);
-      }
-      return user;
-    }
-
-    // Create new user
+  }): Promise<Customer> {
     // Generate a unique phone number placeholder for Google users
-    // Format: g_<hash> where hash is first 17 chars of Google ID + timestamp suffix
+    // Format: g_<hash> where hash is first 8 chars of Google ID + timestamp suffix
     // This ensures uniqueness while staying within varchar(20) limit
     const nameParts = googleProfile.name.split(' ');
     // Use first 8 chars of Google ID + last 9 chars of timestamp to fit in 20 chars (g_ = 2, + 18 = 20)
@@ -674,17 +661,17 @@ export class AuthService {
     const timestampShort = Date.now().toString().slice(-9); // Last 9 digits
     const phonePlaceholder = `g_${googleIdShort}${timestampShort}`;
     
-    user = this.userRepository.create({
+    const customer = this.customerRepository.create({
       email: googleProfile.email,
       first_name: nameParts[0] || null,
       last_name: nameParts.slice(1).join(' ') || null,
       avatar_url: googleProfile.picture || null,
-      role: UserRole.USER,
-      is_verified: true, // Google email is verified
       phone_number: phonePlaceholder,
+      is_verified: true, // Google email is verified
+      last_login: new Date(),
     });
 
-    return await this.userRepository.save(user);
+    return await this.customerRepository.save(customer);
   }
 
   /**
@@ -791,21 +778,17 @@ export class AuthService {
       throw new BadRequestException('Either email or phone_number is required');
     }
 
-    // Normalize email (trim and lowercase) for consistency
-    const normalizedEmail = email ? email.trim().toLowerCase() : null;
-    const normalizedPhoneNumber = phone_number ? phone_number.trim() : null;
-
     // Check if customer already exists
     const existingCustomer = await this.customerRepository.findOne({
       where: [
-        ...(normalizedEmail ? [{ email: normalizedEmail, is_deleted: false }] : []),
-        ...(normalizedPhoneNumber ? [{ phone_number: normalizedPhoneNumber, is_deleted: false }] : []),
+        ...(email ? [{ email, is_deleted: false }] : []),
+        ...(phone_number ? [{ phone_number, is_deleted: false }] : []),
       ],
     });
 
     if (existingCustomer) {
       throw new ConflictException(
-        normalizedEmail && existingCustomer.email === normalizedEmail
+        email && existingCustomer.email === email
           ? 'Email already registered'
           : 'Phone number already registered',
       );
@@ -826,11 +809,11 @@ export class AuthService {
 
     // Generate phone_number placeholder if only email provided
     // Customer entity requires phone_number, so we create a unique placeholder
-    let finalPhoneNumber = normalizedPhoneNumber;
-    if (!finalPhoneNumber && normalizedEmail) {
+    let finalPhoneNumber = phone_number;
+    if (!finalPhoneNumber && email) {
       // Create a shorter unique placeholder: e_<hash>_<timestamp>
       // Hash email to first 8 chars, use shorter timestamp
-      const emailHash = Buffer.from(normalizedEmail)
+      const emailHash = Buffer.from(email)
         .toString('base64')
         .slice(0, 8)
         .replace(/[^a-zA-Z0-9]/g, '');
@@ -844,10 +827,10 @@ export class AuthService {
     const customer = this.customerRepository.create({
       first_name,
       last_name,
-      email: normalizedEmail,
+      email: email || null,
       phone_number: finalPhoneNumber,
       password: hashedPassword,
-      is_verified: normalizedEmail ? true : false, // Email registration is considered verified
+      is_verified: email ? true : false, // Email registration is considered verified
       last_login: new Date(),
     });
 
@@ -903,6 +886,53 @@ export class AuthService {
   }
 
   /**
+   * Issue tokens for customer with app session expiration (for app logins)
+   */
+  private async issueCustomerAppTokens(customer: Customer): Promise<{
+    access_token: string;
+    refresh_token: string;
+    user: any;
+  }> {
+    const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
+      sub: customer.id,
+      email: customer.email || undefined,
+      phone_number: customer.phone_number || undefined,
+      role: UserRole.USER,
+      type: 'user',
+    };
+
+    // Get app session expiration from environment variable
+    const appSessionExpiration = this.getAppSessionExpiration();
+    const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
+    const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
+
+    // Store refresh token in CustomerToken table with app session expiration
+    await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'google');
+
+    // Format customer response
+    const userResponse = this.formatCustomerResponse(customer);
+
+    // Get personalized horoscope for logged-in user based on their birth data
+    try {
+      const personalizedHoroscope = await this.horoscopeService.getHoroscopeForUser(
+        customer.id,
+        'daily',
+      );
+      userResponse.horoscope = personalizedHoroscope;
+    } catch (error) {
+      // If horoscope fails (e.g., no birth date), continue without it (don't block login)
+      // User can update their profile with birth data to get personalized horoscope
+      // No horoscope will be included in the response
+    }
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user: userResponse,
+    };
+  }
+
+  /**
    * Store customer refresh token
    */
   private async storeCustomerToken(token: string, customerId: number): Promise<void> {
@@ -929,6 +959,7 @@ export class AuthService {
     token: string,
     customerId: number,
     expiresIn?: string,
+    loginMethod: 'password' | 'otp' | 'google' = 'otp',
   ): Promise<void> {
     const payload = this.jwtService.verifyToken(token);
     if (!payload) return;
@@ -949,7 +980,7 @@ export class AuthService {
       customer_id: customerId,
       expires_at: expiresAt,
       is_revoked: false,
-      login_method: 'otp',
+      login_method: loginMethod,
     });
 
     await this.customerTokenRepository.save(customerToken);

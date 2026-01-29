@@ -18,61 +18,37 @@ const swagger_1 = require("@nestjs/swagger");
 const jwt_auth_guard_1 = require("../../../common/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../../common/decorators/current-user.decorator");
 const users_service_1 = require("../../services/users.service");
-const customer_service_1 = require("../../services/customer.service");
 const subscriptions_service_1 = require("../../../subscriptions/services/subscriptions.service");
 const usage_tracking_service_1 = require("../../../subscriptions/services/usage-tracking.service");
-const update_customer_profile_dto_1 = require("../../dtos/update-customer-profile.dto");
 let AppUsersController = class AppUsersController {
-    constructor(usersService, customerService, subscriptionsService, usageTrackingService) {
+    constructor(usersService, subscriptionsService, usageTrackingService) {
         this.usersService = usersService;
-        this.customerService = customerService;
         this.subscriptionsService = subscriptionsService;
         this.usageTrackingService = usageTrackingService;
     }
     async getProfile(user) {
-        const profile = await this.customerService.getProfile(user.id);
-        const formattedProfile = {
-            name_and_gender: {
-                name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'User',
-                gender: profile.gender || null,
-            },
-            life_role: profile.life_role || null,
-            birth_details: {
-                date_of_birth: profile.date_of_birth ? new Date(profile.date_of_birth).toLocaleDateString('en-GB') : null,
-                time_of_birth: profile.time_of_birth || null,
-                place_of_birth: profile.place_name || null,
-                current_city: profile.current_city || null,
-            },
-            relationship_status: profile.relationship_status || null,
-            interests: profile.interests || null,
-            contact: {
-                email: profile.email || null,
-                phone_number: profile.phone_number || null,
-            },
-            avatar_url: profile.avatar_url || null,
-        };
+        const fullUser = await this.usersService.findOneByUniqueId(user.unique_id);
         return {
             success: true,
-            data: formattedProfile,
+            data: {
+                id: fullUser.unique_id,
+                name: `${fullUser.first_name || ''} ${fullUser.last_name || ''}`.trim() || 'User',
+                email: fullUser.email,
+                phone: fullUser.phone_number,
+                plan: fullUser.current_plan,
+                avatar: fullUser.avatar_url,
+                verified: fullUser.is_verified,
+            },
         };
     }
     async updateProfile(user, updateData) {
-        const updated = await this.customerService.updateProfile(user.id, updateData);
+        const updated = await this.usersService.update(user.unique_id, updateData, user.id);
         return {
             success: true,
-            message: 'Profile updated successfully',
             data: {
-                id: updated.id,
-                unique_id: updated.unique_id,
+                id: updated.unique_id,
                 name: `${updated.first_name || ''} ${updated.last_name || ''}`.trim() || 'User',
-                email: updated.email,
-                phone_number: updated.phone_number,
-                gender: updated.gender,
-                life_role: updated.life_role || null,
-                relationship_status: updated.relationship_status || null,
-                interests: updated.interests || null,
-                current_city: updated.current_city || null,
-                avatar_url: updated.avatar_url,
+                message: 'Profile updated',
             },
         };
     }
@@ -114,7 +90,7 @@ let AppUsersController = class AppUsersController {
 exports.AppUsersController = AppUsersController;
 __decorate([
     (0, common_1.Get)('profile'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get user profile (Mobile App) - Screen 07 Review Profile' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Get user profile (Mobile App)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -122,11 +98,11 @@ __decorate([
 ], AppUsersController.prototype, "getProfile", null);
 __decorate([
     (0, common_1.Put)('profile'),
-    (0, swagger_1.ApiOperation)({ summary: 'Update profile (Mobile App) - All screens (02-06, 09)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Update profile (Mobile App)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, update_customer_profile_dto_1.UpdateCustomerProfileDto]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], AppUsersController.prototype, "updateProfile", null);
 __decorate([
@@ -159,7 +135,6 @@ exports.AppUsersController = AppUsersController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
     __metadata("design:paramtypes", [users_service_1.UsersService,
-        customer_service_1.CustomerService,
         subscriptions_service_1.SubscriptionsService,
         usage_tracking_service_1.UsageTrackingService])
 ], AppUsersController);

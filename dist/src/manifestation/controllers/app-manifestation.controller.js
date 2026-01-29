@@ -96,7 +96,7 @@ let AppManifestationController = class AppManifestationController {
         };
     }
     async commitIntention(dto, user) {
-        const result = await this.manifestationService.commitIntention(dto.manifestation_id, user.id, dto.commitment_message);
+        const result = await this.manifestationService.commitIntention(dto.manifestation_id, user.id, dto.commitment_message, dto.target_date);
         return {
             success: true,
             code: 200,
@@ -206,12 +206,8 @@ let AppManifestationController = class AppManifestationController {
             data: result,
         };
     }
-    async getJourneyTimeline(id, filter = 'monthly', user) {
-        const validFilters = ['weekly', 'monthly', 'quarterly'];
-        const timelineFilter = validFilters.includes(filter?.toLowerCase())
-            ? filter.toLowerCase()
-            : 'monthly';
-        const result = await this.manifestationService.getJourneyTimeline(id, user.id, timelineFilter);
+    async getJourneyTimeline(id, user) {
+        const result = await this.manifestationService.getJourneyTimeline(id, user.id);
         return {
             success: true,
             code: 200,
@@ -476,10 +472,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id/journey-timeline'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    (0, swagger_1.ApiOperation)({
-        summary: 'Get journey timeline for a manifestation',
-        description: 'Get manifestation journey timeline with optional filter (weekly, monthly, quarterly)'
-    }),
+    (0, swagger_1.ApiOperation)({ summary: 'Get journey timeline for a manifestation' }),
     (0, swagger_1.ApiResponse)({
         status: 200,
         description: 'Journey timeline retrieved successfully',
@@ -489,10 +482,9 @@ __decorate([
         description: 'Manifestation not found',
     }),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
-    __param(1, (0, common_1.Query)('filter')),
-    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, String, Object]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], AppManifestationController.prototype, "getJourneyTimeline", null);
 __decorate([

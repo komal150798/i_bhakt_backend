@@ -40,12 +40,15 @@ __decorate([
     __metadata("design:type", Number)
 ], CommitIntentionDto.prototype, "manifestation_id", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({
-        description: 'Optional commitment message. If not provided, defaults to "I choose to commit consciously."',
-        example: 'I choose to commit consciously.'
-    }),
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Optional commitment message' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CommitIntentionDto.prototype, "commitment_message", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Target date for manifestation (YYYY-MM-DD)' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CommitIntentionDto.prototype, "target_date", void 0);
 //# sourceMappingURL=alignment-action.dto.js.map

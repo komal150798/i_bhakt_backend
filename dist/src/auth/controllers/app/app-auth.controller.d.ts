@@ -5,7 +5,6 @@ import { RefreshTokenDto } from '../../dto/refresh-token.dto';
 import { LoginGoogleDto } from '../../dto/login-google.dto';
 import { SendForgotPasswordOtpDto, ResetPasswordDto } from '../../dto/forgot-password.dto';
 import { LoginPasswordDto } from '../../dto/login-password.dto';
-import { RegisterDto } from '../../dto/register.dto';
 declare class SendEmailOtpDto {
     email: string;
 }
@@ -17,14 +16,6 @@ declare class VerifyEmailOtpDto {
 export declare class AppAuthController {
     private readonly authService;
     constructor(authService: AuthService);
-    register(dto: RegisterDto): Promise<{
-        success: boolean;
-        data: {
-            access_token: string;
-            refresh_token: string;
-            user: any;
-        };
-    }>;
     login(dto: LoginPasswordDto): Promise<{
         success: boolean;
         data: {

@@ -26,9 +26,5 @@ export declare class Customer extends BaseEntity {
     is_verified: boolean;
     last_login: Date | null;
     last_login_ip: string | null;
-    life_role: string | null;
-    relationship_status: string | null;
-    interests: string | null;
-    current_city: string | null;
     tokens: CustomerToken[];
 }

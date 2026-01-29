@@ -98,7 +98,7 @@ let AuthService = class AuthService {
         const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
         const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
         if (customer) {
-            await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration);
+            await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'otp');
         }
         else if (user) {
             await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
@@ -143,7 +143,7 @@ let AuthService = class AuthService {
         const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
         const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
         if (customer) {
-            await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration);
+            await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'otp');
         }
         else if (user) {
             await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
@@ -282,22 +282,12 @@ let AuthService = class AuthService {
         }
     }
     async validateCustomerByPassword(username, password) {
-        const normalizedUsername = username.includes('@')
-            ? username.trim().toLowerCase()
-            : username.trim();
-        let customer = null;
-        if (normalizedUsername.includes('@')) {
-            customer = await this.customerRepository
-                .createQueryBuilder('customer')
-                .where('LOWER(customer.email) = LOWER(:email)', { email: normalizedUsername })
-                .andWhere('customer.is_deleted = :isDeleted', { isDeleted: false })
-                .getOne();
-        }
-        else {
-            customer = await this.customerRepository.findOne({
-                where: { phone_number: normalizedUsername, is_deleted: false },
-            });
-        }
+        const customer = await this.customerRepository.findOne({
+            where: [
+                { email: username, is_deleted: false },
+                { phone_number: username, is_deleted: false },
+            ],
+        });
         if (!customer || !customer.password) {
             return null;
         }
@@ -308,22 +298,11 @@ let AuthService = class AuthService {
         return customer;
     }
     async validateUserByPassword(username, password) {
-        const normalizedUsername = username.includes('@')
-            ? username.trim().toLowerCase()
-            : username.trim();
-        let user = null;
-        if (normalizedUsername.includes('@')) {
-            user = await this.userRepository
-                .createQueryBuilder('user')
-                .where('LOWER(user.email) = LOWER(:email)', { email: normalizedUsername })
-                .andWhere('user.is_deleted = :isDeleted', { isDeleted: false })
-                .getOne();
-        }
-        else {
-            user = await this.userRepository.findOne({
-                where: { email: normalizedUsername, is_deleted: false },
-            });
-        }
+        const user = await this.userRepository.findOne({
+            where: [
+                { email: username, is_deleted: false },
+            ],
+        });
         if (!user || !user.password) {
             return null;
         }
@@ -373,10 +352,28 @@ let AuthService = class AuthService {
         if (!googleProfile) {
             throw new common_1.UnauthorizedException('Invalid Google ID token');
         }
-        const user = await this.findOrCreateGoogleUser(googleProfile);
-        user.last_login = new Date();
-        await this.userRepository.save(user);
-        return this.issueAppTokens(user);
+        let customer = await this.findCustomerByEmail(googleProfile.email);
+        if (customer) {
+            if (googleProfile.picture && customer.avatar_url !== googleProfile.picture) {
+                customer.avatar_url = googleProfile.picture;
+            }
+            customer.last_login = new Date();
+            await this.customerRepository.save(customer);
+            return this.issueCustomerAppTokens(customer);
+        }
+        let user = await this.findUserByEmail(googleProfile.email);
+        if (user) {
+            if (googleProfile.picture && user.avatar_url !== googleProfile.picture) {
+                user.avatar_url = googleProfile.picture;
+            }
+            user.last_login = new Date();
+            await this.userRepository.save(user);
+            return this.issueAppTokens(user);
+        }
+        customer = await this.findOrCreateGoogleCustomer(googleProfile);
+        customer.last_login = new Date();
+        await this.customerRepository.save(customer);
+        return this.issueCustomerAppTokens(customer);
     }
     async issueTokens(user) {
         const payload = {
@@ -415,31 +412,21 @@ let AuthService = class AuthService {
             user: userResponse,
         };
     }
-    async findOrCreateGoogleUser(googleProfile) {
-        let user = await this.userRepository.findOne({
-            where: { email: googleProfile.email, is_deleted: false },
-        });
-        if (user) {
-            if (googleProfile.picture && user.avatar_url !== googleProfile.picture) {
-                user.avatar_url = googleProfile.picture;
-                await this.userRepository.save(user);
-            }
-            return user;
-        }
+    async findOrCreateGoogleCustomer(googleProfile) {
         const nameParts = googleProfile.name.split(' ');
         const googleIdShort = googleProfile.googleId.substring(0, 8);
         const timestampShort = Date.now().toString().slice(-9);
         const phonePlaceholder = `g_${googleIdShort}${timestampShort}`;
-        user = this.userRepository.create({
+        const customer = this.customerRepository.create({
             email: googleProfile.email,
             first_name: nameParts[0] || null,
             last_name: nameParts.slice(1).join(' ') || null,
             avatar_url: googleProfile.picture || null,
-            role: user_role_enum_1.UserRole.USER,
-            is_verified: true,
             phone_number: phonePlaceholder,
+            is_verified: true,
+            last_login: new Date(),
         });
-        return await this.userRepository.save(user);
+        return await this.customerRepository.save(customer);
     }
     async verifyGoogleToken(idToken) {
         try {
@@ -497,16 +484,14 @@ let AuthService = class AuthService {
         if (!email && !phone_number) {
             throw new common_1.BadRequestException('Either email or phone_number is required');
         }
-        const normalizedEmail = email ? email.trim().toLowerCase() : null;
-        const normalizedPhoneNumber = phone_number ? phone_number.trim() : null;
         const existingCustomer = await this.customerRepository.findOne({
             where: [
-                ...(normalizedEmail ? [{ email: normalizedEmail, is_deleted: false }] : []),
-                ...(normalizedPhoneNumber ? [{ phone_number: normalizedPhoneNumber, is_deleted: false }] : []),
+                ...(email ? [{ email, is_deleted: false }] : []),
+                ...(phone_number ? [{ phone_number, is_deleted: false }] : []),
             ],
         });
         if (existingCustomer) {
-            throw new common_1.ConflictException(normalizedEmail && existingCustomer.email === normalizedEmail
+            throw new common_1.ConflictException(email && existingCustomer.email === email
                 ? 'Email already registered'
                 : 'Phone number already registered');
         }
@@ -519,9 +504,9 @@ let AuthService = class AuthService {
             first_name = nameParts[0] || null;
             last_name = nameParts.slice(1).join(' ') || null;
         }
-        let finalPhoneNumber = normalizedPhoneNumber;
-        if (!finalPhoneNumber && normalizedEmail) {
-            const emailHash = Buffer.from(normalizedEmail)
+        let finalPhoneNumber = phone_number;
+        if (!finalPhoneNumber && email) {
+            const emailHash = Buffer.from(email)
                 .toString('base64')
                 .slice(0, 8)
                 .replace(/[^a-zA-Z0-9]/g, '');
@@ -534,10 +519,10 @@ let AuthService = class AuthService {
         const customer = this.customerRepository.create({
             first_name,
             last_name,
-            email: normalizedEmail,
+            email: email || null,
             phone_number: finalPhoneNumber,
             password: hashedPassword,
-            is_verified: normalizedEmail ? true : false,
+            is_verified: email ? true : false,
             last_login: new Date(),
         });
         const savedCustomer = await this.customerRepository.save(customer);
@@ -567,6 +552,31 @@ let AuthService = class AuthService {
             user: userResponse,
         };
     }
+    async issueCustomerAppTokens(customer) {
+        const payload = {
+            sub: customer.id,
+            email: customer.email || undefined,
+            phone_number: customer.phone_number || undefined,
+            role: user_role_enum_1.UserRole.USER,
+            type: 'user',
+        };
+        const appSessionExpiration = this.getAppSessionExpiration();
+        const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
+        const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
+        await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'google');
+        const userResponse = this.formatCustomerResponse(customer);
+        try {
+            const personalizedHoroscope = await this.horoscopeService.getHoroscopeForUser(customer.id, 'daily');
+            userResponse.horoscope = personalizedHoroscope;
+        }
+        catch (error) {
+        }
+        return {
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            user: userResponse,
+        };
+    }
     async storeCustomerToken(token, customerId) {
         const payload = this.jwtService.verifyToken(token);
         if (!payload)
@@ -581,7 +591,7 @@ let AuthService = class AuthService {
         });
         await this.customerTokenRepository.save(customerToken);
     }
-    async storeCustomerRefreshToken(token, customerId, expiresIn) {
+    async storeCustomerRefreshToken(token, customerId, expiresIn, loginMethod = 'otp') {
         const payload = this.jwtService.verifyToken(token);
         if (!payload)
             return;
@@ -598,7 +608,7 @@ let AuthService = class AuthService {
             customer_id: customerId,
             expires_at: expiresAt,
             is_revoked: false,
-            login_method: 'otp',
+            login_method: loginMethod,
         });
         await this.customerTokenRepository.save(customerToken);
     }

@@ -42,7 +42,15 @@ let AuthController = class AuthController {
         return this.authService.verifyOtpForLogin(dto.phone_number, dto.otp_code);
     }
     async loginWithGoogle(dto) {
-        return this.authService.loginWithGoogle(dto.id_token);
+        const result = await this.authService.loginWithGoogle(dto.id_token);
+        return {
+            success: true,
+            data: {
+                access_token: result.access_token,
+                refresh_token: result.refresh_token,
+                user: result.user,
+            },
+        };
     }
     async refreshToken(dto) {
         return this.authService.refreshAccessToken(dto.refresh_token);

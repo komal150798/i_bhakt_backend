@@ -10,9 +10,4 @@ export declare class UpdateCustomerProfileDto {
     timezone?: string;
     gender?: string;
     avatar_url?: string;
-    phone_number?: string;
-    life_role?: string;
-    relationship_status?: string;
-    interests?: string;
-    current_city?: string;
 }

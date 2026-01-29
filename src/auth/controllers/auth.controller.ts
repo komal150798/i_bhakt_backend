@@ -100,7 +100,17 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Invalid Google ID token' })
   async loginWithGoogle(@Body() dto: LoginGoogleDto) {
-    return this.authService.loginWithGoogle(dto.id_token);
+    const result = await this.authService.loginWithGoogle(dto.id_token);
+    
+    // Return consistent format (frontend handles both wrapped and unwrapped)
+    return {
+      success: true,
+      data: {
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+        user: result.user,
+      },
+    };
   }
 
   @Post('refresh')

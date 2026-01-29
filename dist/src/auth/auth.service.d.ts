@@ -77,12 +77,12 @@ export declare class AuthService {
         refresh_token: string;
         user: any;
     }>;
-    findOrCreateGoogleUser(googleProfile: {
+    findOrCreateGoogleCustomer(googleProfile: {
         email: string;
         name: string;
         picture?: string;
         googleId: string;
-    }): Promise<User>;
+    }): Promise<Customer>;
     private verifyGoogleToken;
     register(name: string | undefined, email: string | undefined, phone_number: string | undefined, password: string): Promise<{
         access_token: string;
@@ -90,6 +90,7 @@ export declare class AuthService {
         user: any;
     }>;
     private issueCustomerTokens;
+    private issueCustomerAppTokens;
     private storeCustomerToken;
     private storeCustomerRefreshToken;
     private formatCustomerResponse;

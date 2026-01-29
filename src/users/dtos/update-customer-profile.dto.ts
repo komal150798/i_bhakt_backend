@@ -60,37 +60,6 @@ export class UpdateCustomerProfileDto {
   @IsOptional()
   @IsString()
   avatar_url?: string;
-
-  @ApiPropertyOptional({ description: 'Phone number' })
-  @IsOptional()
-  @IsString()
-  phone_number?: string;
-
-  @ApiPropertyOptional({ 
-    description: 'Life role',
-    enum: ['Working Professional', 'Student', 'Homemaker', 'Entrepreneur', 'Retired', 'Other']
-  })
-  @IsOptional()
-  @IsString()
-  life_role?: string;
-
-  @ApiPropertyOptional({ 
-    description: 'Relationship status',
-    enum: ['Single', 'Married', 'Divorced', 'Widowed']
-  })
-  @IsOptional()
-  @IsString()
-  relationship_status?: string;
-
-  @ApiPropertyOptional({ description: 'Interests (free text)' })
-  @IsOptional()
-  @IsString()
-  interests?: string;
-
-  @ApiPropertyOptional({ description: 'Current city' })
-  @IsOptional()
-  @IsString()
-  current_city?: string;
 }
 
 

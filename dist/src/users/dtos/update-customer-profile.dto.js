@@ -85,40 +85,4 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateCustomerProfileDto.prototype, "avatar_url", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: 'Phone number' }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateCustomerProfileDto.prototype, "phone_number", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({
-        description: 'Life role',
-        enum: ['Working Professional', 'Student', 'Homemaker', 'Entrepreneur', 'Retired', 'Other']
-    }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateCustomerProfileDto.prototype, "life_role", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({
-        description: 'Relationship status',
-        enum: ['Single', 'Married', 'Divorced', 'Widowed']
-    }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateCustomerProfileDto.prototype, "relationship_status", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: 'Interests (free text)' }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateCustomerProfileDto.prototype, "interests", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: 'Current city' }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateCustomerProfileDto.prototype, "current_city", void 0);
 //# sourceMappingURL=update-customer-profile.dto.js.map

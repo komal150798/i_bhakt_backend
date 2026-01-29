@@ -90,18 +90,6 @@ export class Customer extends BaseEntity {
   @Column({ type: 'varchar', length: 50, nullable: true, name: 'last_login_ip' })
   last_login_ip: string | null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true, name: 'life_role' })
-  life_role: string | null; // Working Professional, Student, Homemaker, Entrepreneur, Retired, Other
-
-  @Column({ type: 'varchar', length: 50, nullable: true, name: 'relationship_status' })
-  relationship_status: string | null; // Single, Married, Divorced, Widowed
-
-  @Column({ type: 'text', nullable: true })
-  interests: string | null; // Free text for user interests
-
-  @Column({ type: 'varchar', length: 255, nullable: true, name: 'current_city' })
-  current_city: string | null; // Current city of residence
-
   // Relations
   // TODO: Uncomment after migrating Subscription, Order, Kundli, KarmaEntry, ManifestationLog to use Customer
   // @OneToMany(() => Subscription, (subscription) => subscription.customer)

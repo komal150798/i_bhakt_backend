@@ -2687,6 +2687,7 @@ export class ManifestationEnhancedService {
     manifestationId: number,
     userId: number,
     commitmentMessage?: string,
+    targetDate?: string,
   ): Promise<{
     id: number;
     title: string;
@@ -2714,6 +2715,11 @@ export class ManifestationEnhancedService {
       committed_at: committedAt,
       commitment_message: commitMessage,
     };
+
+    // Update target date if provided
+    if (targetDate) {
+      manifestation.target_date = new Date(targetDate);
+    }
 
     await this.manifestationRepository.save(manifestation);
 
@@ -2984,94 +2990,33 @@ export class ManifestationEnhancedService {
 
   /**
    * Get journey timeline for a manifestation (Screen 6)
-   * @param filter - 'weekly', 'monthly', or 'quarterly' to determine timeline duration
    */
   async getJourneyTimeline(
     manifestationId: number,
     userId: number,
-    filter: 'weekly' | 'monthly' | 'quarterly' = 'monthly',
   ): Promise<{
-    manifestation_id: string;
-    manifestation_category: string;
-    user_id: string;
-    alignment_summary: {
-      alignment_score: number;
-      status: string;
-      timeline_completion_percentage: number;
-    };
-    timeline_start_date: string;
-    timeline_end_date: string;
-    current_phase_id: string;
-    timeline_events: Array<{
-      phase_id: string;
-      phase_type: string;
+    total_progress: number;
+    phases: Array<{
+      id: string;
       title: string;
       description: string;
-      start_date: string;
-      end_date: string;
-      status: string;
-      is_locked: boolean;
-      icon: string;
-      visual_state: {
-        node_state: string;
-        card_highlight: boolean;
-      };
-      actions?: Array<{
-        action_id: string;
-        action_type: string;
-        label: string;
-        frequency: string;
-        completion_required: boolean;
-      }>;
-      astrological_context: {
-        moon_phase?: string;
-        dasha_influence?: string;
-        confidence_level?: string;
-        planetary_support?: string[];
-        energy_level?: string;
-        recommended_effort?: string;
-        planetary_alignment?: string;
-        dasha_support?: boolean;
-        risk_level?: string;
-        planetary_pressure?: string;
-        risk_flag?: string;
-      };
-      evaluation_rules?: {
-        minimum_days_completed: number;
-        minimum_intent_score: number;
-      };
-      recommended_actions?: string[];
+      date_range: string;
+      status: 'Completed' | 'In Progress' | 'Upcoming';
+      progress_percentage?: number;
     }>;
+    current_phase: {
+      id: string;
+      title: string;
+      insight: string;
+      resonance_score: number;
+    };
   }> {
     const manifestation = await this.getManifestationById(manifestationId, userId);
     const progressTracking = manifestation.progress_tracking || {};
-    const cosmicSupport = await this.getCosmicSupportIndex(manifestationId, userId);
 
-    // Calculate dates based on filter
+    // Calculate dates
     const createdDate = manifestation.added_date || new Date();
-    let targetDate: Date;
-
-    switch (filter) {
-      case 'weekly':
-        targetDate = new Date(createdDate);
-        targetDate.setDate(targetDate.getDate() + 7);
-        break;
-      case 'quarterly':
-        targetDate = new Date(createdDate);
-        targetDate.setMonth(targetDate.getMonth() + 3);
-        break;
-      case 'monthly':
-      default:
-        targetDate = new Date(createdDate);
-        targetDate.setMonth(targetDate.getMonth() + 1);
-        break;
-    }
-
-    // If manifestation has a target_date, use it but respect filter for phase generation
-    if (manifestation.target_date) {
-      const manifestTargetDate = new Date(manifestation.target_date);
-      targetDate = manifestTargetDate < targetDate ? manifestTargetDate : targetDate;
-    }
+    const targetDate = manifestation.target_date || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // Default 90 days
 
     const totalDays = Math.ceil(
       (targetDate.getTime() - new Date(createdDate).getTime()) / (24 * 60 * 60 * 1000),
@@ -3079,362 +3024,119 @@ export class ManifestationEnhancedService {
     const elapsedDays = Math.ceil(
       (Date.now() - new Date(createdDate).getTime()) / (24 * 60 * 60 * 1000),
     );
-    const timelineCompletionPercentage = Math.min(100, Math.round((elapsedDays / totalDays) * 100));
+    const totalProgress = Math.min(100, Math.round((elapsedDays / totalDays) * 100));
 
-    // Get alignment score
-    const alignmentScore = manifestation.alignment_score
-      ? Number(manifestation.alignment_score)
-      : manifestation.resonance_score
-        ? Number(manifestation.resonance_score)
-        : 0;
-
-    // Determine alignment status
-    let alignmentStatus = 'Progressing';
-    if (timelineCompletionPercentage >= 80) {
-      alignmentStatus = 'Near Completion';
-    } else if (timelineCompletionPercentage >= 50) {
-      alignmentStatus = 'Progressing';
-    } else if (timelineCompletionPercentage >= 25) {
-      alignmentStatus = 'Early Stage';
-    } else {
-      alignmentStatus = 'Just Started';
-    }
-
-    // Generate timeline events
-    const timelineEvents = this.generateTimelineEvents(
-      createdDate,
-      targetDate,
-      filter,
-      manifestation,
-      cosmicSupport,
-      progressTracking,
-    );
+    // Generate phases
+    const phases = this.generateJourneyPhases(createdDate, targetDate);
 
     // Determine current phase
-    const currentPhase = timelineEvents.find((e) => e.status === 'IN_PROGRESS') || timelineEvents[0];
+    const currentPhaseIndex = phases.findIndex((p) => p.status === 'In Progress');
+    const currentPhase = phases[currentPhaseIndex] || phases[0];
 
-    // Format dates
-    const formatDate = (date: Date): string => {
-      return date.toISOString().split('T')[0];
-    };
-
-    // Generate manifestation ID format
-    const manifestDate = new Date(createdDate);
-    const manifestId = `MANI_${manifestDate.getFullYear()}_${String(manifestDate.getMonth() + 1).padStart(2, '0')}_${String(manifestDate.getDate()).padStart(2, '0')}_${String(manifestation.id).padStart(3, '0')}`;
-    const userIdStr = `USER_${userId}`;
+    // Generate insight for current phase
+    const resonanceScore = manifestation.resonance_score
+      ? Number(manifestation.resonance_score)
+      : 0;
+    let insight = 'Continue your alignment practices.';
+    if (currentPhase.id === 'intention_locked') {
+      insight = 'Your intention is set. Focus on emotional alignment.';
+    } else if (currentPhase.id === 'karma_action') {
+      insight = 'Complete your daily karma actions for best results.';
+    } else if (currentPhase.id === 'karma_consistency') {
+      insight = 'Maintain daily gratitude to align your emotions.';
+    } else if (currentPhase.id === 'astrological_support') {
+      insight = 'Favorable cosmic window for decision making.';
+    }
 
     return {
-      manifestation_id: manifestId,
-      manifestation_category: manifestation.category || 'General',
-      user_id: userIdStr,
-      alignment_summary: {
-        alignment_score: Math.round(alignmentScore),
-        status: alignmentStatus,
-        timeline_completion_percentage: timelineCompletionPercentage,
+      total_progress: totalProgress,
+      phases,
+      current_phase: {
+        id: currentPhase.id,
+        title: currentPhase.title,
+        insight,
+        resonance_score: Math.round(resonanceScore),
       },
-      timeline_start_date: formatDate(new Date(createdDate)),
-      timeline_end_date: formatDate(targetDate),
-      current_phase_id: currentPhase?.phase_id || 'PHASE_001',
-      timeline_events: timelineEvents,
     };
   }
 
   /**
-   * Generate timeline events based on dates and filter (matches schema)
+   * Generate journey phases based on dates
    */
-  private generateTimelineEvents(
+  private generateJourneyPhases(
     startDate: Date | string,
     endDate: Date | string,
-    filter: 'weekly' | 'monthly' | 'quarterly',
-    manifestation: any,
-    cosmicSupport: any,
-    progressTracking: any,
   ): Array<{
-    phase_id: string;
-    phase_type: string;
+    id: string;
     title: string;
     description: string;
-    start_date: string;
-    end_date: string;
-    status: string;
-    is_locked: boolean;
-    icon: string;
-    visual_state: {
-      node_state: string;
-      card_highlight: boolean;
-    };
-    actions?: Array<{
-      action_id: string;
-      action_type: string;
-      label: string;
-      frequency: string;
-      completion_required: boolean;
-    }>;
-    astrological_context: any;
-    evaluation_rules?: {
-      minimum_days_completed: number;
-      minimum_intent_score: number;
-    };
-    recommended_actions?: string[];
+    date_range: string;
+    status: 'Completed' | 'In Progress' | 'Upcoming';
+    progress_percentage?: number;
   }> {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const now = new Date();
-    const formatDate = (date: Date): string => date.toISOString().split('T')[0];
 
-    const events: any[] = [];
-    let phaseCounter = 1;
-
-    // Phase 1: Intention Locked (Today)
-    const intentionDate = new Date(start);
-    const intentionStatus = now >= intentionDate ? 'COMPLETED' : 'UPCOMING';
-    events.push({
-      phase_id: `PHASE_${String(phaseCounter++).padStart(3, '0')}`,
-      phase_type: 'INTENTION_LOCK',
-      title: 'Today - Intention Locked',
-      description: 'Your manifestation intention is locked and aligned with your karmic path.',
-      start_date: formatDate(intentionDate),
-      end_date: formatDate(intentionDate),
-      status: intentionStatus,
-      is_locked: true,
-      icon: 'lock',
-      visual_state: {
-        node_state: intentionStatus === 'COMPLETED' ? 'ACTIVE' : 'UPCOMING',
-        card_highlight: intentionStatus === 'COMPLETED',
-      },
-      actions: [],
-      astrological_context: {
-        moon_phase: this.getMoonPhase(now),
-        dasha_influence: cosmicSupport?.current_mahadasha?.status || 'Neutral',
-        confidence_level: 'High',
-      },
-    });
-
-    // Calculate phase intervals based on filter
     const totalDays = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-    let karmaActionDays = 10;
-    let consistencyCheckDays = 1;
-    let astroSupportDays = 5;
+    const phaseDuration = Math.ceil(totalDays / 5); // 5 phases
 
-    if (filter === 'weekly') {
-      karmaActionDays = 3;
-      astroSupportDays = 2;
-    } else if (filter === 'quarterly') {
-      karmaActionDays = 20;
-      astroSupportDays = 10;
-    }
-
-    // Phase 2: Karma Action Phase
-    const karmaStart = new Date(start);
-    karmaStart.setDate(karmaStart.getDate() + 12); // Start after intention phase
-    const karmaEnd = new Date(karmaStart);
-    karmaEnd.setDate(karmaEnd.getDate() + karmaActionDays - 1);
-    if (karmaEnd > end) karmaEnd.setTime(end.getTime());
-
-    const karmaStatus = now > karmaEnd ? 'COMPLETED' : now >= karmaStart ? 'IN_PROGRESS' : 'UPCOMING';
-    events.push({
-      phase_id: `PHASE_${String(phaseCounter++).padStart(3, '0')}`,
-      phase_type: 'KARMA_ACTION',
-      title: 'Karma Action Phase',
-      description: 'Complete your daily karma actions to strengthen manifestation momentum.',
-      start_date: formatDate(karmaStart),
-      end_date: formatDate(karmaEnd),
-      status: karmaStatus,
-      is_locked: false,
-      icon: 'karma_action',
-      visual_state: {
-        node_state: karmaStatus === 'COMPLETED' ? 'ACTIVE' : karmaStatus === 'IN_PROGRESS' ? 'ACTIVE' : 'UPCOMING',
-        card_highlight: karmaStatus === 'IN_PROGRESS',
+    const phases = [
+      {
+        id: 'intention_locked',
+        title: 'Intention Locked',
+        description: 'Your manifestation intention has been set.',
       },
-      actions: [
-        {
-          action_id: 'KA_001',
-          action_type: 'DAILY_PRACTICE',
-          label: 'Daily Karma Action',
-          frequency: 'DAILY',
-          completion_required: true,
-        },
-      ],
-      astrological_context: {
-        planetary_support: this.getPlanetarySupport(manifestation.category, cosmicSupport),
-        energy_level: 'Moderate',
-        recommended_effort: 'Consistent disciplined action',
+      {
+        id: 'karma_action',
+        title: 'Karma Action Phase',
+        description: 'Complete your daily karma actions.',
       },
-    });
-
-    // Phase 3: Karma Consistency Check
-    const consistencyDate = new Date(karmaEnd);
-    consistencyDate.setDate(consistencyDate.getDate() + 1);
-    if (consistencyDate > end) consistencyDate.setTime(end.getTime());
-
-    const consistencyStatus = now > consistencyDate ? 'COMPLETED' : now >= consistencyDate ? 'IN_PROGRESS' : 'UPCOMING';
-    events.push({
-      phase_id: `PHASE_${String(phaseCounter++).padStart(3, '0')}`,
-      phase_type: 'KARMA_CONSISTENCY_CHECK',
-      title: 'Karma Consistency Check',
-      description: 'System evaluates consistency and intent integrity.',
-      start_date: formatDate(consistencyDate),
-      end_date: formatDate(consistencyDate),
-      status: consistencyStatus,
-      is_locked: true,
-      icon: 'consistency_check',
-      visual_state: {
-        node_state: consistencyStatus === 'COMPLETED' ? 'ACTIVE' : 'LOCKED',
-        card_highlight: false,
+      {
+        id: 'karma_consistency',
+        title: 'Karma Consistency Check',
+        description: 'Maintain consistency in your practices.',
       },
-      evaluation_rules: {
-        minimum_days_completed: 4,
-        minimum_intent_score: 65,
+      {
+        id: 'astrological_support',
+        title: 'Astrological Support Phase',
+        description: 'Favorable cosmic window for decision making.',
       },
-      astrological_context: {
-        planetary_pressure: 'Neutral',
-        risk_flag: 'Low',
+      {
+        id: 'manifestation_window',
+        title: 'Manifestation Window',
+        description: 'Peak alignment period for manifestation.',
       },
-    });
+    ];
 
-    // Phase 4: Astrological Support Phase
-    const astroStart = new Date(consistencyDate);
-    astroStart.setDate(astroStart.getDate() + 1);
-    const astroEnd = new Date(astroStart);
-    astroEnd.setDate(astroEnd.getDate() + astroSupportDays - 1);
-    if (astroEnd > end) astroEnd.setTime(end.getTime());
+    return phases.map((phase, index) => {
+      const phaseStart = new Date(start);
+      phaseStart.setDate(phaseStart.getDate() + index * phaseDuration);
 
-    const astroStatus = now > astroEnd ? 'COMPLETED' : now >= astroStart ? 'IN_PROGRESS' : 'UPCOMING';
-    events.push({
-      phase_id: `PHASE_${String(phaseCounter++).padStart(3, '0')}`,
-      phase_type: 'ASTROLOGICAL_SUPPORT',
-      title: 'Astrological Support Phase',
-      description: 'Favourable cosmic window for decision making and key actions.',
-      start_date: formatDate(astroStart),
-      end_date: formatDate(astroEnd),
-      status: astroStatus,
-      is_locked: false,
-      icon: 'astrology_support',
-      visual_state: {
-        node_state: astroStatus === 'COMPLETED' ? 'ACTIVE' : astroStatus === 'IN_PROGRESS' ? 'ACTIVE' : 'UPCOMING',
-        card_highlight: astroStatus === 'IN_PROGRESS',
-      },
-      recommended_actions: [
-        'Important discussions',
-        'Decision finalization',
-        'External commitments',
-      ],
-      astrological_context: {
-        planetary_alignment: 'Strong',
-        dasha_support: cosmicSupport?.current_mahadasha?.status === 'Supportive',
-        risk_level: 'Low',
-      },
-    });
+      const phaseEnd = new Date(phaseStart);
+      phaseEnd.setDate(phaseEnd.getDate() + phaseDuration);
 
-    // Add repeatable Karma Consistency Checks for longer timelines
-    if (filter === 'quarterly' || filter === 'monthly') {
-      let nextConsistencyDate = new Date(astroEnd);
-      nextConsistencyDate.setDate(nextConsistencyDate.getDate() + 2);
-      
-      while (nextConsistencyDate < end && phaseCounter < 10) {
-        if (nextConsistencyDate > end) break;
-        
-        events.push({
-          phase_id: `PHASE_${String(phaseCounter++).padStart(3, '0')}`,
-          phase_type: 'KARMA_CONSISTENCY_CHECK',
-          title: 'Karma Consistency Check',
-          description: 'System evaluates consistency and intent integrity.',
-          start_date: formatDate(nextConsistencyDate),
-          end_date: formatDate(nextConsistencyDate),
-          status: now > nextConsistencyDate ? 'COMPLETED' : 'UPCOMING',
-          is_locked: true,
-          icon: 'consistency_check',
-          visual_state: {
-            node_state: 'LOCKED',
-            card_highlight: false,
-          },
-          evaluation_rules: {
-            minimum_days_completed: 4,
-            minimum_intent_score: 65,
-          },
-          astrological_context: {
-            planetary_pressure: 'Neutral',
-            risk_flag: 'Low',
-          },
-        });
+      let status: 'Completed' | 'In Progress' | 'Upcoming' = 'Upcoming';
+      let progressPercentage: number | undefined;
 
-        // Add another Astrological Support Phase after consistency check
-        const nextAstroStart = new Date(nextConsistencyDate);
-        nextAstroStart.setDate(nextAstroStart.getDate() + 1);
-        const nextAstroEnd = new Date(nextAstroStart);
-        nextAstroEnd.setDate(nextAstroEnd.getDate() + astroSupportDays - 1);
-        if (nextAstroEnd > end) nextAstroEnd.setTime(end.getTime());
-        if (nextAstroEnd <= end && phaseCounter < 10) {
-          events.push({
-            phase_id: `PHASE_${String(phaseCounter++).padStart(3, '0')}`,
-            phase_type: 'ASTROLOGICAL_SUPPORT',
-            title: 'Astrological Support Phase',
-            description: 'Favourable cosmic window for decision making and key actions.',
-            start_date: formatDate(nextAstroStart),
-            end_date: formatDate(nextAstroEnd),
-            status: now > nextAstroEnd ? 'COMPLETED' : now >= nextAstroStart ? 'IN_PROGRESS' : 'UPCOMING',
-            is_locked: false,
-            icon: 'astrology_support',
-            visual_state: {
-              node_state: 'UPCOMING',
-              card_highlight: false,
-            },
-            recommended_actions: [
-              'Important discussions',
-              'Decision finalization',
-              'External commitments',
-            ],
-            astrological_context: {
-              planetary_alignment: 'Strong',
-              dasha_support: cosmicSupport?.current_mahadasha?.status === 'Supportive',
-              risk_level: 'Low',
-            },
-          });
-          nextConsistencyDate = new Date(nextAstroEnd);
-          nextConsistencyDate.setDate(nextConsistencyDate.getDate() + 2);
-        } else {
-          break;
-        }
+      if (now >= phaseEnd) {
+        status = 'Completed';
+      } else if (now >= phaseStart && now < phaseEnd) {
+        status = 'In Progress';
+        const phaseElapsed = now.getTime() - phaseStart.getTime();
+        const phaseDurationMs = phaseEnd.getTime() - phaseStart.getTime();
+        progressPercentage = Math.round((phaseElapsed / phaseDurationMs) * 100);
       }
-    }
 
-    return events;
-  }
-
-  /**
-   * Get moon phase (simplified)
-   */
-  private getMoonPhase(date: Date): string {
-    // Simplified moon phase calculation
-    const dayOfMonth = date.getDate();
-    if (dayOfMonth <= 7) return 'Waxing';
-    if (dayOfMonth <= 14) return 'Full';
-    if (dayOfMonth <= 21) return 'Waning';
-    return 'New';
-  }
-
-  /**
-   * Get planetary support based on category
-   */
-  private getPlanetarySupport(category: string | null, cosmicSupport: any): string[] {
-    const categoryPlanets: Record<string, string[]> = {
-      career: ['Mercury', 'Saturn'],
-      relationship: ['Venus', 'Jupiter'],
-      money: ['Jupiter', 'Venus'],
-      health: ['Mars', 'Sun'],
-      spiritual: ['Jupiter', 'Ketu'],
-    };
-
-    if (category && categoryPlanets[category.toLowerCase()]) {
-      return categoryPlanets[category.toLowerCase()];
-    }
-
-    // Default based on dasha
-    if (cosmicSupport?.current_mahadasha?.lord) {
-      return [cosmicSupport.current_mahadasha.lord];
-    }
-
-    return ['Jupiter', 'Venus'];
+      return {
+        id: phase.id,
+        title: phase.title,
+        description: phase.description,
+        date_range: `${phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+        status,
+        progress_percentage: progressPercentage,
+      };
+    });
   }
 }
 
