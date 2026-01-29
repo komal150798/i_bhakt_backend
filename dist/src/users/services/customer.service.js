@@ -60,6 +60,10 @@ let CustomerService = CustomerService_1 = class CustomerService {
             referral_code: customer.referral_code,
             added_date: customer.added_date,
             modify_date: customer.modify_date,
+            life_role: customer.life_role || null,
+            relationship_status: customer.relationship_status || null,
+            interests: customer.interests || null,
+            current_city: customer.current_city || null,
         };
     }
     async updateProfile(id, updateData) {
@@ -96,6 +100,21 @@ let CustomerService = CustomerService_1 = class CustomerService {
         }
         if (updateData.avatar_url !== undefined) {
             customer.avatar_url = updateData.avatar_url || null;
+        }
+        if (updateData.phone_number !== undefined) {
+            customer.phone_number = updateData.phone_number;
+        }
+        if (updateData.life_role !== undefined) {
+            customer.life_role = updateData.life_role || null;
+        }
+        if (updateData.relationship_status !== undefined) {
+            customer.relationship_status = updateData.relationship_status || null;
+        }
+        if (updateData.interests !== undefined) {
+            customer.interests = updateData.interests || null;
+        }
+        if (updateData.current_city !== undefined) {
+            customer.current_city = updateData.current_city || null;
         }
         customer.modify_date = new Date();
         try {

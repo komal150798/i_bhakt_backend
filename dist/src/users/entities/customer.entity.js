@@ -115,6 +115,22 @@ __decorate([
     __metadata("design:type", String)
 ], Customer.prototype, "last_login_ip", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 100, nullable: true, name: 'life_role' }),
+    __metadata("design:type", String)
+], Customer.prototype, "life_role", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 50, nullable: true, name: 'relationship_status' }),
+    __metadata("design:type", String)
+], Customer.prototype, "relationship_status", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "interests", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 255, nullable: true, name: 'current_city' }),
+    __metadata("design:type", String)
+], Customer.prototype, "current_city", void 0);
+__decorate([
     (0, typeorm_1.OneToMany)(() => customer_token_entity_1.CustomerToken, (token) => token.customer),
     __metadata("design:type", Array)
 ], Customer.prototype, "tokens", void 0);
