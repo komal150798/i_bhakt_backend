@@ -15,6 +15,9 @@ import { Kundli } from '../../kundli/entities/kundli.entity';
 import { KundliPlanet } from '../../kundli/entities/kundli-planet.entity';
 import { KundliHouse } from '../../kundli/entities/kundli-house.entity';
 import { KundliService } from '../../kundli/services/kundli.service';
+import { TextNormalizer } from '../utils/text-normalizer.util';
+import { ConfidenceScoring } from '../algorithms/confidence-scoring.util';
+import { NGramMatching } from '../algorithms/ngram-matching.util';
 
 @Injectable()
 export class ManifestationEnhancedService {
@@ -157,24 +160,251 @@ export class ManifestationEnhancedService {
     coherence_score: number;
     energy_state: 'aligned' | 'unstable' | 'blocked';
   }> {
-    const text = `${title} ${description}`.toLowerCase();
+    // Normalize text to handle spelling variations, typos, and Hindi transliteration
+    const rawText = `${title} ${description}`;
+    const normalizedText = TextNormalizer.normalizeText(rawText);
+    const text = normalizedText.toLowerCase();
+    
+    // Log if Hindi script detected
+    if (TextNormalizer.hasHindiScript(rawText)) {
+      this.logger.debug(`Hindi script detected in manifestation text`);
+    }
 
     // Quick category detection using keywords
     const categoryKeywords: Record<string, string[]> = {
-      career: ['job', 'career', 'work', 'promotion', 'business', 'office', 'salary', 'profession', 'position', 'cm', 'minister', 'election', 'political', 'government', 'sarpanch', 'mla', 'mp'],
-      relationship: ['love', 'relationship', 'marriage', 'partner', 'spouse', 'family', 'friend', 'dating'],
-      money: ['money', 'wealth', 'rich', 'income', 'financial', 'earning', 'profit', 'investment'],
-      health: ['health', 'fitness', 'weight', 'body', 'disease', 'cure', 'medical', 'wellness'],
-      spiritual: ['spiritual', 'meditation', 'peace', 'enlightenment', 'soul', 'divine', 'god', 'prayer'],
+      career: [
+        // Common career terms
+        'job', 'career', 'work', 'employment', 'profession', 'occupation', 'position', 'role', 'post',
+        // Hindi/Indian variations
+        'naukri', 'nokri', 'kam', 'kaam', 'vyavasaya', 'pesha', 'नौकरी', 'काम', 'व्यवसाय', 'पेशा',
+        // Career actions (removed generic verbs like 'get', 'find', 'achieve' - they're too ambiguous)
+        // These are only used in fallback logic when combined with career nouns
+        'become', 'obtain', 'secure', 'land', 'apply', 'interview', 'promote', 'promotion',
+        'banna', 'banana', 'pana', 'milna', 'बनना', 'पाना', 'मिलना',
+        // Professions and roles
+        'teacher', 'doctor', 'engineer', 'lawyer', 'nurse', 'accountant', 'manager', 'director', 'executive',
+        'developer', 'programmer', 'designer', 'artist', 'writer', 'journalist', 'consultant', 'analyst',
+        'scientist', 'researcher', 'professor', 'lecturer', 'coach', 'trainer', 'instructor', 'mentor',
+        // Hindi profession names
+        'sikshak', 'adhyapak', 'master', 'daktar', 'vaidya', 'hakim', 'abhiyanta', 'vakil', 'nars',
+        'शिक्षक', 'अध्यापक', 'डॉक्टर', 'वैद्य', 'इंजीनियर', 'वकील', 'नर्स', 'मैनेजर',
+        // Business terms (career context - job/business as profession)
+        'promotion', 'salary', 'raise', 'hike', 'bonus', 'office', 'workplace', 'colleague', 'boss',
+        'professional', 'corporate', 'organization',
+        'vetan', 'tankhwah', 'वेतन', 'तनख्वाह',
+        // Note: 'business', 'vyapar', 'dhandha' removed from career - they're in business category
+        // Political/government roles
+        'cm', 'chief minister', 'minister', 'election', 'political', 'government', 'sarpanch', 'mla', 'mp',
+        'politician', 'leader', 'bureaucrat', 'officer', 'administrator',
+        'mukhyamantri', 'mantri', 'neta', 'neta', 'sarkar', 'rajneeti', 'चुनाव', 'मुख्यमंत्री', 'मंत्री', 'नेता',
+        // Career goals
+        'goal', 'ambition', 'aspiration', 'dream job', 'career growth', 'skill development',
+        'lakshya', 'sapna', 'uddeshya', 'लक्ष्य', 'सपना', 'उद्देश्य',
+      ],
+      relationship: [
+        'love', 'relationship', 'marriage', 'married', 'wedding', 'partner', 'spouse', 'family', 'friend', 
+        'dating', 'romance', 'romantic', 'boyfriend', 'girlfriend', 'husband', 'wife', 'soulmate', 
+        'life partner', 'fiancé', 'fiancée', 'engaged', 'couple', 'dating', 'marry',
+        // Hindi/Indian variations
+        'pyaar', 'prem', 'mohabbat', 'shadi', 'vivah', 'sathi', 'pati', 'patni', 'dost', 'parivar',
+        'jivan sathi', 'sangini', 'sangat', 'प्रेम', 'प्यार', 'मोहब्बत', 'शादी', 'विवाह', 'साथी',
+        'पति', 'पत्नी', 'दोस्त', 'परिवार', 'जीवनसाथी',
+        // Relationship actions
+        'find love', 'find soulmate', 'find partner', 'get married', 'get engaged',
+        'pyaar milna', 'shadi karna', 'vivah karna', 'साथी मिलना', 'शादी करना',
+      ],
+      money: [
+        'money', 'wealth', 'rich', 'richer', 'income', 'financial', 'finances', 'earning', 'earn', 'profit', 
+        'investment', 'invest', 'savings', 'save', 'fortune', 'affluent', 'prosperity', 'prosperous', 
+        'million', 'billion', 'dollar', 'rupee', 'abundance', 'debt', 'loan', 'salary', 'hike', 'raise',
+        // Hindi/Indian variations (removed 'dhandha' - it's business-specific)
+        // Note: 'dhan' means wealth, but 'dhandha' means business - they're different
+        'paisa', 'rupay', 'rupee', 'rupaiya', 'sampatti', 'amiri', 'dhani', 'aay', 'kamai',
+        // 'dhan' removed - it conflicts with 'dhandha' (business). Use 'sampatti' or 'dhan' only in context
+        'nivesh', 'bachet', 'udhar', 'karz', 'पैसा', 'रुपये', 'धन', 'संपत्ति', 'अमीर', 'धनी',
+        'आय', 'कमाई', 'निवेश', 'बचत', 'उधार', 'कर्ज',
+        // Money actions
+        'become rich', 'get rich', 'earn money', 'make money',
+        'amir banna', 'paisa kamana', 'धन कमाना', 'अमीर बनना',
+      ],
+      health: [
+        'health', 'healthy', 'fitness', 'fit', 'weight', 'body', 'disease', 'illness', 'cure', 'medical', 
+        'wellness', 'wellbeing', 'heal', 'healing', 'recovery', 'recover', 'treatment', 'therapy', 
+        'exercise', 'diet', 'pain', 'doctor', 'hospital', 'medicine',
+        // Hindi/Indian variations
+        'swasthya', 'tandurusti', 'bimari', 'rog', 'ilaj', 'upchar', 'dawai', 'dava', 'vajan', 'wajan',
+        'vyayam', 'kasrat', 'aahar', 'dard', 'स्वास्थ्य', 'तंदुरुस्ती', 'बीमारी', 'रोग', 'इलाज',
+        'उपचार', 'दवा', 'वजन', 'व्यायाम', 'कसरत', 'आहार', 'दर्द',
+        // Health actions
+        'fitness goals', 'health goals', 'lose weight', 'gain weight',
+        'vajan kam karna', 'vajan badhana', 'swasth rahna', 'वजन कम करना', 'वजन बढ़ाना', 'स्वस्थ रहना',
+      ],
+      spiritual: [
+        'spiritual', 'spirituality', 'meditation', 'meditate', 'peace', 'peaceful', 'enlightenment', 
+        'enlightened', 'soul', 'divine', 'god', 'prayer', 'pray', 'devotion', 'devotional', 'worship', 
+        'blessing', 'blessed', 'dharma', 'karma', 'moksha', 'nirvana',
+        // Hindi/Indian variations
+        'adhyatmik', 'adhyatma', 'dhyan', 'shanti', 'atma', 'ishwar', 'bhagwan', 'puja', 'prarthana',
+        'bhakti', 'upasana', 'ashirvad', 'धर्म', 'कर्म', 'मोक्ष', 'आध्यात्मिक', 'ध्यान', 'शांति',
+        'आत्मा', 'ईश्वर', 'भगवान', 'पूजा', 'प्रार्थना', 'भक्ति', 'उपासना', 'आशीर्वाद',
+        // Spiritual actions
+        'find peace', 'find enlightenment', 'achieve peace',
+        'shanti milna', 'moksha pana', 'शांति मिलना', 'मोक्ष पाना',
+      ],
+      // Personal/Self Growth category
+      personal: [
+        'personal', 'self', 'myself', 'growth', 'development', 'improve', 'improvement', 'transform', 
+        'transformation', 'change', 'better', 'best', 'confidence', 'self confidence', 'self esteem',
+        'personality', 'character', 'habits', 'behavior', 'mindset', 'attitude', 'positive thinking',
+        'motivation', 'inspiration', 'success', 'achieve', 'goals', 'dreams', 'aspirations',
+        // Hindi/Indian variations
+        'vyaktigat', 'swayam', 'vikas', 'sudhar', 'badlav', 'sabhyata', 'charitra', 'aadat',
+        'vyavhar', 'soch', 'drishtikon', 'sakaratmak', 'prerana', 'safalta', 'लक्ष्य', 'सपने',
+        'व्यक्तिगत', 'स्वयं', 'विकास', 'सुधार', 'बदलाव', 'सभ्यता', 'चरित्र', 'आदत',
+        'व्यवहार', 'सोच', 'दृष्टिकोण', 'सकारात्मक', 'प्रेरणा', 'सफलता',
+      ],
+      // Farming/Agriculture category
+      farming: [
+        'farming', 'farm', 'farmer', 'agriculture', 'agricultural', 'crop', 'crops', 'harvest', 
+        'harvesting', 'cultivation', 'cultivate', 'field', 'fields', 'land', 'farming land',
+        'irrigation', 'fertilizer', 'seeds', 'planting', 'sowing', 'reaping', 'yield', 'production',
+        'livestock', 'cattle', 'dairy', 'poultry', 'organic', 'organic farming', 'crop yield',
+        'agricultural income', 'farm income', 'rural', 'village farming', 'kheti', 'krishi',
+        // Hindi/Indian variations
+        'kheti', 'krishi', 'kisan', 'fasal', 'khet', 'zameen', 'beej', 'bona', 'katayi',
+        'sabji', 'anaj', 'dhan', 'gehu', 'chawal', 'makka', 'jowar', 'bajra', 'गेहूं', 'चावल',
+        'खेती', 'कृषि', 'किसान', 'फसल', 'खेत', 'जमीन', 'बीज', 'बोना', 'कटाई',
+        'सब्जी', 'अनाज', 'धान', 'मक्का', 'ज्वार', 'बाजरा',
+        // Common farming goals
+        'good harvest', 'better crop', 'more yield', 'agricultural success', 'farm success',
+        'अच्छी फसल', 'बेहतर उत्पादन', 'अधिक उपज',
+      ],
+      // Family category
+      family: [
+        'family', 'families', 'parent', 'parents', 'father', 'mother', 'dad', 'mom', 'mummy', 'papa',
+        'son', 'daughter', 'child', 'children', 'kids', 'sibling', 'siblings', 'brother', 'sister',
+        'grandfather', 'grandmother', 'grandpa', 'grandma', 'uncle', 'aunt', 'cousin', 'relatives',
+        'home', 'household', 'family harmony', 'family peace', 'family happiness', 'family support',
+        'family relationship', 'family bond', 'family unity', 'family togetherness',
+        // Multi-word phrases (higher priority to avoid confusion with relationship)
+        'my family', 'our family', 'family member', 'family members', 'family life', 'family time',
+        // Hindi/Indian variations
+        'parivar', 'ghar', 'maata', 'pita', 'beta', 'beti', 'bhai', 'behen', 'dada', 'dadi',
+        'nana', 'nani', 'chacha', 'chachi', 'mama', 'mami', 'rishtedar', 'sambandhi',
+        'परिवार', 'घर', 'माता', 'पिता', 'बेटा', 'बेटी', 'भाई', 'बहन', 'दादा', 'दादी',
+        'नाना', 'नानी', 'चाचा', 'चाची', 'मामा', 'मामी', 'रिश्तेदार', 'संबंधी',
+        'parivar mein shanti', 'ghar mein khushi', 'मेरा परिवार', 'हमारा परिवार',
+        'परिवार में शांति', 'घर में खुशी',
+      ],
+      // Business category (separate from career for business-specific goals)
+      business: [
+        // Multi-word phrases first (highest priority)
+        'business growth', 'business success', 'business expansion', 'business profit',
+        'new business', 'start business', 'own business', 'my business', 'my dhandha', 'apna dhandha',
+        'business owner', 'business partner', 'business plan', 'business model',
+        'vyapar badhana', 'dhandha badhana', 'naya vyapar', 'apna vyapar',
+        'व्यापार बढ़ाना', 'धंधा बढ़ाना', 'नया व्यापार', 'अपना व्यापार', 'अपना धंधा',
+        // Single words
+        'business', 'businesses', 'businessman', 'businesswoman', 'entrepreneur', 'entrepreneurship',
+        'startup', 'start up', 'company', 'companies', 'firm', 'firms', 'enterprise', 'enterprises',
+        'venture', 'ventures', 'trade', 'trading', 'commerce', 'commercial', 'profit', 'profits',
+        'revenue', 'sales', 'customer', 'customers', 'client', 'clients', 'market', 'marketing',
+        // Hindi/Indian variations (prioritize these to avoid confusion with money)
+        'vyapar', 'dhandha', 'udhyog', 'vyapari', 'udhyogpati', 'vyavasay',
+        'व्यापार', 'धंधा', 'उद्योग', 'व्यापारी', 'उद्योगपति', 'व्यवसाय',
+      ],
     };
 
     let detectedCategory = 'other';
     let maxScore = 0;
+    const categoryScores: Record<string, number> = {}; // Track all scores for confidence calculation
+    
+    // Calculate scores for each category
+    // IMPORTANT: Check multi-word phrases FIRST (they're more specific and should win)
     for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-      const score = keywords.filter(kw => text.includes(kw)).length;
+      let score = 0;
+      
+      // First pass: Check multi-word phrases (higher priority, more specific)
+      const multiWordKeywords = keywords.filter(kw => kw.includes(' '));
+      for (const kw of multiWordKeywords) {
+        // Use fuzzy matching for multi-word phrases (handles typos)
+        if (text.includes(kw) || TextNormalizer.fuzzyMatch(rawText, kw, 2)) {
+          score += 3; // Multi-word matches are very specific, give highest weight
+        } else {
+          // Try n-gram matching for better Hindi/transliteration support
+          if (NGramMatching.matches(text, kw, 0.7)) {
+            score += 2.5; // High weight for n-gram matches
+          }
+        }
+      }
+      
+      // Second pass: Check single words (lower priority)
+      const singleWordKeywords = keywords.filter(kw => !kw.includes(' '));
+      for (const kw of singleWordKeywords) {
+        // For single words, check for word boundary to avoid false matches
+        const wordBoundaryRegex = new RegExp(`\\b${kw}\\b`, 'i');
+        if (wordBoundaryRegex.test(text)) {
+          score += 1;
+        } else {
+          // Try fuzzy matching for typos and variations
+          if (TextNormalizer.fuzzyMatch(rawText, kw, 1)) {
+            score += 0.8; // Slightly lower weight for fuzzy matches
+          } else {
+            // Try n-gram matching for Hindi/transliteration
+            if (NGramMatching.matches(text, kw, 0.8)) {
+              score += 0.7; // Lower weight for single word n-gram matches
+            }
+          }
+        }
+      }
+      
+      categoryScores[cat] = score;
+      
       if (score > maxScore) {
         maxScore = score;
         detectedCategory = cat;
+      }
+    }
+    
+    // Calculate confidence score
+    const confidence = ConfidenceScoring.calculateConfidence(categoryScores);
+    const confidenceLevel = ConfidenceScoring.getConfidenceLevel(confidence);
+    
+    // Log low confidence detections for monitoring
+    if (confidenceLevel === 'low') {
+      this.logger.debug(`Low confidence category detection (${confidence}%): "${text.substring(0, 50)}" → ${detectedCategory}`);
+    }
+    
+    // If no category detected but text contains career-related verbs, default to career
+    // BUT only if there are no other category matches (maxScore === 0)
+    // AND the context suggests career (not just generic verbs like "find", "get")
+    if (detectedCategory === 'other' && maxScore === 0) {
+      // More specific career verbs that strongly indicate career intent
+      const strongCareerVerbs = ['become', 'obtain', 'secure', 'land', 'apply', 'interview', 'promote'];
+      // Generic verbs that could be any category - only use with career nouns
+      const genericVerbs = ['get', 'find', 'achieve'];
+      const careerNouns = ['job', 'position', 'role', 'career', 'profession', 'work', 'employment', 'business', 'office', 'promotion'];
+      
+      const hasStrongCareerVerb = strongCareerVerbs.some(verb => {
+        const regex = new RegExp(`\\b${verb}\\b`, 'i');
+        return regex.test(text);
+      });
+      
+      const hasCareerNoun = careerNouns.some(noun => {
+        const regex = new RegExp(`\\b${noun}\\b`, 'i');
+        return regex.test(text);
+      });
+      
+      // Only apply career fallback if:
+      // 1. Has strong career verb (become, obtain, etc.) WITH career noun, OR
+      // 2. Has generic verb (get, find, achieve) WITH career noun
+      // This prevents "achieve dreams" from being classified as career
+      if ((hasStrongCareerVerb && hasCareerNoun) || (hasCareerNoun && genericVerbs.some(verb => {
+        const regex = new RegExp(`\\b${verb}\\b`, 'i');
+        return regex.test(text);
+      }))) {
+        detectedCategory = 'career';
+        this.logger.debug(`Category fallback: Detected career based on verb/noun: ${text.substring(0, 50)}`);
       }
     }
 
@@ -188,11 +418,26 @@ export class ManifestationEnhancedService {
     };
 
     // Quick resonance score based on positive/negative words
-    const positiveWords = ['want', 'wish', 'desire', 'hope', 'dream', 'achieve', 'success', 'happy', 'love', 'grow', 'improve', 'best'];
-    const negativeWords = ['not', 'never', 'can\'t', 'won\'t', 'fear', 'worry', 'doubt', 'fail', 'hate', 'problem'];
+    const positiveWords = [
+      'want', 'wish', 'desire', 'hope', 'dream', 'achieve', 'success', 'successful', 'happy', 'happiness',
+      'love', 'grow', 'growth', 'improve', 'improvement', 'best', 'better', 'excellent', 'great', 'wonderful',
+      'fulfill', 'fulfillment', 'accomplish', 'accomplishment', 'win', 'victory', 'triumph', 'blessed',
+      'grateful', 'gratitude', 'positive', 'optimistic', 'confident', 'strong', 'powerful', 'abundant',
+    ];
+    const negativeWords = [
+      'not', 'never', 'no', 'can\'t', 'cannot', 'won\'t', 'fear', 'worry', 'worried', 'doubt', 'doubtful',
+      'fail', 'failure', 'hate', 'problem', 'problems', 'difficult', 'difficulty', 'struggle', 'struggling',
+      'impossible', 'unable', 'weak', 'weakness', 'poor', 'bad', 'terrible', 'awful', 'negative', 'pessimistic',
+    ];
 
-    const positiveCount = positiveWords.filter(w => text.includes(w)).length;
-    const negativeCount = negativeWords.filter(w => text.includes(w)).length;
+    const positiveCount = positiveWords.filter(w => {
+      const regex = new RegExp(`\\b${w}\\b`, 'i');
+      return regex.test(text);
+    }).length;
+    const negativeCount = negativeWords.filter(w => {
+      const regex = new RegExp(`\\b${w}\\b`, 'i');
+      return regex.test(text);
+    }).length;
 
     let resonance_score = 50 + (positiveCount * 8) - (negativeCount * 10);
     resonance_score = Math.max(20, Math.min(85, resonance_score));
@@ -205,11 +450,18 @@ export class ManifestationEnhancedService {
     if (text.length > 100) alignment_score += 5;
     alignment_score = Math.min(80, alignment_score);
 
-    // Quick antrashaakti score
-    const powerWords = ['will', 'can', 'able', 'strong', 'confident', 'believe', 'certain'];
-    const powerCount = powerWords.filter(w => text.includes(w)).length;
-    let antrashaakti_score = 45 + (powerCount * 8);
-    antrashaakti_score = Math.min(75, antrashaakti_score);
+    // Quick antrashaakti score (Inner Power)
+    const powerWords = [
+      'will', 'can', 'able', 'capable', 'strong', 'strength', 'confident', 'confidence', 'believe', 'belief',
+      'certain', 'determined', 'determination', 'commit', 'commitment', 'dedicated', 'dedication', 'focused',
+      'focus', 'powerful', 'power', 'courage', 'brave', 'fearless', 'unstoppable', 'resilient', 'resilience',
+    ];
+    const powerCount = powerWords.filter(w => {
+      const regex = new RegExp(`\\b${w}\\b`, 'i');
+      return regex.test(text);
+    }).length;
+    let antrashaakti_score = 45 + (powerCount * 6); // Reduced multiplier for better balance
+    antrashaakti_score = Math.min(85, antrashaakti_score);
 
     // Quick mahaadha score (blockages)
     let mahaadha_score = negativeCount * 15;
@@ -304,17 +556,69 @@ export class ManifestationEnhancedService {
       // Calculate action windows
       const actionWindows = await this.calculateActionWindows(finalCategory, user as User);
 
-      // Enhance insights
-      const enhancedInsights = { ...evaluation.insights };
+      // Get kundli data for enhanced tips
+      const kundli = await this.kundliRepository.findOne({
+        where: { user_id: userId, is_deleted: false },
+      });
+
+      let planets: KundliPlanet[] = [];
+      let houses: KundliHouse[] = [];
+      let currentMahadasha: any = null;
+      let currentAntardasha: any = null;
+
+      if (kundli) {
+        try {
+          planets = await this.kundliPlanetRepository.find({
+            where: { kundli_id: kundli.id, is_deleted: false },
+          });
+          houses = await this.kundliHouseRepository.find({
+            where: { kundli_id: kundli.id, is_deleted: false },
+          });
+          this.logger.debug(`Found ${planets.length} planets and ${houses.length} houses for kundli ${kundli.id}`);
+        } catch (error) {
+          this.logger.warn('Could not fetch planets/houses, continuing without them:', error.message);
+        }
+
+        // Get current dasha from kundliBasedScores
+        if (kundliBasedScores && kundliBasedScores.currentDasha) {
+          currentMahadasha = kundliBasedScores.currentDasha.mahadasha;
+          currentAntardasha = kundliBasedScores.currentDasha.antardasha;
+        }
+      }
+
+      // Enhance tips with kundli data (dasha-specific rituals, planetary guidance, etc.)
+      const enhancedTips = await this.generateEnhancedTips(
+        evaluation.tips,
+        finalCategory || 'other',
+        currentMahadasha,
+        currentAntardasha,
+        planets,
+        houses,
+        kundli,
+      );
+
+      // Enhance insights with kundli data
+      const enhancedInsights = await this.generateEnhancedInsights(
+        evaluation.insights,
+        finalCategory || 'other',
+        currentMahadasha,
+        currentAntardasha,
+        planets,
+        houses,
+        kundli,
+      );
+
+      // Add dasha information to insights if available
       if (kundliBasedScores && kundliBasedScores.currentDasha) {
         const mahaLord = kundliBasedScores.currentDasha.mahadasha?.lord || 'Unknown';
         const antaraLord = kundliBasedScores.currentDasha.antardasha?.lord || 'Unknown';
-        enhancedInsights.astro_insights = `Current Dasha: ${mahaLord}-${antaraLord}. ${kundliBasedScores.dasha_supportive > 60
+        const existingAstroInsights = enhancedInsights.astro_insights || '';
+        enhancedInsights.astro_insights = `${existingAstroInsights ? existingAstroInsights + ' ' : ''}Current Dasha: ${mahaLord}-${antaraLord}. ${kundliBasedScores.dasha_supportive > 60
           ? `This period is favorable (${Math.round(kundliBasedScores.dasha_supportive)}% supportive) for ${finalCategory || 'your'} manifestations.`
           : `This period has some challenges (${Math.round(kundliBasedScores.dasha_challenging)}% challenging). Focus on inner alignment and patience.`}`;
       }
 
-      // Update manifestation with enhanced data
+      // Update manifestation with enhanced data including kundli-based tips
       await this.manifestationRepository.update(manifestationId, {
         category: finalCategory,
         resonance_score: evaluation.scores.resonance_score,
@@ -325,8 +629,8 @@ export class ManifestationEnhancedService {
         mfp_score: mfp_score,
         coherence_score: evaluation.scores.coherence_score,
         action_windows: actionWindows,
-        tips: evaluation.tips,
-        insights: enhancedInsights,
+        tips: enhancedTips, // Use kundli-enhanced tips
+        insights: enhancedInsights, // Use kundli-enhanced insights
       });
 
       this.logger.log(`Async enhancement completed for manifestation ${manifestationId}`);

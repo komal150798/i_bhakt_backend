@@ -16,6 +16,7 @@ const config_1 = require("@nestjs/config");
 const axios_1 = require("@nestjs/axios");
 const rxjs_1 = require("rxjs");
 const prompt_service_1 = require("../../common/ai/prompt.service");
+const text_normalizer_util_1 = require("../utils/text-normalizer.util");
 let ManifestationLLMAnalyzerService = ManifestationLLMAnalyzerService_1 = class ManifestationLLMAnalyzerService {
     constructor(configService, httpService, promptService) {
         this.configService = configService;
@@ -655,17 +656,63 @@ Return ONLY valid JSON. No markdown, no explanation.`;
         };
     }
     detectCategoryFallback(title, description, backendConfig, hint) {
-        const text = `${title} ${description}`.toLowerCase();
-        const relationshipTerms = ['girlfriend', 'boyfriend', 'wife', 'husband', 'partner', 'spouse', 'marriage', 'wedding', 'marry', 'engaged', 'fiancé', 'fiancée', 'dating', 'date', 'romance', 'romantic', 'love', 'soulmate', 'relationship', 'couple'];
-        const careerTerms = ['job', 'work', 'career', 'employment', 'profession', 'business', 'promotion', 'salary', 'hike', 'raise', 'office', 'colleague', 'boss', 'workplace', 'professional', 'interview', 'resume', 'cv', 'cm', 'chief minister', 'minister', 'politics', 'political', 'election', 'politician', 'leader', 'position', 'post', 'role', 'become', 'achieve', 'goal', 'ambition', 'aspiration'];
-        const wealthTerms = ['money', 'wealth', 'rich', 'financial', 'income', 'salary', 'savings', 'investment', 'debt', 'loan', 'abundance', 'prosperity', 'finances', 'earn', 'million', 'billion', 'dollar', 'rupee'];
-        const healthTerms = ['health', 'healthy', 'fitness', 'exercise', 'weight', 'diet', 'illness', 'disease', 'pain', 'healing', 'recovery', 'wellness', 'wellbeing', 'doctor', 'hospital', 'medicine'];
+        const rawText = `${title} ${description}`;
+        const normalizedText = text_normalizer_util_1.TextNormalizer.normalizeText(rawText);
+        const text = normalizedText.toLowerCase();
+        if (text_normalizer_util_1.TextNormalizer.hasHindiScript(rawText)) {
+            this.logger.debug(`Hindi script detected in manifestation text for category detection`);
+        }
+        const relationshipTerms = [
+            'girlfriend', 'boyfriend', 'wife', 'husband', 'partner', 'spouse', 'marriage', 'wedding', 'marry',
+            'engaged', 'fiancé', 'fiancée', 'dating', 'date', 'romance', 'romantic', 'love', 'soulmate',
+            'relationship', 'couple',
+            'pyaar', 'prem', 'mohabbat', 'shadi', 'vivah', 'sathi', 'pati', 'patni', 'dost', 'parivar',
+            'jivan sathi', 'sangini', 'sangat', 'प्रेम', 'प्यार', 'मोहब्बत', 'शादी', 'विवाह', 'साथी',
+            'पति', 'पत्नी', 'दोस्त', 'परिवार', 'जीवनसाथी',
+        ];
+        const careerTerms = [
+            'job', 'work', 'career', 'employment', 'profession', 'occupation', 'position', 'post', 'role',
+            'naukri', 'nokri', 'kam', 'kaam', 'vyavasaya', 'pesha', 'नौकरी', 'काम', 'व्यवसाय', 'पेशा',
+            'become', 'obtain', 'secure', 'land', 'apply', 'interview', 'promote', 'promotion',
+            'banna', 'banana', 'pana', 'milna', 'बनना', 'पाना', 'मिलना',
+            'teacher', 'doctor', 'engineer', 'lawyer', 'nurse', 'accountant', 'manager', 'director', 'executive',
+            'developer', 'programmer', 'designer', 'artist', 'writer', 'journalist', 'consultant', 'analyst',
+            'scientist', 'researcher', 'professor', 'lecturer', 'coach', 'trainer', 'instructor', 'mentor',
+            'sikshak', 'adhyapak', 'master', 'daktar', 'vaidya', 'hakim', 'abhiyanta', 'vakil', 'nars',
+            'शिक्षक', 'अध्यापक', 'डॉक्टर', 'वैद्य', 'इंजीनियर', 'वकील', 'नर्स', 'मैनेजर',
+            'business', 'promotion', 'salary', 'raise', 'hike', 'bonus', 'office', 'workplace', 'colleague', 'boss',
+            'professional', 'corporate', 'company', 'organization', 'firm', 'enterprise',
+            'vyapar', 'dhandha', 'vetan', 'tankhwah', 'व्यापार', 'धंधा', 'वेतन', 'तनख्वाह',
+            'cm', 'chief minister', 'minister', 'election', 'political', 'government', 'sarpanch', 'mla', 'mp',
+            'politician', 'leader', 'bureaucrat', 'officer', 'administrator',
+            'mukhyamantri', 'mantri', 'neta', 'sarkar', 'rajneeti', 'चुनाव', 'मुख्यमंत्री', 'मंत्री', 'नेता',
+            'goal', 'ambition', 'aspiration', 'dream job', 'career growth', 'skill development',
+            'lakshya', 'sapna', 'uddeshya', 'लक्ष्य', 'सपना', 'उद्देश्य',
+            'resume', 'cv', 'interview',
+        ];
+        const wealthTerms = [
+            'money', 'wealth', 'rich', 'financial', 'income', 'salary', 'savings', 'investment', 'debt', 'loan',
+            'abundance', 'prosperity', 'finances', 'earn', 'million', 'billion', 'dollar', 'rupee',
+            'paisa', 'rupay', 'rupee', 'rupaiya', 'dhan', 'sampatti', 'amiri', 'dhani', 'aay', 'kamai',
+            'nivesh', 'bachet', 'udhar', 'karz', 'पैसा', 'रुपये', 'धन', 'संपत्ति', 'अमीर', 'धनी',
+            'आय', 'कमाई', 'निवेश', 'बचत', 'उधार', 'कर्ज',
+        ];
+        const healthTerms = [
+            'health', 'healthy', 'fitness', 'exercise', 'weight', 'diet', 'illness', 'disease', 'pain',
+            'healing', 'recovery', 'wellness', 'wellbeing', 'doctor', 'hospital', 'medicine',
+            'swasthya', 'tandurusti', 'bimari', 'rog', 'ilaj', 'upchar', 'dawai', 'dava', 'vajan', 'wajan',
+            'vyayam', 'kasrat', 'aahar', 'dard', 'स्वास्थ्य', 'तंदुरुस्ती', 'बीमारी', 'रोग', 'इलाज',
+            'उपचार', 'दवा', 'वजन', 'व्यायाम', 'कसरत', 'आहार', 'दर्द',
+        ];
         const scores = {};
         for (const [cat, keywords] of Object.entries(backendConfig.category_keywords)) {
             let score = keywords.filter(kw => {
                 const keyword = kw.toLowerCase();
                 const regex = new RegExp(`\\b${keyword}\\b`, 'i');
-                return regex.test(text);
+                if (regex.test(text)) {
+                    return true;
+                }
+                return text_normalizer_util_1.TextNormalizer.fuzzyMatch(rawText, keyword, 1);
             }).length;
             if (cat === 'love' || cat === 'relationship') {
                 const relationshipMatches = relationshipTerms.filter(term => text.includes(term)).length;

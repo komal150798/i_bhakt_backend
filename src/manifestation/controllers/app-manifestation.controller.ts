@@ -64,6 +64,17 @@ export class AppManifestationController {
       dto,
     );
 
+    // Helper function to convert decimal/string to number
+    const toNumber = (value: any): number | null => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
+      }
+      return null;
+    };
+
     // Return only essential data for fast response
     // Other details (tips, insights, etc.) can be fetched via /:id endpoint
     return {
@@ -76,12 +87,13 @@ export class AppManifestationController {
         title: manifestation.title,
         category: manifestation.category,
         category_label: manifestation.insights?.category_label || null,
-        resonance_score: manifestation.resonance_score,
-        alignment_score: manifestation.alignment_score,
-        antrashaakti_score: manifestation.antrashaakti_score,
-        mahaadha_score: manifestation.mahaadha_score,
-        astro_support_index: manifestation.astro_support_index,
-        mfp_score: manifestation.mfp_score,
+        resonance_score: toNumber(manifestation.resonance_score),
+        alignment_score: toNumber(manifestation.alignment_score),
+        antrashaakti_score: toNumber(manifestation.antrashaakti_score),
+        mahaadha_score: toNumber(manifestation.mahaadha_score),
+        astro_support_index: toNumber(manifestation.astro_support_index),
+        mfp_score: toNumber(manifestation.mfp_score),
+        coherence_score: toNumber(manifestation.coherence_score),
       },
     };
   }
@@ -125,6 +137,17 @@ export class AppManifestationController {
       true,
     );
 
+    // Helper function to convert decimal/string to number
+    const toNumber = (value: any): number | null => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
+      }
+      return null;
+    };
+
     return {
       success: true,
       code: 200,
@@ -135,8 +158,13 @@ export class AppManifestationController {
         title: m.title,
         description: m.description,
         category: m.category,
-        resonance_score: m.resonance_score,
-        mfp_score: m.mfp_score,
+        resonance_score: toNumber(m.resonance_score),
+        alignment_score: toNumber(m.alignment_score),
+        antrashaakti_score: toNumber(m.antrashaakti_score),
+        mahaadha_score: toNumber(m.mahaadha_score),
+        astro_support_index: toNumber(m.astro_support_index),
+        mfp_score: toNumber(m.mfp_score),
+        coherence_score: toNumber(m.coherence_score),
         is_archived: m.is_archived,
         is_locked: m.is_locked,
         added_date: m.added_date,
@@ -275,6 +303,17 @@ export class AppManifestationController {
       user.id,
     );
 
+    // Helper function to convert decimal/string to number
+    const toNumber = (value: any): number | null => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
+      }
+      return null;
+    };
+
     return {
       success: true,
       code: 200,
@@ -288,12 +327,13 @@ export class AppManifestationController {
         category_label: manifestation.insights?.category_label || null,
         emotional_state: manifestation.emotional_state,
         target_date: manifestation.target_date,
-        resonance_score: manifestation.resonance_score,
-        alignment_score: manifestation.alignment_score,
-        antrashaakti_score: manifestation.antrashaakti_score,
-        mahaadha_score: manifestation.mahaadha_score,
-        astro_support_index: manifestation.astro_support_index,
-        mfp_score: manifestation.mfp_score,
+        resonance_score: toNumber(manifestation.resonance_score),
+        alignment_score: toNumber(manifestation.alignment_score),
+        antrashaakti_score: toNumber(manifestation.antrashaakti_score),
+        mahaadha_score: toNumber(manifestation.mahaadha_score),
+        astro_support_index: toNumber(manifestation.astro_support_index),
+        mfp_score: toNumber(manifestation.mfp_score),
+        coherence_score: toNumber(manifestation.coherence_score),
         tips: manifestation.tips,
         insights: manifestation.insights,
         summary_for_ui: manifestation.insights?.summary_for_ui || null,

@@ -20,6 +20,7 @@ export declare class AppManifestationController {
             mahaadha_score: number;
             astro_support_index: number;
             mfp_score: number;
+            coherence_score: number;
         };
     }>;
     getDashboard(user: any): Promise<{
@@ -63,7 +64,12 @@ export declare class AppManifestationController {
             description: string;
             category: string;
             resonance_score: number;
+            alignment_score: number;
+            antrashaakti_score: number;
+            mahaadha_score: number;
+            astro_support_index: number;
             mfp_score: number;
+            coherence_score: number;
             is_archived: boolean;
             is_locked: boolean;
             added_date: Date;
@@ -170,6 +176,7 @@ export declare class AppManifestationController {
             mahaadha_score: number;
             astro_support_index: number;
             mfp_score: number;
+            coherence_score: number;
             tips: {
                 rituals?: string[];
                 what_to_manifest?: string[];

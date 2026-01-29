@@ -30,6 +30,9 @@ const kundli_entity_1 = require("../../kundli/entities/kundli.entity");
 const kundli_planet_entity_1 = require("../../kundli/entities/kundli-planet.entity");
 const kundli_house_entity_1 = require("../../kundli/entities/kundli-house.entity");
 const kundli_service_1 = require("../../kundli/services/kundli.service");
+const text_normalizer_util_1 = require("../utils/text-normalizer.util");
+const confidence_scoring_util_1 = require("../algorithms/confidence-scoring.util");
+const ngram_matching_util_1 = require("../algorithms/ngram-matching.util");
 let ManifestationEnhancedService = ManifestationEnhancedService_1 = class ManifestationEnhancedService {
     constructor(manifestationRepository, userRepository, customerRepository, dashaRepository, antardashaRepository, pratyantarRepository, sukshmaRepository, kundliRepository, kundliPlanetRepository, kundliHouseRepository, aiEvaluationService, swissEphemerisService, kundliService) {
         this.manifestationRepository = manifestationRepository;
@@ -113,21 +116,185 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         return savedManifestation;
     }
     async getQuickScores(title, description) {
-        const text = `${title} ${description}`.toLowerCase();
+        const rawText = `${title} ${description}`;
+        const normalizedText = text_normalizer_util_1.TextNormalizer.normalizeText(rawText);
+        const text = normalizedText.toLowerCase();
+        if (text_normalizer_util_1.TextNormalizer.hasHindiScript(rawText)) {
+            this.logger.debug(`Hindi script detected in manifestation text`);
+        }
         const categoryKeywords = {
-            career: ['job', 'career', 'work', 'promotion', 'business', 'office', 'salary', 'profession', 'position', 'cm', 'minister', 'election', 'political', 'government', 'sarpanch', 'mla', 'mp'],
-            relationship: ['love', 'relationship', 'marriage', 'partner', 'spouse', 'family', 'friend', 'dating'],
-            money: ['money', 'wealth', 'rich', 'income', 'financial', 'earning', 'profit', 'investment'],
-            health: ['health', 'fitness', 'weight', 'body', 'disease', 'cure', 'medical', 'wellness'],
-            spiritual: ['spiritual', 'meditation', 'peace', 'enlightenment', 'soul', 'divine', 'god', 'prayer'],
+            career: [
+                'job', 'career', 'work', 'employment', 'profession', 'occupation', 'position', 'role', 'post',
+                'naukri', 'nokri', 'kam', 'kaam', 'vyavasaya', 'pesha', 'नौकरी', 'काम', 'व्यवसाय', 'पेशा',
+                'become', 'obtain', 'secure', 'land', 'apply', 'interview', 'promote', 'promotion',
+                'banna', 'banana', 'pana', 'milna', 'बनना', 'पाना', 'मिलना',
+                'teacher', 'doctor', 'engineer', 'lawyer', 'nurse', 'accountant', 'manager', 'director', 'executive',
+                'developer', 'programmer', 'designer', 'artist', 'writer', 'journalist', 'consultant', 'analyst',
+                'scientist', 'researcher', 'professor', 'lecturer', 'coach', 'trainer', 'instructor', 'mentor',
+                'sikshak', 'adhyapak', 'master', 'daktar', 'vaidya', 'hakim', 'abhiyanta', 'vakil', 'nars',
+                'शिक्षक', 'अध्यापक', 'डॉक्टर', 'वैद्य', 'इंजीनियर', 'वकील', 'नर्स', 'मैनेजर',
+                'promotion', 'salary', 'raise', 'hike', 'bonus', 'office', 'workplace', 'colleague', 'boss',
+                'professional', 'corporate', 'organization',
+                'vetan', 'tankhwah', 'वेतन', 'तनख्वाह',
+                'cm', 'chief minister', 'minister', 'election', 'political', 'government', 'sarpanch', 'mla', 'mp',
+                'politician', 'leader', 'bureaucrat', 'officer', 'administrator',
+                'mukhyamantri', 'mantri', 'neta', 'neta', 'sarkar', 'rajneeti', 'चुनाव', 'मुख्यमंत्री', 'मंत्री', 'नेता',
+                'goal', 'ambition', 'aspiration', 'dream job', 'career growth', 'skill development',
+                'lakshya', 'sapna', 'uddeshya', 'लक्ष्य', 'सपना', 'उद्देश्य',
+            ],
+            relationship: [
+                'love', 'relationship', 'marriage', 'married', 'wedding', 'partner', 'spouse', 'family', 'friend',
+                'dating', 'romance', 'romantic', 'boyfriend', 'girlfriend', 'husband', 'wife', 'soulmate',
+                'life partner', 'fiancé', 'fiancée', 'engaged', 'couple', 'dating', 'marry',
+                'pyaar', 'prem', 'mohabbat', 'shadi', 'vivah', 'sathi', 'pati', 'patni', 'dost', 'parivar',
+                'jivan sathi', 'sangini', 'sangat', 'प्रेम', 'प्यार', 'मोहब्बत', 'शादी', 'विवाह', 'साथी',
+                'पति', 'पत्नी', 'दोस्त', 'परिवार', 'जीवनसाथी',
+                'find love', 'find soulmate', 'find partner', 'get married', 'get engaged',
+                'pyaar milna', 'shadi karna', 'vivah karna', 'साथी मिलना', 'शादी करना',
+            ],
+            money: [
+                'money', 'wealth', 'rich', 'richer', 'income', 'financial', 'finances', 'earning', 'earn', 'profit',
+                'investment', 'invest', 'savings', 'save', 'fortune', 'affluent', 'prosperity', 'prosperous',
+                'million', 'billion', 'dollar', 'rupee', 'abundance', 'debt', 'loan', 'salary', 'hike', 'raise',
+                'paisa', 'rupay', 'rupee', 'rupaiya', 'sampatti', 'amiri', 'dhani', 'aay', 'kamai',
+                'nivesh', 'bachet', 'udhar', 'karz', 'पैसा', 'रुपये', 'धन', 'संपत्ति', 'अमीर', 'धनी',
+                'आय', 'कमाई', 'निवेश', 'बचत', 'उधार', 'कर्ज',
+                'become rich', 'get rich', 'earn money', 'make money',
+                'amir banna', 'paisa kamana', 'धन कमाना', 'अमीर बनना',
+            ],
+            health: [
+                'health', 'healthy', 'fitness', 'fit', 'weight', 'body', 'disease', 'illness', 'cure', 'medical',
+                'wellness', 'wellbeing', 'heal', 'healing', 'recovery', 'recover', 'treatment', 'therapy',
+                'exercise', 'diet', 'pain', 'doctor', 'hospital', 'medicine',
+                'swasthya', 'tandurusti', 'bimari', 'rog', 'ilaj', 'upchar', 'dawai', 'dava', 'vajan', 'wajan',
+                'vyayam', 'kasrat', 'aahar', 'dard', 'स्वास्थ्य', 'तंदुरुस्ती', 'बीमारी', 'रोग', 'इलाज',
+                'उपचार', 'दवा', 'वजन', 'व्यायाम', 'कसरत', 'आहार', 'दर्द',
+                'fitness goals', 'health goals', 'lose weight', 'gain weight',
+                'vajan kam karna', 'vajan badhana', 'swasth rahna', 'वजन कम करना', 'वजन बढ़ाना', 'स्वस्थ रहना',
+            ],
+            spiritual: [
+                'spiritual', 'spirituality', 'meditation', 'meditate', 'peace', 'peaceful', 'enlightenment',
+                'enlightened', 'soul', 'divine', 'god', 'prayer', 'pray', 'devotion', 'devotional', 'worship',
+                'blessing', 'blessed', 'dharma', 'karma', 'moksha', 'nirvana',
+                'adhyatmik', 'adhyatma', 'dhyan', 'shanti', 'atma', 'ishwar', 'bhagwan', 'puja', 'prarthana',
+                'bhakti', 'upasana', 'ashirvad', 'धर्म', 'कर्म', 'मोक्ष', 'आध्यात्मिक', 'ध्यान', 'शांति',
+                'आत्मा', 'ईश्वर', 'भगवान', 'पूजा', 'प्रार्थना', 'भक्ति', 'उपासना', 'आशीर्वाद',
+                'find peace', 'find enlightenment', 'achieve peace',
+                'shanti milna', 'moksha pana', 'शांति मिलना', 'मोक्ष पाना',
+            ],
+            personal: [
+                'personal', 'self', 'myself', 'growth', 'development', 'improve', 'improvement', 'transform',
+                'transformation', 'change', 'better', 'best', 'confidence', 'self confidence', 'self esteem',
+                'personality', 'character', 'habits', 'behavior', 'mindset', 'attitude', 'positive thinking',
+                'motivation', 'inspiration', 'success', 'achieve', 'goals', 'dreams', 'aspirations',
+                'vyaktigat', 'swayam', 'vikas', 'sudhar', 'badlav', 'sabhyata', 'charitra', 'aadat',
+                'vyavhar', 'soch', 'drishtikon', 'sakaratmak', 'prerana', 'safalta', 'लक्ष्य', 'सपने',
+                'व्यक्तिगत', 'स्वयं', 'विकास', 'सुधार', 'बदलाव', 'सभ्यता', 'चरित्र', 'आदत',
+                'व्यवहार', 'सोच', 'दृष्टिकोण', 'सकारात्मक', 'प्रेरणा', 'सफलता',
+            ],
+            farming: [
+                'farming', 'farm', 'farmer', 'agriculture', 'agricultural', 'crop', 'crops', 'harvest',
+                'harvesting', 'cultivation', 'cultivate', 'field', 'fields', 'land', 'farming land',
+                'irrigation', 'fertilizer', 'seeds', 'planting', 'sowing', 'reaping', 'yield', 'production',
+                'livestock', 'cattle', 'dairy', 'poultry', 'organic', 'organic farming', 'crop yield',
+                'agricultural income', 'farm income', 'rural', 'village farming', 'kheti', 'krishi',
+                'kheti', 'krishi', 'kisan', 'fasal', 'khet', 'zameen', 'beej', 'bona', 'katayi',
+                'sabji', 'anaj', 'dhan', 'gehu', 'chawal', 'makka', 'jowar', 'bajra', 'गेहूं', 'चावल',
+                'खेती', 'कृषि', 'किसान', 'फसल', 'खेत', 'जमीन', 'बीज', 'बोना', 'कटाई',
+                'सब्जी', 'अनाज', 'धान', 'मक्का', 'ज्वार', 'बाजरा',
+                'good harvest', 'better crop', 'more yield', 'agricultural success', 'farm success',
+                'अच्छी फसल', 'बेहतर उत्पादन', 'अधिक उपज',
+            ],
+            family: [
+                'family', 'families', 'parent', 'parents', 'father', 'mother', 'dad', 'mom', 'mummy', 'papa',
+                'son', 'daughter', 'child', 'children', 'kids', 'sibling', 'siblings', 'brother', 'sister',
+                'grandfather', 'grandmother', 'grandpa', 'grandma', 'uncle', 'aunt', 'cousin', 'relatives',
+                'home', 'household', 'family harmony', 'family peace', 'family happiness', 'family support',
+                'family relationship', 'family bond', 'family unity', 'family togetherness',
+                'my family', 'our family', 'family member', 'family members', 'family life', 'family time',
+                'parivar', 'ghar', 'maata', 'pita', 'beta', 'beti', 'bhai', 'behen', 'dada', 'dadi',
+                'nana', 'nani', 'chacha', 'chachi', 'mama', 'mami', 'rishtedar', 'sambandhi',
+                'परिवार', 'घर', 'माता', 'पिता', 'बेटा', 'बेटी', 'भाई', 'बहन', 'दादा', 'दादी',
+                'नाना', 'नानी', 'चाचा', 'चाची', 'मामा', 'मामी', 'रिश्तेदार', 'संबंधी',
+                'parivar mein shanti', 'ghar mein khushi', 'मेरा परिवार', 'हमारा परिवार',
+                'परिवार में शांति', 'घर में खुशी',
+            ],
+            business: [
+                'business growth', 'business success', 'business expansion', 'business profit',
+                'new business', 'start business', 'own business', 'my business', 'my dhandha', 'apna dhandha',
+                'business owner', 'business partner', 'business plan', 'business model',
+                'vyapar badhana', 'dhandha badhana', 'naya vyapar', 'apna vyapar',
+                'व्यापार बढ़ाना', 'धंधा बढ़ाना', 'नया व्यापार', 'अपना व्यापार', 'अपना धंधा',
+                'business', 'businesses', 'businessman', 'businesswoman', 'entrepreneur', 'entrepreneurship',
+                'startup', 'start up', 'company', 'companies', 'firm', 'firms', 'enterprise', 'enterprises',
+                'venture', 'ventures', 'trade', 'trading', 'commerce', 'commercial', 'profit', 'profits',
+                'revenue', 'sales', 'customer', 'customers', 'client', 'clients', 'market', 'marketing',
+                'vyapar', 'dhandha', 'udhyog', 'vyapari', 'udhyogpati', 'vyavasay',
+                'व्यापार', 'धंधा', 'उद्योग', 'व्यापारी', 'उद्योगपति', 'व्यवसाय',
+            ],
         };
         let detectedCategory = 'other';
         let maxScore = 0;
+        const categoryScores = {};
         for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-            const score = keywords.filter(kw => text.includes(kw)).length;
+            let score = 0;
+            const multiWordKeywords = keywords.filter(kw => kw.includes(' '));
+            for (const kw of multiWordKeywords) {
+                if (text.includes(kw) || text_normalizer_util_1.TextNormalizer.fuzzyMatch(rawText, kw, 2)) {
+                    score += 3;
+                }
+                else {
+                    if (ngram_matching_util_1.NGramMatching.matches(text, kw, 0.7)) {
+                        score += 2.5;
+                    }
+                }
+            }
+            const singleWordKeywords = keywords.filter(kw => !kw.includes(' '));
+            for (const kw of singleWordKeywords) {
+                const wordBoundaryRegex = new RegExp(`\\b${kw}\\b`, 'i');
+                if (wordBoundaryRegex.test(text)) {
+                    score += 1;
+                }
+                else {
+                    if (text_normalizer_util_1.TextNormalizer.fuzzyMatch(rawText, kw, 1)) {
+                        score += 0.8;
+                    }
+                    else {
+                        if (ngram_matching_util_1.NGramMatching.matches(text, kw, 0.8)) {
+                            score += 0.7;
+                        }
+                    }
+                }
+            }
+            categoryScores[cat] = score;
             if (score > maxScore) {
                 maxScore = score;
                 detectedCategory = cat;
+            }
+        }
+        const confidence = confidence_scoring_util_1.ConfidenceScoring.calculateConfidence(categoryScores);
+        const confidenceLevel = confidence_scoring_util_1.ConfidenceScoring.getConfidenceLevel(confidence);
+        if (confidenceLevel === 'low') {
+            this.logger.debug(`Low confidence category detection (${confidence}%): "${text.substring(0, 50)}" → ${detectedCategory}`);
+        }
+        if (detectedCategory === 'other' && maxScore === 0) {
+            const strongCareerVerbs = ['become', 'obtain', 'secure', 'land', 'apply', 'interview', 'promote'];
+            const genericVerbs = ['get', 'find', 'achieve'];
+            const careerNouns = ['job', 'position', 'role', 'career', 'profession', 'work', 'employment', 'business', 'office', 'promotion'];
+            const hasStrongCareerVerb = strongCareerVerbs.some(verb => {
+                const regex = new RegExp(`\\b${verb}\\b`, 'i');
+                return regex.test(text);
+            });
+            const hasCareerNoun = careerNouns.some(noun => {
+                const regex = new RegExp(`\\b${noun}\\b`, 'i');
+                return regex.test(text);
+            });
+            if ((hasStrongCareerVerb && hasCareerNoun) || (hasCareerNoun && genericVerbs.some(verb => {
+                const regex = new RegExp(`\\b${verb}\\b`, 'i');
+                return regex.test(text);
+            }))) {
+                detectedCategory = 'career';
+                this.logger.debug(`Category fallback: Detected career based on verb/noun: ${text.substring(0, 50)}`);
             }
         }
         const categoryLabels = {
@@ -138,10 +305,25 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             spiritual: 'Spirituality',
             other: 'General',
         };
-        const positiveWords = ['want', 'wish', 'desire', 'hope', 'dream', 'achieve', 'success', 'happy', 'love', 'grow', 'improve', 'best'];
-        const negativeWords = ['not', 'never', 'can\'t', 'won\'t', 'fear', 'worry', 'doubt', 'fail', 'hate', 'problem'];
-        const positiveCount = positiveWords.filter(w => text.includes(w)).length;
-        const negativeCount = negativeWords.filter(w => text.includes(w)).length;
+        const positiveWords = [
+            'want', 'wish', 'desire', 'hope', 'dream', 'achieve', 'success', 'successful', 'happy', 'happiness',
+            'love', 'grow', 'growth', 'improve', 'improvement', 'best', 'better', 'excellent', 'great', 'wonderful',
+            'fulfill', 'fulfillment', 'accomplish', 'accomplishment', 'win', 'victory', 'triumph', 'blessed',
+            'grateful', 'gratitude', 'positive', 'optimistic', 'confident', 'strong', 'powerful', 'abundant',
+        ];
+        const negativeWords = [
+            'not', 'never', 'no', 'can\'t', 'cannot', 'won\'t', 'fear', 'worry', 'worried', 'doubt', 'doubtful',
+            'fail', 'failure', 'hate', 'problem', 'problems', 'difficult', 'difficulty', 'struggle', 'struggling',
+            'impossible', 'unable', 'weak', 'weakness', 'poor', 'bad', 'terrible', 'awful', 'negative', 'pessimistic',
+        ];
+        const positiveCount = positiveWords.filter(w => {
+            const regex = new RegExp(`\\b${w}\\b`, 'i');
+            return regex.test(text);
+        }).length;
+        const negativeCount = negativeWords.filter(w => {
+            const regex = new RegExp(`\\b${w}\\b`, 'i');
+            return regex.test(text);
+        }).length;
         let resonance_score = 50 + (positiveCount * 8) - (negativeCount * 10);
         resonance_score = Math.max(20, Math.min(85, resonance_score));
         let alignment_score = 40;
@@ -154,10 +336,17 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         if (text.length > 100)
             alignment_score += 5;
         alignment_score = Math.min(80, alignment_score);
-        const powerWords = ['will', 'can', 'able', 'strong', 'confident', 'believe', 'certain'];
-        const powerCount = powerWords.filter(w => text.includes(w)).length;
-        let antrashaakti_score = 45 + (powerCount * 8);
-        antrashaakti_score = Math.min(75, antrashaakti_score);
+        const powerWords = [
+            'will', 'can', 'able', 'capable', 'strong', 'strength', 'confident', 'confidence', 'believe', 'belief',
+            'certain', 'determined', 'determination', 'commit', 'commitment', 'dedicated', 'dedication', 'focused',
+            'focus', 'powerful', 'power', 'courage', 'brave', 'fearless', 'unstoppable', 'resilient', 'resilience',
+        ];
+        const powerCount = powerWords.filter(w => {
+            const regex = new RegExp(`\\b${w}\\b`, 'i');
+            return regex.test(text);
+        }).length;
+        let antrashaakti_score = 45 + (powerCount * 6);
+        antrashaakti_score = Math.min(85, antrashaakti_score);
         let mahaadha_score = negativeCount * 15;
         mahaadha_score = Math.min(50, mahaadha_score);
         const astro_support_index = 60;
@@ -213,11 +402,38 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
                 astro_support_index: astro_support_index,
             });
             const actionWindows = await this.calculateActionWindows(finalCategory, user);
-            const enhancedInsights = { ...evaluation.insights };
+            const kundli = await this.kundliRepository.findOne({
+                where: { user_id: userId, is_deleted: false },
+            });
+            let planets = [];
+            let houses = [];
+            let currentMahadasha = null;
+            let currentAntardasha = null;
+            if (kundli) {
+                try {
+                    planets = await this.kundliPlanetRepository.find({
+                        where: { kundli_id: kundli.id, is_deleted: false },
+                    });
+                    houses = await this.kundliHouseRepository.find({
+                        where: { kundli_id: kundli.id, is_deleted: false },
+                    });
+                    this.logger.debug(`Found ${planets.length} planets and ${houses.length} houses for kundli ${kundli.id}`);
+                }
+                catch (error) {
+                    this.logger.warn('Could not fetch planets/houses, continuing without them:', error.message);
+                }
+                if (kundliBasedScores && kundliBasedScores.currentDasha) {
+                    currentMahadasha = kundliBasedScores.currentDasha.mahadasha;
+                    currentAntardasha = kundliBasedScores.currentDasha.antardasha;
+                }
+            }
+            const enhancedTips = await this.generateEnhancedTips(evaluation.tips, finalCategory || 'other', currentMahadasha, currentAntardasha, planets, houses, kundli);
+            const enhancedInsights = await this.generateEnhancedInsights(evaluation.insights, finalCategory || 'other', currentMahadasha, currentAntardasha, planets, houses, kundli);
             if (kundliBasedScores && kundliBasedScores.currentDasha) {
                 const mahaLord = kundliBasedScores.currentDasha.mahadasha?.lord || 'Unknown';
                 const antaraLord = kundliBasedScores.currentDasha.antardasha?.lord || 'Unknown';
-                enhancedInsights.astro_insights = `Current Dasha: ${mahaLord}-${antaraLord}. ${kundliBasedScores.dasha_supportive > 60
+                const existingAstroInsights = enhancedInsights.astro_insights || '';
+                enhancedInsights.astro_insights = `${existingAstroInsights ? existingAstroInsights + ' ' : ''}Current Dasha: ${mahaLord}-${antaraLord}. ${kundliBasedScores.dasha_supportive > 60
                     ? `This period is favorable (${Math.round(kundliBasedScores.dasha_supportive)}% supportive) for ${finalCategory || 'your'} manifestations.`
                     : `This period has some challenges (${Math.round(kundliBasedScores.dasha_challenging)}% challenging). Focus on inner alignment and patience.`}`;
             }
@@ -231,7 +447,7 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
                 mfp_score: mfp_score,
                 coherence_score: evaluation.scores.coherence_score,
                 action_windows: actionWindows,
-                tips: evaluation.tips,
+                tips: enhancedTips,
                 insights: enhancedInsights,
             });
             this.logger.log(`Async enhancement completed for manifestation ${manifestationId}`);
