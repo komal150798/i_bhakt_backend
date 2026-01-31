@@ -7,6 +7,7 @@ import { KundliHouse } from './entities/kundli-house.entity';
 import { PlanetMaster } from './entities/planet-master.entity';
 import { NakshatraMaster } from './entities/nakshatra-master.entity';
 import { AyanamsaMaster } from './entities/ayanamsa-master.entity';
+import { Customer } from '../users/entities/customer.entity';
 import { CacheModule } from '../cache/cache.module';
 import { RepositoriesModule } from '../infrastructure/repositories/repositories.module';
 import { AstrologyModule } from '../astrology/astrology.module';
@@ -23,6 +24,7 @@ import { KundliController } from './controllers/kundli.controller';
       PlanetMaster,
       NakshatraMaster,
       AyanamsaMaster,
+      Customer,
     ]),
     HttpModule,
     CacheModule,

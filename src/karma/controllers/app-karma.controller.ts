@@ -8,16 +8,20 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiBody,
 } from '@nestjs/swagger';
 import { KarmaService, AddKarmaActionDto } from '../services/karma.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUserPayload } from '../../common/types/jwt-payload.interface';
+import { AddKarmaInputDto } from '../dtos/add-karma-input.dto';
 
 @ApiTags('Karma (App)')
 @Controller('app/karma')
@@ -37,7 +41,7 @@ export class AppKarmaController {
     status: 200,
     description: "Today's karma data retrieved successfully",
   })
-  async getTodayKarma(@CurrentUser() user: any) {
+  async getTodayKarma(@CurrentUser() user: CurrentUserPayload) {
     const userId = user.id;
     
     // Get today's karma entries and summary
@@ -77,18 +81,31 @@ export class AppKarmaController {
   @Post('input')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Add karma input/action (Mobile App)' })
+  @ApiBody({
+    type: AddKarmaInputDto,
+    description: 'Karma action details',
+    examples: {
+      example1: {
+        summary: 'Add karma action',
+        value: {
+          action_text: 'Helped an elderly person cross the road',
+          timestamp: '2024-01-15T10:30:00Z',
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 201,
     description: 'Karma input added successfully',
   })
   async addKarmaInput(
-    @Body() body: { action_text: string; timestamp?: string },
-    @CurrentUser() user: any,
+    @Body() inputDto: AddKarmaInputDto,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const dto: AddKarmaActionDto = {
       user_id: user.id,
-      action_text: body.action_text,
-      timestamp: body.timestamp ? new Date(body.timestamp) : new Date(),
+      action_text: inputDto.action_text,
+      timestamp: inputDto.timestamp ? new Date(inputDto.timestamp) : new Date(),
     };
 
     const entry = await this.karmaService.addKarmaAction(dto);
@@ -117,7 +134,10 @@ export class AppKarmaController {
     status: 200,
     description: 'Karma scores retrieved successfully',
   })
-  async getKarmaScores(@CurrentUser() user: any) {
+  async getKarmaScores(@CurrentUser() user: CurrentUserPayload) {
+    if (!user.id) {
+      throw new BadRequestException('User ID is missing');
+    }
     const userId = user.id;
     const summary = await this.karmaService.getUserKarmaSummary(userId);
 
@@ -148,7 +168,10 @@ export class AppKarmaController {
     status: 200,
     description: 'Dashboard data retrieved successfully',
   })
-  async getDashboard(@CurrentUser() user: any) {
+  async getDashboard(@CurrentUser() user: CurrentUserPayload) {
+    if (!user.id) {
+      throw new BadRequestException('User ID is missing');
+    }
     const userId = user.id;
     const dashboard = await this.karmaService.getDashboardSummary(userId);
 

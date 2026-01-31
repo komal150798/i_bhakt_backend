@@ -61,6 +61,24 @@ __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: 'Generate kundli (birth chart)' }),
+    (0, swagger_1.ApiBody)({
+        type: generate_kundli_dto_1.GenerateKundliDto,
+        description: 'Birth details for kundli generation',
+        examples: {
+            example1: {
+                summary: 'Complete birth data',
+                value: {
+                    name: 'John Doe',
+                    birth_date: '1990-01-15',
+                    birth_time: '10:30:00',
+                    birth_place: 'Mumbai',
+                    latitude: 19.0760,
+                    longitude: 72.8777,
+                    timezone: 'Asia/Kolkata',
+                },
+            },
+        },
+    }),
     (0, swagger_1.ApiResponse)({
         status: 200,
         description: 'Kundli generated successfully',
@@ -82,10 +100,18 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: 'Generate kundli for authenticated user' }),
+    (0, swagger_1.ApiBody)({
+        type: generate_kundli_dto_1.GenerateKundliDto,
+        description: 'Birth details for kundli generation',
+    }),
     (0, swagger_1.ApiResponse)({
         status: 200,
         description: 'Kundli generated successfully',
         type: kundli_response_dto_1.KundliResponseDto,
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 400,
+        description: 'Invalid input data',
     }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Request)()),
@@ -101,6 +127,10 @@ __decorate([
     (0, swagger_1.ApiOperation)({
         summary: 'Generate Kundli PDF report (authenticated users only)',
         description: 'Generates a PDF report containing birth details, Lagna, Nakshatra, Mahadasha, Antardasha, Pratyantar Dasha, planetary positions, and houses. Requires valid JWT authentication.',
+    }),
+    (0, swagger_1.ApiBody)({
+        type: generate_kundli_pdf_dto_1.GenerateKundliPdfDto,
+        description: 'Kundli data for PDF generation',
     }),
     (0, swagger_1.ApiProduces)('application/pdf'),
     (0, swagger_1.ApiResponse)({

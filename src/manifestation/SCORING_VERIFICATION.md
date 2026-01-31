@@ -176,3 +176,4 @@ The scoring logic:
 - ✅ Returns scores in proper ranges
 - ✅ Updates astro support async with kundli data
 
+

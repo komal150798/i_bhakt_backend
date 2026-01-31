@@ -20,23 +20,14 @@ const current_user_decorator_1 = require("../../common/decorators/current-user.d
 const manifestation_enhanced_service_1 = require("../services/manifestation-enhanced.service");
 const create_manifestation_enhanced_dto_1 = require("../dtos/create-manifestation-enhanced.dto");
 const alignment_action_dto_1 = require("../dtos/alignment-action.dto");
+const calculate_resonance_dto_1 = require("../dtos/calculate-resonance.dto");
+const number_util_1 = require("../../common/utils/number.util");
 let AppManifestationController = class AppManifestationController {
     constructor(manifestationService) {
         this.manifestationService = manifestationService;
     }
     async createManifestation(dto, user) {
         const manifestation = await this.manifestationService.createManifestation(user.id, dto);
-        const toNumber = (value) => {
-            if (value === null || value === undefined)
-                return null;
-            if (typeof value === 'number')
-                return value;
-            if (typeof value === 'string') {
-                const num = parseFloat(value);
-                return isNaN(num) ? null : num;
-            }
-            return null;
-        };
         return {
             success: true,
             code: 201,
@@ -47,17 +38,20 @@ let AppManifestationController = class AppManifestationController {
                 title: manifestation.title,
                 category: manifestation.category,
                 category_label: manifestation.insights?.category_label || null,
-                resonance_score: toNumber(manifestation.resonance_score),
-                alignment_score: toNumber(manifestation.alignment_score),
-                antrashaakti_score: toNumber(manifestation.antrashaakti_score),
-                mahaadha_score: toNumber(manifestation.mahaadha_score),
-                astro_support_index: toNumber(manifestation.astro_support_index),
-                mfp_score: toNumber(manifestation.mfp_score),
-                coherence_score: toNumber(manifestation.coherence_score),
+                resonance_score: (0, number_util_1.toNumber)(manifestation.resonance_score),
+                alignment_score: (0, number_util_1.toNumber)(manifestation.alignment_score),
+                antrashaakti_score: (0, number_util_1.toNumber)(manifestation.antrashaakti_score),
+                mahaadha_score: (0, number_util_1.toNumber)(manifestation.mahaadha_score),
+                astro_support_index: (0, number_util_1.toNumber)(manifestation.astro_support_index),
+                mfp_score: (0, number_util_1.toNumber)(manifestation.mfp_score),
+                coherence_score: (0, number_util_1.toNumber)(manifestation.coherence_score),
             },
         };
     }
     async getDashboard(user) {
+        if (!user.id) {
+            throw new common_1.BadRequestException('User ID is missing');
+        }
         const dashboard = await this.manifestationService.getDashboard(user.id);
         return {
             success: true,
@@ -67,18 +61,10 @@ let AppManifestationController = class AppManifestationController {
         };
     }
     async getAllManifestations(user) {
+        if (!user.id) {
+            throw new common_1.BadRequestException('User ID is missing');
+        }
         const manifestations = await this.manifestationService.getAllManifestations(user.id, true);
-        const toNumber = (value) => {
-            if (value === null || value === undefined)
-                return null;
-            if (typeof value === 'number')
-                return value;
-            if (typeof value === 'string') {
-                const num = parseFloat(value);
-                return isNaN(num) ? null : num;
-            }
-            return null;
-        };
         return {
             success: true,
             code: 200,
@@ -89,24 +75,24 @@ let AppManifestationController = class AppManifestationController {
                 title: m.title,
                 description: m.description,
                 category: m.category,
-                resonance_score: toNumber(m.resonance_score),
-                alignment_score: toNumber(m.alignment_score),
-                antrashaakti_score: toNumber(m.antrashaakti_score),
-                mahaadha_score: toNumber(m.mahaadha_score),
-                astro_support_index: toNumber(m.astro_support_index),
-                mfp_score: toNumber(m.mfp_score),
-                coherence_score: toNumber(m.coherence_score),
+                resonance_score: (0, number_util_1.toNumber)(m.resonance_score),
+                alignment_score: (0, number_util_1.toNumber)(m.alignment_score),
+                antrashaakti_score: (0, number_util_1.toNumber)(m.antrashaakti_score),
+                mahaadha_score: (0, number_util_1.toNumber)(m.mahaadha_score),
+                astro_support_index: (0, number_util_1.toNumber)(m.astro_support_index),
+                mfp_score: (0, number_util_1.toNumber)(m.mfp_score),
+                coherence_score: (0, number_util_1.toNumber)(m.coherence_score),
                 is_archived: m.is_archived,
                 is_locked: m.is_locked,
                 added_date: m.added_date,
             })),
         };
     }
-    async calculateResonance(body, user) {
-        if (!body.description || body.description.trim().length < 15) {
+    async calculateResonance(dto, user) {
+        if (!dto.description || dto.description.trim().length < 15) {
             throw new common_1.BadRequestException('Description must be at least 15 characters long.');
         }
-        const result = await this.manifestationService.calculateDetailedResonance(user.id, body.description.trim());
+        const result = await this.manifestationService.calculateDetailedResonance(user.id, dto.description.trim());
         return {
             success: true,
             code: 200,
@@ -134,17 +120,6 @@ let AppManifestationController = class AppManifestationController {
     }
     async getManifestation(id, user) {
         const manifestation = await this.manifestationService.getManifestationById(id, user.id);
-        const toNumber = (value) => {
-            if (value === null || value === undefined)
-                return null;
-            if (typeof value === 'number')
-                return value;
-            if (typeof value === 'string') {
-                const num = parseFloat(value);
-                return isNaN(num) ? null : num;
-            }
-            return null;
-        };
         return {
             success: true,
             code: 200,
@@ -158,13 +133,13 @@ let AppManifestationController = class AppManifestationController {
                 category_label: manifestation.insights?.category_label || null,
                 emotional_state: manifestation.emotional_state,
                 target_date: manifestation.target_date,
-                resonance_score: toNumber(manifestation.resonance_score),
-                alignment_score: toNumber(manifestation.alignment_score),
-                antrashaakti_score: toNumber(manifestation.antrashaakti_score),
-                mahaadha_score: toNumber(manifestation.mahaadha_score),
-                astro_support_index: toNumber(manifestation.astro_support_index),
-                mfp_score: toNumber(manifestation.mfp_score),
-                coherence_score: toNumber(manifestation.coherence_score),
+                resonance_score: (0, number_util_1.toNumber)(manifestation.resonance_score),
+                alignment_score: (0, number_util_1.toNumber)(manifestation.alignment_score),
+                antrashaakti_score: (0, number_util_1.toNumber)(manifestation.antrashaakti_score),
+                mahaadha_score: (0, number_util_1.toNumber)(manifestation.mahaadha_score),
+                astro_support_index: (0, number_util_1.toNumber)(manifestation.astro_support_index),
+                mfp_score: (0, number_util_1.toNumber)(manifestation.mfp_score),
+                coherence_score: (0, number_util_1.toNumber)(manifestation.coherence_score),
                 tips: manifestation.tips,
                 insights: manifestation.insights,
                 summary_for_ui: manifestation.insights?.summary_for_ui || null,
@@ -269,13 +244,37 @@ __decorate([
     (0, common_1.Post)('add'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     (0, swagger_1.ApiOperation)({ summary: 'Create a new manifestation with AI scoring' }),
+    (0, swagger_1.ApiBody)({
+        type: create_manifestation_enhanced_dto_1.CreateManifestationEnhancedDto,
+        description: 'Manifestation description. Category, scores, and suggestions will be auto-generated based on your kundli.',
+        examples: {
+            career: {
+                summary: 'Career manifestation example',
+                value: {
+                    description: 'I want to become a successful teacher in 2028 and make a positive impact on students\' lives through quality education.',
+                },
+            },
+            relationship: {
+                summary: 'Relationship manifestation example',
+                value: {
+                    description: 'I want to find my soulmate and build a loving, committed relationship based on mutual respect, understanding, and shared values.',
+                },
+            },
+            money: {
+                summary: 'Money manifestation example',
+                value: {
+                    description: 'I want to achieve financial freedom by 2025 through smart investments and building multiple income streams.',
+                },
+            },
+        },
+    }),
     (0, swagger_1.ApiResponse)({
         status: 201,
         description: 'Manifestation created successfully',
     }),
     (0, swagger_1.ApiResponse)({
         status: 400,
-        description: 'Validation failed (description too short, etc.)',
+        description: 'Validation failed (description too short, kundli missing, etc.)',
     }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -315,20 +314,55 @@ __decorate([
     (0, swagger_1.ApiOperation)({
         summary: 'Calculate detailed resonance score with Dasha analysis',
     }),
+    (0, swagger_1.ApiBody)({
+        type: calculate_resonance_dto_1.CalculateResonanceDto,
+        description: 'Manifestation description for resonance calculation',
+        examples: {
+            example1: {
+                summary: 'Career manifestation',
+                value: {
+                    description: 'I want to become a successful teacher in 2028 and make a positive impact on students\' lives.',
+                },
+            },
+            example2: {
+                summary: 'Relationship manifestation',
+                value: {
+                    description: 'I want to find my soulmate and build a loving, committed relationship based on mutual respect and understanding.',
+                },
+            },
+        },
+    }),
     (0, swagger_1.ApiResponse)({
         status: 200,
         description: 'Resonance score calculated successfully',
     }),
+    (0, swagger_1.ApiResponse)({
+        status: 400,
+        description: 'Description too short (minimum 15 characters)',
+    }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [calculate_resonance_dto_1.CalculateResonanceDto, Object]),
     __metadata("design:returntype", Promise)
 ], AppManifestationController.prototype, "calculateResonance", null);
 __decorate([
     (0, common_1.Post)('alignment-actions/add'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     (0, swagger_1.ApiOperation)({ summary: 'Add selected alignment actions to karma ledger' }),
+    (0, swagger_1.ApiBody)({
+        type: alignment_action_dto_1.AddAlignmentActionsDto,
+        description: 'Selected alignment actions to add to karma ledger',
+        examples: {
+            example1: {
+                summary: 'Add multiple actions',
+                value: {
+                    manifestation_id: 123,
+                    action_ids: [1, 2, 3],
+                },
+            },
+        },
+    }),
     (0, swagger_1.ApiResponse)({
         status: 201,
         description: 'Alignment actions added to karma ledger successfully',
@@ -347,6 +381,26 @@ __decorate([
     (0, common_1.Post)('commit'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: 'Commit manifestation intention' }),
+    (0, swagger_1.ApiBody)({
+        type: alignment_action_dto_1.CommitIntentionDto,
+        description: 'Commitment data for manifestation',
+        examples: {
+            example1: {
+                summary: 'Commit with message and target date',
+                value: {
+                    manifestation_id: 123,
+                    commitment_message: 'I am fully committed to achieving this goal',
+                    target_date: '2025-12-31',
+                },
+            },
+            example2: {
+                summary: 'Simple commit',
+                value: {
+                    manifestation_id: 123,
+                },
+            },
+        },
+    }),
     (0, swagger_1.ApiResponse)({
         status: 200,
         description: 'Manifestation committed successfully',

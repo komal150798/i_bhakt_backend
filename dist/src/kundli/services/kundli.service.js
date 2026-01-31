@@ -24,6 +24,7 @@ const kundli_planet_entity_1 = require("../entities/kundli-planet.entity");
 const kundli_house_entity_1 = require("../entities/kundli-house.entity");
 const swiss_ephemeris_service_1 = require("../../astrology/services/swiss-ephemeris.service");
 const ai_kundli_service_1 = require("../../astrology/services/ai-kundli.service");
+const customer_entity_1 = require("../../users/entities/customer.entity");
 const DASHA_SEQUENCE = [
     'Ketu',
     'Venus',
@@ -81,11 +82,12 @@ const NAKSHATRA_LORDS = [
     'Mercury',
 ];
 let KundliService = KundliService_1 = class KundliService {
-    constructor(httpService, kundliRepository, kundliPlanetRepository, kundliHouseRepository, swissEphemerisService, aiKundliService, configService) {
+    constructor(httpService, kundliRepository, kundliPlanetRepository, kundliHouseRepository, customerRepository, swissEphemerisService, aiKundliService, configService) {
         this.httpService = httpService;
         this.kundliRepository = kundliRepository;
         this.kundliPlanetRepository = kundliPlanetRepository;
         this.kundliHouseRepository = kundliHouseRepository;
+        this.customerRepository = customerRepository;
         this.swissEphemerisService = swissEphemerisService;
         this.aiKundliService = aiKundliService;
         this.configService = configService;
@@ -310,6 +312,13 @@ let KundliService = KundliService_1 = class KundliService {
     }
     async saveKundliToDatabase(userId, dto, kundliData, latitude, longitude, timezone) {
         try {
+            const customer = await this.customerRepository.findOne({
+                where: { id: userId, is_deleted: false },
+            });
+            if (!customer) {
+                throw new common_1.BadRequestException(`Customer with ID ${userId} not found`);
+            }
+            const resolvedUserId = customer.id;
             const birthDateTime = new Date(`${dto.birth_date}T${dto.birth_time}`);
             const moonPlanet = kundliData.planets?.find((p) => p.name === 'Moon');
             const moonLongitude = moonPlanet?.longitude;
@@ -319,7 +328,7 @@ let KundliService = KundliService_1 = class KundliService {
                 marriage_strength: '',
             };
             const savedKundli = await this.kundliRepository.create({
-                user_id: userId,
+                user_id: resolvedUserId,
                 birth_date: new Date(dto.birth_date),
                 birth_time: dto.birth_time,
                 birth_place: dto.birth_place,
@@ -380,10 +389,11 @@ let KundliService = KundliService_1 = class KundliService {
                 await this.kundliHouseRepository.save(housesToSave);
                 this.logger.log(`Saved ${housesToSave.length} houses for kundli ${savedKundli.id}`);
             }
-            this.logger.log(`Kundli saved for user ${userId} with all related data`);
+            this.logger.log(`Kundli saved for customer ${resolvedUserId} with all related data`);
         }
         catch (error) {
-            this.logger.error('Failed to save kundli to database:', error);
+            this.logger.error(`Failed to save kundli to database for userId ${userId}:`, error);
+            throw error;
         }
     }
     getSignNumber(signName) {
@@ -945,8 +955,10 @@ exports.KundliService = KundliService = KundliService_1 = __decorate([
     __param(1, (0, common_1.Inject)('IKundliRepository')),
     __param(2, (0, typeorm_1.InjectRepository)(kundli_planet_entity_1.KundliPlanet)),
     __param(3, (0, typeorm_1.InjectRepository)(kundli_house_entity_1.KundliHouse)),
-    __param(5, (0, common_1.Optional)()),
+    __param(4, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
+    __param(6, (0, common_1.Optional)()),
     __metadata("design:paramtypes", [axios_1.HttpService, Object, typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         swiss_ephemeris_service_1.SwissEphemerisService,
         ai_kundli_service_1.AIKundliService,

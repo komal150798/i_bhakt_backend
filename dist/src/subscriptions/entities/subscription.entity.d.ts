@@ -1,5 +1,5 @@
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { Plan } from '../../plans/entities/plan.entity';
 import { PlanType } from '../../common/enums/plan-type.enum';
 import { Order } from '../../orders/entities/order.entity';
@@ -15,7 +15,7 @@ export declare class Subscription extends BaseEntity {
     order_id: number | null;
     cancelled_at: Date | null;
     cancellation_reason: string | null;
-    user: User;
+    customer: Customer;
     plan: Plan;
     order: Order | null;
     usage_tracking: UsageTracking[];

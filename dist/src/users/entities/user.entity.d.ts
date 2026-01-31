@@ -1,10 +1,6 @@
 import { BaseEntity } from '../../common/entities/base.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { PlanType } from '../../common/enums/plan-type.enum';
-import { Subscription } from '../../subscriptions/entities/subscription.entity';
-import { Order } from '../../orders/entities/order.entity';
-import { Kundli } from '../../kundli/entities/kundli.entity';
-import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
 import { DashaRecord } from '../../database/entities/dasha-record.entity';
 export declare class User extends BaseEntity {
     first_name: string | null;
@@ -30,9 +26,5 @@ export declare class User extends BaseEntity {
     is_verified: boolean;
     last_login: Date | null;
     password: string | null;
-    subscriptions: Subscription[];
-    orders: Order[];
-    kundlis: Kundli[];
-    manifestation_logs: ManifestationLog[];
     dasha_records: DashaRecord[];
 }

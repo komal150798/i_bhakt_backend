@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Customer } from '../entities/customer.entity';
 import { UpdateCustomerProfileDto } from '../dtos/update-customer-profile.dto';
+import { parseDateString, formatDateToISO } from '../../common/utils/date.util';
 import { ListUsersDto } from '../dtos/list-users.dto';
 import { PlanType } from '../../common/enums/plan-type.enum';
 import { KundliService } from '../../kundli/services/kundli.service';
@@ -84,7 +85,7 @@ export class CustomerService {
       customer.email = updateData.email;
     }
     if (updateData.date_of_birth !== undefined) {
-      customer.date_of_birth = updateData.date_of_birth ? new Date(updateData.date_of_birth) : null;
+      customer.date_of_birth = parseDateString(updateData.date_of_birth) || null;
     }
     if (updateData.time_of_birth !== undefined) {
       customer.time_of_birth = updateData.time_of_birth || null;
@@ -144,10 +145,10 @@ export class CustomerService {
 
       // Format birth date and time
       // date_of_birth is guaranteed to be non-null at this point (checked above)
-      const birthDateObj = customer.date_of_birth instanceof Date 
-        ? customer.date_of_birth 
-        : new Date(customer.date_of_birth);
-      const birthDate = birthDateObj.toISOString().split('T')[0];
+      const birthDate = formatDateToISO(customer.date_of_birth) || 
+        (customer.date_of_birth instanceof Date 
+          ? customer.date_of_birth.toISOString().split('T')[0]
+          : String(customer.date_of_birth));
 
       const birthTime = customer.time_of_birth || '12:00:00';
 

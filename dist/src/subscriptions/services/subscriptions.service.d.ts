@@ -1,13 +1,13 @@
 import { Repository } from 'typeorm';
 import { Subscription } from '../entities/subscription.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { Plan } from '../../plans/entities/plan.entity';
 import { PlanType } from '../../common/enums/plan-type.enum';
 export declare class SubscriptionsService {
     private subscriptionRepository;
-    private userRepository;
+    private customerRepository;
     private planRepository;
-    constructor(subscriptionRepository: Repository<Subscription>, userRepository: Repository<User>, planRepository: Repository<Plan>);
+    constructor(subscriptionRepository: Repository<Subscription>, customerRepository: Repository<Customer>, planRepository: Repository<Plan>);
     getCurrentSubscription(userId: number): Promise<Subscription | null>;
     getCurrentPlanType(userId: number): Promise<PlanType>;
     hasModuleAccess(userId: number, moduleSlug: string): Promise<boolean>;

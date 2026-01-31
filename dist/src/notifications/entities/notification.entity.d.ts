@@ -1,5 +1,5 @@
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 export declare class Notification extends BaseEntity {
     user_id: number;
     title: string;
@@ -9,5 +9,5 @@ export declare class Notification extends BaseEntity {
     is_read: boolean;
     read_at: Date | null;
     metadata: Record<string, any> | null;
-    user: User;
+    customer: Customer;
 }

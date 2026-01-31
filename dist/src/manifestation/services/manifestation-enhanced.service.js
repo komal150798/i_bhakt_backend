@@ -33,6 +33,8 @@ const kundli_service_1 = require("../../kundli/services/kundli.service");
 const text_normalizer_util_1 = require("../utils/text-normalizer.util");
 const confidence_scoring_util_1 = require("../algorithms/confidence-scoring.util");
 const ngram_matching_util_1 = require("../algorithms/ngram-matching.util");
+const date_util_1 = require("../../common/utils/date.util");
+const number_util_1 = require("../../common/utils/number.util");
 let ManifestationEnhancedService = ManifestationEnhancedService_1 = class ManifestationEnhancedService {
     constructor(manifestationRepository, userRepository, customerRepository, dashaRepository, antardashaRepository, pratyantarRepository, sukshmaRepository, kundliRepository, kundliPlanetRepository, kundliHouseRepository, aiEvaluationService, swissEphemerisService, kundliService) {
         this.manifestationRepository = manifestationRepository;
@@ -49,6 +51,7 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         this.swissEphemerisService = swissEphemerisService;
         this.kundliService = kundliService;
         this.logger = new common_1.Logger(ManifestationEnhancedService_1.name);
+        this.regexCache = new Map();
     }
     async createManifestation(userId, dto) {
         if (dto.description.trim().length < 15) {
@@ -76,6 +79,10 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         }
         if (!user) {
             throw new common_1.NotFoundException('User not found');
+        }
+        const kundliValidation = await this.validateKundliForManifestation(user);
+        if (!kundliValidation.isValid) {
+            throw new common_1.BadRequestException(kundliValidation.message);
         }
         const quickScores = await this.getQuickScores(title, description);
         const manifestation = this.manifestationRepository.create({
@@ -251,7 +258,12 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             }
             const singleWordKeywords = keywords.filter(kw => !kw.includes(' '));
             for (const kw of singleWordKeywords) {
-                const wordBoundaryRegex = new RegExp(`\\b${kw}\\b`, 'i');
+                const regexKey = `word_${kw}`;
+                if (!this.regexCache.has(regexKey)) {
+                    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    this.regexCache.set(regexKey, new RegExp(`\\b${escaped}\\b`, 'i'));
+                }
+                const wordBoundaryRegex = this.regexCache.get(regexKey);
                 if (wordBoundaryRegex.test(text)) {
                     score += 1;
                 }
@@ -411,12 +423,14 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             let currentAntardasha = null;
             if (kundli) {
                 try {
-                    planets = await this.kundliPlanetRepository.find({
-                        where: { kundli_id: kundli.id, is_deleted: false },
-                    });
-                    houses = await this.kundliHouseRepository.find({
-                        where: { kundli_id: kundli.id, is_deleted: false },
-                    });
+                    [planets, houses] = await Promise.all([
+                        this.kundliPlanetRepository.find({
+                            where: { kundli_id: kundli.id, is_deleted: false },
+                        }),
+                        this.kundliHouseRepository.find({
+                            where: { kundli_id: kundli.id, is_deleted: false },
+                        }),
+                    ]);
                     this.logger.debug(`Found ${planets.length} planets and ${houses.length} houses for kundli ${kundli.id}`);
                 }
                 catch (error) {
@@ -465,7 +479,15 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             },
             order: { added_date: 'ASC' },
         });
-        const lockedManifestations = activeManifestations.filter(m => m.is_locked === true);
+        const lockedManifestations = await this.manifestationRepository.find({
+            where: {
+                user_id: userId,
+                is_archived: false,
+                is_deleted: false,
+                is_locked: true,
+            },
+            order: { added_date: 'ASC' },
+        });
         this.logger.debug(`Total active manifestations: ${activeManifestations.length}`);
         this.logger.debug(`Locked manifestations: ${lockedManifestations.length}`);
         if (lockedManifestations.length > 0) {
@@ -483,37 +505,13 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         let energy_state = 'aligned';
         if (lockedManifestations.length > 0) {
             const totalResonance = lockedManifestations.reduce((sum, m) => {
-                let score = 0;
-                if (m.resonance_score !== null && m.resonance_score !== undefined) {
-                    score = typeof m.resonance_score === 'string'
-                        ? parseFloat(m.resonance_score)
-                        : Number(m.resonance_score);
-                    if (isNaN(score))
-                        score = 0;
-                }
-                return sum + score;
+                return sum + ((0, number_util_1.toNumber)(m.resonance_score) || 0);
             }, 0);
             const totalAlignment = lockedManifestations.reduce((sum, m) => {
-                let score = 0;
-                if (m.alignment_score !== null && m.alignment_score !== undefined) {
-                    score = typeof m.alignment_score === 'string'
-                        ? parseFloat(m.alignment_score)
-                        : Number(m.alignment_score);
-                    if (isNaN(score))
-                        score = 0;
-                }
-                return sum + score;
+                return sum + ((0, number_util_1.toNumber)(m.alignment_score) || 0);
             }, 0);
             const totalAstro = lockedManifestations.reduce((sum, m) => {
-                let score = 0;
-                if (m.astro_support_index !== null && m.astro_support_index !== undefined) {
-                    score = typeof m.astro_support_index === 'string'
-                        ? parseFloat(m.astro_support_index)
-                        : Number(m.astro_support_index);
-                    if (isNaN(score))
-                        score = 0;
-                }
-                return sum + score;
+                return sum + ((0, number_util_1.toNumber)(m.astro_support_index) || 0);
             }, 0);
             top_resonance = Math.round((totalResonance / lockedManifestations.length) * 100) / 100;
             alignment_score = Math.round((totalAlignment / lockedManifestations.length) * 100) / 100;
@@ -528,21 +526,9 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         }
         else if (activeManifestations.length > 0) {
             const topManifestation = activeManifestations[0];
-            top_resonance = topManifestation.resonance_score !== null && topManifestation.resonance_score !== undefined
-                ? (typeof topManifestation.resonance_score === 'string'
-                    ? parseFloat(topManifestation.resonance_score) || 0
-                    : Number(topManifestation.resonance_score) || 0)
-                : 0;
-            alignment_score = topManifestation.alignment_score !== null && topManifestation.alignment_score !== undefined
-                ? (typeof topManifestation.alignment_score === 'string'
-                    ? parseFloat(topManifestation.alignment_score) || 0
-                    : Number(topManifestation.alignment_score) || 0)
-                : 0;
-            astro_support = topManifestation.astro_support_index !== null && topManifestation.astro_support_index !== undefined
-                ? (typeof topManifestation.astro_support_index === 'string'
-                    ? parseFloat(topManifestation.astro_support_index) || 0
-                    : Number(topManifestation.astro_support_index) || 0)
-                : 0;
+            top_resonance = (0, number_util_1.toNumber)(topManifestation.resonance_score) || 0;
+            alignment_score = (0, number_util_1.toNumber)(topManifestation.alignment_score) || 0;
+            astro_support = (0, number_util_1.toNumber)(topManifestation.astro_support_index) || 0;
             energy_state = topManifestation.insights?.energy_state || 'aligned';
         }
         const summary = {
@@ -551,29 +537,21 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             astro_support: astro_support !== null && astro_support !== undefined && !isNaN(astro_support) ? Number(astro_support) : 0,
             energy_state: energy_state || 'aligned',
         };
-        this.logger.debug(`Dashboard summary calculated:`, JSON.stringify(summary));
-        this.logger.debug(`Locked manifestations count: ${lockedManifestations.length}`);
+        if (process.env.LOG_LEVEL === 'debug' || process.env.NODE_ENV === 'development') {
+            this.logger.debug(`Dashboard summary calculated:`, JSON.stringify(summary));
+            this.logger.debug(`Locked manifestations count: ${lockedManifestations.length}`);
+        }
         return {
             summary,
             manifestations: activeManifestations.map((m) => ({
                 id: m.id,
                 title: m.title,
                 description: m.description,
-                resonance_score: typeof m.resonance_score === 'string'
-                    ? parseFloat(m.resonance_score)
-                    : (m.resonance_score || null),
-                alignment_score: typeof m.alignment_score === 'string'
-                    ? parseFloat(m.alignment_score)
-                    : (m.alignment_score || null),
-                coherence_score: typeof m.coherence_score === 'string'
-                    ? parseFloat(m.coherence_score)
-                    : (m.coherence_score || null),
-                mfp_score: typeof m.mfp_score === 'string'
-                    ? parseFloat(m.mfp_score)
-                    : (m.mfp_score || null),
-                astro_support_index: typeof m.astro_support_index === 'string'
-                    ? parseFloat(m.astro_support_index)
-                    : (m.astro_support_index || null),
+                resonance_score: (0, number_util_1.toNumber)(m.resonance_score),
+                alignment_score: (0, number_util_1.toNumber)(m.alignment_score),
+                coherence_score: (0, number_util_1.toNumber)(m.coherence_score),
+                mfp_score: (0, number_util_1.toNumber)(m.mfp_score),
+                astro_support_index: (0, number_util_1.toNumber)(m.astro_support_index),
                 is_archived: m.is_archived,
                 is_locked: m.is_locked,
                 added_date: m.added_date,
@@ -941,6 +919,69 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             scores.astro_support_index * weights.astro;
         return Math.max(0, Math.min(100, Math.round(mfp)));
     }
+    async validateKundliForManifestation(user) {
+        try {
+            const existingKundli = await this.kundliRepository.findOne({
+                where: { user_id: user.id, is_deleted: false },
+            });
+            if (existingKundli) {
+                this.logger.debug(`Kundli exists for user ${user.id}`);
+                return { isValid: true };
+            }
+            const birthDate = user.date_of_birth || user.birth_date;
+            const birthTime = user.time_of_birth || user.birth_time;
+            const latitude = user.latitude;
+            const longitude = user.longitude;
+            const placeName = user.place_name || user.birth_place;
+            const missingFields = [];
+            if (!birthDate)
+                missingFields.push('Date of Birth');
+            if (!birthTime)
+                missingFields.push('Time of Birth');
+            if (!placeName)
+                missingFields.push('Place of Birth');
+            if (!latitude || !longitude)
+                missingFields.push('Birth Location (Latitude/Longitude)');
+            if (missingFields.length > 0) {
+                const missingFieldsText = missingFields.join(', ');
+                return {
+                    isValid: false,
+                    message: `Kundli is required for personalized manifestation suggestions. Please update your profile with the following information: ${missingFieldsText}. You can update your profile from the settings or generate your kundli first.`,
+                };
+            }
+            try {
+                this.logger.log(`Creating kundli for user ${user.id} before manifestation`);
+                const firstName = user.first_name || 'User';
+                const lastName = user.last_name || '';
+                const fullName = `${firstName} ${lastName}`.trim();
+                await this.kundliService.generateKundli({
+                    name: fullName,
+                    birth_date: (0, date_util_1.formatDateToISO)(birthDate) || birthDate,
+                    birth_time: birthTime,
+                    birth_place: placeName || 'Unknown',
+                    latitude,
+                    longitude,
+                    timezone: user.timezone || 'Asia/Kolkata',
+                }, user.id);
+                this.logger.log(`Kundli created successfully for user ${user.id}`);
+                return { isValid: true };
+            }
+            catch (kundliError) {
+                this.logger.error(`Failed to create kundli for user ${user.id}:`, kundliError);
+                return {
+                    isValid: false,
+                    message: 'Failed to generate your kundli. Please ensure your birth details are correct and try again. If the problem persists, please contact support.',
+                };
+            }
+        }
+        catch (error) {
+            this.logger.error(`Error validating kundli for user ${user.id}:`, error);
+            return {
+                isValid: false,
+                message: 'Unable to validate kundli. Please try again or contact support.',
+            };
+        }
+    }
     async ensureKundliExists(user) {
         try {
             const existingKundli = await this.kundliRepository.findOne({
@@ -965,7 +1006,7 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             const fullName = `${firstName} ${lastName}`.trim();
             await this.kundliService.generateKundli({
                 name: fullName,
-                birth_date: birthDate instanceof Date ? birthDate.toISOString().split('T')[0] : birthDate,
+                birth_date: (0, date_util_1.formatDateToISO)(birthDate) || birthDate,
                 birth_time: birthTime,
                 birth_place: placeName || 'Unknown',
                 latitude,

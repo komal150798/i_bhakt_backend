@@ -1,5 +1,5 @@
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { OrderStatus } from '../../common/enums/order-status.enum';
 import { Payment } from '../../payments/entities/payment.entity';
 import { Subscription } from '../../subscriptions/entities/subscription.entity';
@@ -15,7 +15,7 @@ export declare class Order extends BaseEntity {
     items: Record<string, any>[] | null;
     notes: string | null;
     completed_at: Date | null;
-    user: User;
+    customer: Customer;
     payments: Payment[];
     subscriptions: Subscription[];
 }

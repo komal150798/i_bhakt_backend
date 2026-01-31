@@ -14,7 +14,7 @@ const usage_tracking_service_1 = require("./services/usage-tracking.service");
 const entitlements_service_1 = require("./services/entitlements.service");
 const subscription_entity_1 = require("./entities/subscription.entity");
 const usage_tracking_entity_1 = require("./entities/usage-tracking.entity");
-const user_entity_1 = require("../users/entities/user.entity");
+const customer_entity_1 = require("../users/entities/customer.entity");
 const plan_entity_1 = require("../plans/entities/plan.entity");
 const app_subscription_controller_1 = require("./controllers/app-subscription.controller");
 const app_entitlements_controller_1 = require("./controllers/app-entitlements.controller");
@@ -26,7 +26,7 @@ exports.SubscriptionsModule = SubscriptionsModule;
 exports.SubscriptionsModule = SubscriptionsModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([subscription_entity_1.Subscription, usage_tracking_entity_1.UsageTracking, user_entity_1.User, plan_entity_1.Plan]),
+            typeorm_1.TypeOrmModule.forFeature([subscription_entity_1.Subscription, usage_tracking_entity_1.UsageTracking, customer_entity_1.Customer, plan_entity_1.Plan]),
             plans_module_1.PlansModule,
         ],
         controllers: [

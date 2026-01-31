@@ -113,3 +113,4 @@ Created `verify-category-detection.ts` with 25+ test cases covering:
 - Kundli integration now properly enhances all tips and insights
 - Test script can be run to verify accuracy
 
+

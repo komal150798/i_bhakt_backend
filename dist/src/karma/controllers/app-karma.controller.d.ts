@@ -1,8 +1,10 @@
 import { KarmaService } from '../services/karma.service';
+import { CurrentUserPayload } from '../../common/types/jwt-payload.interface';
+import { AddKarmaInputDto } from '../dtos/add-karma-input.dto';
 export declare class AppKarmaController {
     private readonly karmaService;
     constructor(karmaService: KarmaService);
-    getTodayKarma(user: any): Promise<{
+    getTodayKarma(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             karma_score: any;
@@ -13,10 +15,7 @@ export declare class AppKarmaController {
             daily_alignment_tip: any;
         };
     }>;
-    addKarmaInput(body: {
-        action_text: string;
-        timestamp?: string;
-    }, user: any): Promise<{
+    addKarmaInput(inputDto: AddKarmaInputDto, user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             id: number;
@@ -27,7 +26,7 @@ export declare class AppKarmaController {
             created_at: Date;
         };
     }>;
-    getKarmaScores(user: any): Promise<{
+    getKarmaScores(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             current_score: number;
@@ -37,7 +36,7 @@ export declare class AppKarmaController {
             grade: string;
         };
     }>;
-    getDashboard(user: any): Promise<{
+    getDashboard(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             karma_score: any;

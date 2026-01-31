@@ -12,6 +12,7 @@ import { KundliPlanet } from '../entities/kundli-planet.entity';
 import { KundliHouse } from '../entities/kundli-house.entity';
 import { SwissEphemerisService } from '../../astrology/services/swiss-ephemeris.service';
 import { AIKundliService } from '../../astrology/services/ai-kundli.service';
+import { Customer } from '../../users/entities/customer.entity';
 
 /**
  * Vimshottari Dasha Constants
@@ -132,6 +133,8 @@ export class KundliService {
     private readonly kundliPlanetRepository: Repository<KundliPlanet>,
     @InjectRepository(KundliHouse)
     private readonly kundliHouseRepository: Repository<KundliHouse>,
+    @InjectRepository(Customer)
+    private readonly customerRepository: Repository<Customer>,
     private readonly swissEphemerisService: SwissEphemerisService,
     @Optional() private readonly aiKundliService: AIKundliService,
     private readonly configService: ConfigService,
@@ -483,6 +486,18 @@ export class KundliService {
     timezone: string,
   ): Promise<void> {
     try {
+      // Use Customer directly - cst_customer is the main table for both app and web
+      const customer = await this.customerRepository.findOne({
+        where: { id: userId, is_deleted: false },
+      });
+
+      if (!customer) {
+        throw new BadRequestException(`Customer with ID ${userId} not found`);
+      }
+
+      // Use customer.id directly - no need to create User records
+      const resolvedUserId = customer.id;
+
       // Calculate dasha timeline
       const birthDateTime = new Date(`${dto.birth_date}T${dto.birth_time}`);
       // Get Moon longitude from kundli data
@@ -501,9 +516,9 @@ export class KundliService {
         marriage_strength: '',
       };
 
-      // Create kundli record
+      // Create kundli record with resolved user_id
       const savedKundli = await this.kundliRepository.create({
-        user_id: userId,
+        user_id: resolvedUserId,
         birth_date: new Date(dto.birth_date),
         birth_time: dto.birth_time,
         birth_place: dto.birth_place,
@@ -571,10 +586,11 @@ export class KundliService {
         this.logger.log(`Saved ${housesToSave.length} houses for kundli ${savedKundli.id}`);
       }
 
-      this.logger.log(`Kundli saved for user ${userId} with all related data`);
+      this.logger.log(`Kundli saved for customer ${resolvedUserId} with all related data`);
     } catch (error) {
-      this.logger.error('Failed to save kundli to database:', error);
-      // Don't throw - kundli generation succeeded even if save failed
+      this.logger.error(`Failed to save kundli to database for userId ${userId}:`, error);
+      // Re-throw the error so it can be handled by the caller
+      throw error;
     }
   }
 

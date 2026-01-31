@@ -1,6 +1,6 @@
 import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { Subscription } from './subscription.entity';
 
 @Entity('usage_tracking')
@@ -8,7 +8,7 @@ import { Subscription } from './subscription.entity';
 @Index(['subscription_id', 'period'])
 export class UsageTracking extends BaseEntity {
   @Column({ type: 'bigint', name: 'user_id' })
-  user_id: number;
+  user_id: number; // Note: Still named user_id for backward compatibility, but references cst_customer.id
 
   @Column({ type: 'bigint', nullable: true, name: 'subscription_id' })
   subscription_id: number | null;
@@ -31,9 +31,9 @@ export class UsageTracking extends BaseEntity {
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any> | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Customer, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  user: User;
+  customer: Customer;
 
   @ManyToOne(() => Subscription, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'subscription_id', referencedColumnName: 'id' })

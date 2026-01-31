@@ -27,6 +27,7 @@ const admin_token_entity_1 = require("./entities/admin-token.entity");
 const otp_service_1 = require("./services/otp.service");
 const jwt_service_1 = require("./services/jwt.service");
 const user_role_enum_1 = require("../common/enums/user-role.enum");
+const plan_type_enum_1 = require("../common/enums/plan-type.enum");
 const horoscope_service_1 = require("../horoscope/services/horoscope.service");
 let AuthService = class AuthService {
     constructor(userRepository, customerRepository, adminUserRepository, refreshTokenRepository, customerTokenRepository, adminTokenRepository, otpService, jwtService, configService, horoscopeService) {
@@ -321,9 +322,42 @@ let AuthService = class AuthService {
         }
         const user = await this.validateUserByPassword(username, password);
         if (user) {
-            user.last_login = new Date();
-            await this.userRepository.save(user);
-            return this.issueTokens(user);
+            let existingCustomer = null;
+            if (user.email) {
+                existingCustomer = await this.findCustomerByEmail(user.email);
+            }
+            if (!existingCustomer && user.phone_number) {
+                existingCustomer = await this.findCustomerByPhone(user.phone_number);
+            }
+            if (existingCustomer) {
+                existingCustomer.last_login = new Date();
+                await this.customerRepository.save(existingCustomer);
+                return this.issueCustomerTokens(existingCustomer);
+            }
+            customer = this.customerRepository.create({
+                first_name: user.first_name,
+                last_name: user.last_name,
+                email: user.email,
+                phone_number: user.phone_number,
+                password: user.password,
+                date_of_birth: user.date_of_birth,
+                time_of_birth: user.time_of_birth,
+                place_name: user.place_name,
+                latitude: user.latitude,
+                longitude: user.longitude,
+                timezone: user.timezone,
+                gender: user.gender,
+                avatar_url: user.avatar_url,
+                nakshatra: user.nakshatra,
+                pada: user.pada,
+                moon_longitude_deg: user.moon_longitude_deg,
+                dasha_at_birth: user.dasha_at_birth,
+                current_plan: user.current_plan || plan_type_enum_1.PlanType.FREE,
+                is_verified: user.is_verified || false,
+                last_login: new Date(),
+            });
+            customer = await this.customerRepository.save(customer);
+            return this.issueCustomerTokens(customer);
         }
         throw new common_1.UnauthorizedException('Invalid username or password');
     }
@@ -331,21 +365,48 @@ let AuthService = class AuthService {
         if (!this.otpService.verifyOtp(phoneNumber, otpCode)) {
             throw new common_1.UnauthorizedException('Invalid or expired OTP');
         }
-        let user = await this.findUserByPhone(phoneNumber);
-        if (!user) {
-            user = this.userRepository.create({
-                phone_number: phoneNumber,
-                role: user_role_enum_1.UserRole.USER,
-                is_verified: true,
-                last_login: new Date(),
-            });
-            user = await this.userRepository.save(user);
+        let customer = await this.findCustomerByPhone(phoneNumber);
+        if (!customer) {
+            const legacyUser = await this.findUserByPhone(phoneNumber);
+            if (legacyUser) {
+                customer = this.customerRepository.create({
+                    first_name: legacyUser.first_name,
+                    last_name: legacyUser.last_name,
+                    email: legacyUser.email,
+                    phone_number: phoneNumber,
+                    password: legacyUser.password,
+                    date_of_birth: legacyUser.date_of_birth,
+                    time_of_birth: legacyUser.time_of_birth,
+                    place_name: legacyUser.place_name,
+                    latitude: legacyUser.latitude,
+                    longitude: legacyUser.longitude,
+                    timezone: legacyUser.timezone,
+                    gender: legacyUser.gender,
+                    avatar_url: legacyUser.avatar_url,
+                    nakshatra: legacyUser.nakshatra,
+                    pada: legacyUser.pada,
+                    moon_longitude_deg: legacyUser.moon_longitude_deg,
+                    dasha_at_birth: legacyUser.dasha_at_birth,
+                    current_plan: legacyUser.current_plan,
+                    is_verified: true,
+                    last_login: new Date(),
+                });
+                customer = await this.customerRepository.save(customer);
+            }
+            else {
+                customer = this.customerRepository.create({
+                    phone_number: phoneNumber,
+                    is_verified: true,
+                    last_login: new Date(),
+                });
+                customer = await this.customerRepository.save(customer);
+            }
         }
         else {
-            user.last_login = new Date();
-            await this.userRepository.save(user);
+            customer.last_login = new Date();
+            await this.customerRepository.save(customer);
         }
-        return this.issueTokens(user);
+        return this.issueCustomerAppTokens(customer);
     }
     async loginWithGoogle(idToken) {
         const googleProfile = await this.verifyGoogleToken(idToken);

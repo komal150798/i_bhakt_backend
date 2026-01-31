@@ -15,6 +15,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiProduces,
+  ApiBody,
 } from '@nestjs/swagger';
 import { Response } from 'express';
 import { KundliService } from '../services/kundli.service';
@@ -43,6 +44,24 @@ export class KundliController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generate kundli (birth chart)' })
+  @ApiBody({
+    type: GenerateKundliDto,
+    description: 'Birth details for kundli generation',
+    examples: {
+      example1: {
+        summary: 'Complete birth data',
+        value: {
+          name: 'John Doe',
+          birth_date: '1990-01-15',
+          birth_time: '10:30:00',
+          birth_place: 'Mumbai',
+          latitude: 19.0760,
+          longitude: 72.8777,
+          timezone: 'Asia/Kolkata',
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'Kundli generated successfully',
@@ -70,10 +89,18 @@ export class KundliController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generate kundli for authenticated user' })
+  @ApiBody({
+    type: GenerateKundliDto,
+    description: 'Birth details for kundli generation',
+  })
   @ApiResponse({
     status: 200,
     description: 'Kundli generated successfully',
     type: KundliResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data',
   })
   async generateKundliAuthenticated(
     @Body() dto: GenerateKundliDto,
@@ -96,6 +123,10 @@ export class KundliController {
     summary: 'Generate Kundli PDF report (authenticated users only)',
     description:
       'Generates a PDF report containing birth details, Lagna, Nakshatra, Mahadasha, Antardasha, Pratyantar Dasha, planetary positions, and houses. Requires valid JWT authentication.',
+  })
+  @ApiBody({
+    type: GenerateKundliPdfDto,
+    description: 'Kundli data for PDF generation',
   })
   @ApiProduces('application/pdf')
   @ApiResponse({

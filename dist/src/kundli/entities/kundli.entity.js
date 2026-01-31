@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Kundli = void 0;
 const typeorm_1 = require("typeorm");
 const base_entity_1 = require("../../common/entities/base.entity");
-const user_entity_1 = require("../../users/entities/user.entity");
+const customer_entity_1 = require("../../users/entities/customer.entity");
 const kundli_planet_entity_1 = require("./kundli-planet.entity");
 const kundli_house_entity_1 = require("./kundli-house.entity");
 let Kundli = class Kundli extends base_entity_1.BaseEntity {
@@ -91,10 +91,10 @@ __decorate([
     __metadata("design:type", Object)
 ], Kundli.prototype, "navamsa_data", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, { onDelete: 'CASCADE' }),
+    (0, typeorm_1.ManyToOne)(() => customer_entity_1.Customer, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)({ name: 'user_id', referencedColumnName: 'id' }),
-    __metadata("design:type", user_entity_1.User)
-], Kundli.prototype, "user", void 0);
+    __metadata("design:type", customer_entity_1.Customer)
+], Kundli.prototype, "customer", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => kundli_planet_entity_1.KundliPlanet, (planet) => planet.kundli, { cascade: true }),
     __metadata("design:type", Array)

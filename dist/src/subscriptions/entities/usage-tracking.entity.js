@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsageTracking = void 0;
 const typeorm_1 = require("typeorm");
 const base_entity_1 = require("../../common/entities/base.entity");
-const user_entity_1 = require("../../users/entities/user.entity");
+const customer_entity_1 = require("../../users/entities/customer.entity");
 const subscription_entity_1 = require("./subscription.entity");
 let UsageTracking = class UsageTracking extends base_entity_1.BaseEntity {
 };
@@ -50,10 +50,10 @@ __decorate([
     __metadata("design:type", Object)
 ], UsageTracking.prototype, "metadata", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, { onDelete: 'CASCADE' }),
+    (0, typeorm_1.ManyToOne)(() => customer_entity_1.Customer, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)({ name: 'user_id', referencedColumnName: 'id' }),
-    __metadata("design:type", user_entity_1.User)
-], UsageTracking.prototype, "user", void 0);
+    __metadata("design:type", customer_entity_1.Customer)
+], UsageTracking.prototype, "customer", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => subscription_entity_1.Subscription, { nullable: true, onDelete: 'SET NULL' }),
     (0, typeorm_1.JoinColumn)({ name: 'subscription_id', referencedColumnName: 'id' }),

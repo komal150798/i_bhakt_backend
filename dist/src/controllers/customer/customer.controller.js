@@ -33,6 +33,9 @@ let CustomerController = class CustomerController {
         return this.plansService.findOneByUniqueId(uniqueId);
     }
     async getProfile(user) {
+        if (!user.id) {
+            throw new common_1.BadRequestException('User ID is missing');
+        }
         const profile = await this.customerService.getProfile(user.id);
         return {
             success: true,
@@ -99,6 +102,33 @@ __decorate([
     (0, common_1.Put)('profile'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: 'Update customer profile' }),
+    (0, swagger_1.ApiBody)({
+        type: update_customer_profile_dto_1.UpdateCustomerProfileDto,
+        description: 'Profile update data. All fields are optional.',
+        examples: {
+            basic: {
+                summary: 'Basic profile update',
+                value: {
+                    first_name: 'John',
+                    last_name: 'Doe',
+                    email: 'john.doe@example.com',
+                },
+            },
+            withBirthData: {
+                summary: 'Update with birth data for kundli',
+                value: {
+                    first_name: 'John',
+                    last_name: 'Doe',
+                    date_of_birth: '1990-01-15',
+                    time_of_birth: '10:30:00',
+                    place_name: 'Mumbai',
+                    latitude: 19.0760,
+                    longitude: 72.8777,
+                    timezone: 'Asia/Kolkata',
+                },
+            },
+        },
+    }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Profile updated successfully' }),
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Invalid input data' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Customer not found' }),

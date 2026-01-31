@@ -84,21 +84,22 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   password: string | null;
 
-  @OneToMany(() => Subscription, (subscription) => subscription.user)
-  subscriptions: Subscription[];
+  // Relationships migrated to Customer entity - cst_customer is now the main table
+  // @OneToMany(() => Subscription, (subscription) => subscription.customer)
+  // subscriptions: Subscription[];
 
-  @OneToMany(() => Order, (order) => order.user)
-  orders: Order[];
+  // @OneToMany(() => Order, (order) => order.customer)
+  // orders: Order[];
 
-  @OneToMany(() => Kundli, (kundli) => kundli.user)
-  kundlis: Kundli[];
+  // @OneToMany(() => Kundli, (kundli) => kundli.customer)
+  // kundlis: Kundli[];
 
   // KarmaEntry now uses Customer entity, not User
   // @OneToMany(() => KarmaEntry, (karma) => karma.user)
   // karma_entries: KarmaEntry[];
 
-  @OneToMany(() => ManifestationLog, (manifestation) => manifestation.user)
-  manifestation_logs: ManifestationLog[];
+  // @OneToMany(() => ManifestationLog, (manifestation) => manifestation.customer)
+  // manifestation_logs: ManifestationLog[];
 
   @OneToMany(() => DashaRecord, (dasha) => dasha.user, { cascade: true })
   dasha_records: DashaRecord[];

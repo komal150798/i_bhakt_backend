@@ -2,19 +2,20 @@ import { PlansService } from '../../plans/services/plans.service';
 import { PlanResponseDto } from '../../plans/dtos/plan-response.dto';
 import { CustomerService } from '../../users/services/customer.service';
 import { UpdateCustomerProfileDto } from '../../users/dtos/update-customer-profile.dto';
+import { CurrentUserPayload } from '../../common/types/jwt-payload.interface';
 export declare class CustomerController {
     private readonly plansService;
     private readonly customerService;
     constructor(plansService: PlansService, customerService: CustomerService);
     getAvailablePlans(): Promise<PlanResponseDto[]>;
     getPlan(uniqueId: string): Promise<PlanResponseDto>;
-    getProfile(user: any): Promise<{
+    getProfile(user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
         data: Partial<import("../../users/entities/customer.entity").Customer>;
     }>;
-    updateProfile(user: any, updateData: UpdateCustomerProfileDto): Promise<{
+    updateProfile(user: CurrentUserPayload, updateData: UpdateCustomerProfileDto): Promise<{
         success: boolean;
         code: number;
         message: string;

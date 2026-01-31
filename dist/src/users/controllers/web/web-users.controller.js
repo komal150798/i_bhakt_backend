@@ -15,19 +15,37 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebUsersController = void 0;
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
+const update_customer_profile_dto_1 = require("../../dtos/update-customer-profile.dto");
+const date_util_1 = require("../../../common/utils/date.util");
 const jwt_auth_guard_1 = require("../../../common/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../../common/decorators/current-user.decorator");
 const users_service_1 = require("../../services/users.service");
+const customer_service_1 = require("../../services/customer.service");
 const subscriptions_service_1 = require("../../../subscriptions/services/subscriptions.service");
 const usage_tracking_service_1 = require("../../../subscriptions/services/usage-tracking.service");
 let WebUsersController = class WebUsersController {
-    constructor(usersService, subscriptionsService, usageTrackingService) {
+    constructor(usersService, customerService, subscriptionsService, usageTrackingService) {
         this.usersService = usersService;
+        this.customerService = customerService;
         this.subscriptionsService = subscriptionsService;
         this.usageTrackingService = usageTrackingService;
     }
     async getProfile(user) {
-        const fullUser = await this.usersService.findOneByUniqueId(user.unique_id);
+        if (!user.unique_id) {
+            throw new common_1.BadRequestException('User unique_id is missing');
+        }
+        let fullUser;
+        try {
+            fullUser = await this.customerService.findByUniqueId(user.unique_id);
+        }
+        catch (error) {
+            try {
+                fullUser = await this.usersService.findOneByUniqueId(user.unique_id);
+            }
+            catch (userError) {
+                throw new common_1.NotFoundException(`User with unique ID ${user.unique_id} not found in Customer or User table`);
+            }
+        }
         return {
             success: true,
             data: {
@@ -48,7 +66,40 @@ let WebUsersController = class WebUsersController {
         };
     }
     async updateProfile(user, updateData) {
-        const updated = await this.usersService.update(user.unique_id, updateData, user.id);
+        if (!user.unique_id) {
+            throw new common_1.BadRequestException('User unique_id is missing');
+        }
+        let fullUser;
+        let isCustomer = false;
+        try {
+            fullUser = await this.customerService.findByUniqueId(user.unique_id);
+            isCustomer = true;
+        }
+        catch (error) {
+            try {
+                fullUser = await this.usersService.findOneByUniqueId(user.unique_id);
+                isCustomer = false;
+            }
+            catch (userError) {
+                throw new common_1.NotFoundException(`User with unique ID ${user.unique_id} not found`);
+            }
+        }
+        let updated;
+        if (isCustomer) {
+            updated = await this.customerService.updateProfile(user.id, updateData);
+        }
+        else {
+            const userUpdateData = {};
+            Object.keys(updateData).forEach(key => {
+                if (key !== 'date_of_birth') {
+                    userUpdateData[key] = updateData[key];
+                }
+            });
+            if (updateData.date_of_birth) {
+                userUpdateData.date_of_birth = (0, date_util_1.parseDateString)(updateData.date_of_birth);
+            }
+            updated = await this.usersService.update(user.unique_id, userUpdateData, user.id);
+        }
         return {
             success: true,
             data: {
@@ -112,10 +163,22 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Update own profile (Web)' }),
+    (0, swagger_1.ApiBody)({
+        type: update_customer_profile_dto_1.UpdateCustomerProfileDto,
+        description: 'Profile update data. All fields are optional.',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Profile updated successfully',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 400,
+        description: 'Invalid input data',
+    }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [Object, update_customer_profile_dto_1.UpdateCustomerProfileDto]),
     __metadata("design:returntype", Promise)
 ], WebUsersController.prototype, "updateProfile", null);
 __decorate([
@@ -152,6 +215,7 @@ exports.WebUsersController = WebUsersController = __decorate([
     (0, swagger_1.ApiTags)('web-users'),
     (0, common_1.Controller)('web/users'),
     __metadata("design:paramtypes", [users_service_1.UsersService,
+        customer_service_1.CustomerService,
         subscriptions_service_1.SubscriptionsService,
         usage_tracking_service_1.UsageTrackingService])
 ], WebUsersController);

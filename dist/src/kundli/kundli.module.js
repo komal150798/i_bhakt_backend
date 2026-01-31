@@ -16,6 +16,7 @@ const kundli_house_entity_1 = require("./entities/kundli-house.entity");
 const planet_master_entity_1 = require("./entities/planet-master.entity");
 const nakshatra_master_entity_1 = require("./entities/nakshatra-master.entity");
 const ayanamsa_master_entity_1 = require("./entities/ayanamsa-master.entity");
+const customer_entity_1 = require("../users/entities/customer.entity");
 const cache_module_1 = require("../cache/cache.module");
 const repositories_module_1 = require("../infrastructure/repositories/repositories.module");
 const astrology_module_1 = require("../astrology/astrology.module");
@@ -35,6 +36,7 @@ exports.KundliModule = KundliModule = __decorate([
                 planet_master_entity_1.PlanetMaster,
                 nakshatra_master_entity_1.NakshatraMaster,
                 ayanamsa_master_entity_1.AyanamsaMaster,
+                customer_entity_1.Customer,
             ]),
             axios_1.HttpModule,
             cache_module_1.CacheModule,

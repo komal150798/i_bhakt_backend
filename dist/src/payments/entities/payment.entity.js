@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Payment = void 0;
 const typeorm_1 = require("typeorm");
 const base_entity_1 = require("../../common/entities/base.entity");
-const user_entity_1 = require("../../users/entities/user.entity");
+const customer_entity_1 = require("../../users/entities/customer.entity");
 const order_entity_1 = require("../../orders/entities/order.entity");
 const payment_status_enum_1 = require("../../common/enums/payment-status.enum");
 let Payment = class Payment extends base_entity_1.BaseEntity {
@@ -67,10 +67,10 @@ __decorate([
     __metadata("design:type", Number)
 ], Payment.prototype, "refund_amount", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, { onDelete: 'CASCADE' }),
+    (0, typeorm_1.ManyToOne)(() => customer_entity_1.Customer, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)({ name: 'user_id', referencedColumnName: 'id' }),
-    __metadata("design:type", user_entity_1.User)
-], Payment.prototype, "user", void 0);
+    __metadata("design:type", customer_entity_1.Customer)
+], Payment.prototype, "customer", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => order_entity_1.Order, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)({ name: 'order_id', referencedColumnName: 'id' }),

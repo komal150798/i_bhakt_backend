@@ -1,6 +1,6 @@
 import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { Order } from '../../orders/entities/order.entity';
 import { PaymentStatus } from '../../common/enums/payment-status.enum';
 
@@ -44,9 +44,9 @@ export class Payment extends BaseEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true, name: 'refund_amount' })
   refund_amount: number | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Customer, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  user: User;
+  customer: Customer;
 
   @ManyToOne(() => Order, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'order_id', referencedColumnName: 'id' })

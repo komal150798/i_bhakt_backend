@@ -17,13 +17,13 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const subscription_entity_1 = require("../entities/subscription.entity");
-const user_entity_1 = require("../../users/entities/user.entity");
+const customer_entity_1 = require("../../users/entities/customer.entity");
 const plan_entity_1 = require("../../plans/entities/plan.entity");
 const plan_type_enum_1 = require("../../common/enums/plan-type.enum");
 let SubscriptionsService = class SubscriptionsService {
-    constructor(subscriptionRepository, userRepository, planRepository) {
+    constructor(subscriptionRepository, customerRepository, planRepository) {
         this.subscriptionRepository = subscriptionRepository;
-        this.userRepository = userRepository;
+        this.customerRepository = customerRepository;
         this.planRepository = planRepository;
     }
     async getCurrentSubscription(userId) {
@@ -62,9 +62,9 @@ let SubscriptionsService = class SubscriptionsService {
         return plan.modules?.map((m) => m.slug) || [];
     }
     async createSubscription(userId, planId, startDate, orderId) {
-        const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (!user) {
-            throw new common_1.NotFoundException('User not found');
+        const customer = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
+        if (!customer) {
+            throw new common_1.NotFoundException('Customer not found');
         }
         const plan = await this.planRepository.findOne({ where: { id: planId, is_deleted: false } });
         if (!plan) {
@@ -85,8 +85,8 @@ let SubscriptionsService = class SubscriptionsService {
             order_id: orderId || null,
         });
         const saved = await this.subscriptionRepository.save(subscription);
-        user.current_plan = plan.plan_type;
-        await this.userRepository.save(user);
+        customer.current_plan = plan.plan_type;
+        await this.customerRepository.save(customer);
         return saved;
     }
     async upgradeSubscription(userId, newPlanId, orderId) {
@@ -106,16 +106,16 @@ let SubscriptionsService = class SubscriptionsService {
         subscription.cancelled_at = new Date();
         subscription.cancellation_reason = reason || null;
         await this.subscriptionRepository.save(subscription);
-        const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (user) {
-            user.current_plan = plan_type_enum_1.PlanType.FREE;
-            await this.userRepository.save(user);
+        const customer = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
+        if (customer) {
+            customer.current_plan = plan_type_enum_1.PlanType.FREE;
+            await this.customerRepository.save(customer);
         }
     }
     async findById(id) {
         const subscription = await this.subscriptionRepository.findOne({
             where: { id, is_deleted: false },
-            relations: ['user', 'plan', 'order'],
+            relations: ['customer', 'plan', 'order'],
         });
         if (!subscription) {
             throw new common_1.NotFoundException('Subscription not found');
@@ -127,7 +127,7 @@ exports.SubscriptionsService = SubscriptionsService;
 exports.SubscriptionsService = SubscriptionsService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(subscription_entity_1.Subscription)),
-    __param(1, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
+    __param(1, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
     __param(2, (0, typeorm_1.InjectRepository)(plan_entity_1.Plan)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,

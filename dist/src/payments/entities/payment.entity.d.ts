@@ -1,5 +1,5 @@
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { Order } from '../../orders/entities/order.entity';
 import { PaymentStatus } from '../../common/enums/payment-status.enum';
 export declare class Payment extends BaseEntity {
@@ -15,6 +15,6 @@ export declare class Payment extends BaseEntity {
     paid_at: Date | null;
     refunded_at: Date | null;
     refund_amount: number | null;
-    user: User;
+    customer: Customer;
     order: Order;
 }

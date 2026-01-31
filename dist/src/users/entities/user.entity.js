@@ -14,10 +14,6 @@ const typeorm_1 = require("typeorm");
 const base_entity_1 = require("../../common/entities/base.entity");
 const user_role_enum_1 = require("../../common/enums/user-role.enum");
 const plan_type_enum_1 = require("../../common/enums/plan-type.enum");
-const subscription_entity_1 = require("../../subscriptions/entities/subscription.entity");
-const order_entity_1 = require("../../orders/entities/order.entity");
-const kundli_entity_1 = require("../../kundli/entities/kundli.entity");
-const manifestation_log_entity_1 = require("../../manifestation/entities/manifestation-log.entity");
 const dasha_record_entity_1 = require("../../database/entities/dasha-record.entity");
 let User = class User extends base_entity_1.BaseEntity {
 };
@@ -115,22 +111,6 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'varchar', length: 255, nullable: true }),
     __metadata("design:type", String)
 ], User.prototype, "password", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => subscription_entity_1.Subscription, (subscription) => subscription.user),
-    __metadata("design:type", Array)
-], User.prototype, "subscriptions", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => order_entity_1.Order, (order) => order.user),
-    __metadata("design:type", Array)
-], User.prototype, "orders", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => kundli_entity_1.Kundli, (kundli) => kundli.user),
-    __metadata("design:type", Array)
-], User.prototype, "kundlis", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => manifestation_log_entity_1.ManifestationLog, (manifestation) => manifestation.user),
-    __metadata("design:type", Array)
-], User.prototype, "manifestation_logs", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => dasha_record_entity_1.DashaRecord, (dasha) => dasha.user, { cascade: true }),
     __metadata("design:type", Array)

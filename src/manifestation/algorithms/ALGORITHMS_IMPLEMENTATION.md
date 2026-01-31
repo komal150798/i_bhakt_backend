@@ -425,3 +425,4 @@ class LRUCache<K, V> {
 4. **Add Ranking Algorithm** - Better UX
 5. **Implement Adaptive Learning** - Long-term improvement
 
+

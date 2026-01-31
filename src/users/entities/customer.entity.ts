@@ -1,12 +1,11 @@
 import { Entity, Column, OneToMany, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { PlanType } from '../../common/enums/plan-type.enum';
-// TODO: Uncomment after migrating entities to use Customer
-// import { Subscription } from '../../subscriptions/entities/subscription.entity';
-// import { Order } from '../../orders/entities/order.entity';
-// import { Kundli } from '../../kundli/entities/kundli.entity';
+import { Subscription } from '../../subscriptions/entities/subscription.entity';
+import { Order } from '../../orders/entities/order.entity';
+import { Kundli } from '../../kundli/entities/kundli.entity';
 // import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
-// import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
+import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
 import { CustomerToken } from '../../auth/entities/customer-token.entity';
 
 /**
@@ -90,22 +89,21 @@ export class Customer extends BaseEntity {
   @Column({ type: 'varchar', length: 50, nullable: true, name: 'last_login_ip' })
   last_login_ip: string | null;
 
-  // Relations
-  // TODO: Uncomment after migrating Subscription, Order, Kundli, KarmaEntry, ManifestationLog to use Customer
-  // @OneToMany(() => Subscription, (subscription) => subscription.customer)
-  // subscriptions: Subscription[];
+  // Relations - Now using Customer as the main table for both app and web
+  @OneToMany(() => Subscription, (subscription) => subscription.customer)
+  subscriptions: Subscription[];
 
-  // @OneToMany(() => Order, (order) => order.customer)
-  // orders: Order[];
+  @OneToMany(() => Order, (order) => order.customer)
+  orders: Order[];
 
-  // @OneToMany(() => Kundli, (kundli) => kundli.customer)
-  // kundlis: Kundli[];
+  @OneToMany(() => Kundli, (kundli) => kundli.customer)
+  kundlis: Kundli[];
 
   // @OneToMany(() => KarmaEntry, (karma) => karma.customer)
   // karma_entries: KarmaEntry[];
 
-  // @OneToMany(() => ManifestationLog, (manifestation) => manifestation.customer)
-  // manifestation_logs: ManifestationLog[];
+  @OneToMany(() => ManifestationLog, (manifestation) => manifestation.customer)
+  manifestation_logs: ManifestationLog[];
 
   @OneToMany(() => CustomerToken, (token) => token.customer)
   tokens: CustomerToken[];

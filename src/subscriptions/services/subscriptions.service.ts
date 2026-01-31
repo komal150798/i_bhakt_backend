@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { Subscription } from '../entities/subscription.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { Plan } from '../../plans/entities/plan.entity';
 import { PlanType } from '../../common/enums/plan-type.enum';
 
@@ -11,8 +11,8 @@ export class SubscriptionsService {
   constructor(
     @InjectRepository(Subscription)
     private subscriptionRepository: Repository<Subscription>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    @InjectRepository(Customer)
+    private customerRepository: Repository<Customer>,
     @InjectRepository(Plan)
     private planRepository: Repository<Plan>,
   ) {}
@@ -80,9 +80,9 @@ export class SubscriptionsService {
     startDate?: Date,
     orderId?: number,
   ): Promise<Subscription> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException('User not found');
+    const customer = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
+    if (!customer) {
+      throw new NotFoundException('Customer not found');
     }
 
     const plan = await this.planRepository.findOne({ where: { id: planId, is_deleted: false } });
@@ -114,9 +114,9 @@ export class SubscriptionsService {
 
     const saved = await this.subscriptionRepository.save(subscription);
 
-    // Update user's current plan
-    user.current_plan = plan.plan_type;
-    await this.userRepository.save(user);
+    // Update customer's current plan
+    customer.current_plan = plan.plan_type;
+    await this.customerRepository.save(customer);
 
     return saved;
   }
@@ -152,11 +152,11 @@ export class SubscriptionsService {
 
     await this.subscriptionRepository.save(subscription);
 
-    // Update user to FREE plan
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (user) {
-      user.current_plan = PlanType.FREE;
-      await this.userRepository.save(user);
+    // Update customer to FREE plan
+    const customer = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
+    if (customer) {
+      customer.current_plan = PlanType.FREE;
+      await this.customerRepository.save(customer);
     }
   }
 
@@ -166,7 +166,7 @@ export class SubscriptionsService {
   async findById(id: number): Promise<Subscription> {
     const subscription = await this.subscriptionRepository.findOne({
       where: { id, is_deleted: false },
-      relations: ['user', 'plan', 'order'],
+      relations: ['customer', 'plan', 'order'],
     });
 
     if (!subscription) {

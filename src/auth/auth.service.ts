@@ -13,6 +13,7 @@ import { OtpService } from './services/otp.service';
 import { AuthJwtService } from './services/jwt.service';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { UserRole } from '../common/enums/user-role.enum';
+import { PlanType } from '../common/enums/plan-type.enum';
 import { HoroscopeService } from '../horoscope/services/horoscope.service';
 
 @Injectable()
@@ -451,6 +452,7 @@ export class AuthService {
   /**
    * Login with username/email and password
    * Checks Customer table first, then falls back to User table for backward compatibility
+   * Migrates users from User table to Customer table on successful login
    */
   async loginWithPassword(
     username: string,
@@ -473,10 +475,48 @@ export class AuthService {
     // Fallback to legacy User table for backward compatibility
     const user = await this.validateUserByPassword(username, password);
     if (user) {
-      // Update last login
-      user.last_login = new Date();
-      await this.userRepository.save(user);
-      return this.issueTokens(user);
+      // Migrate legacy user to Customer table
+      // Check if customer already exists by email or phone
+      let existingCustomer = null;
+      if (user.email) {
+        existingCustomer = await this.findCustomerByEmail(user.email);
+      }
+      if (!existingCustomer && user.phone_number) {
+        existingCustomer = await this.findCustomerByPhone(user.phone_number);
+      }
+
+      if (existingCustomer) {
+        // Customer already exists, update last login and use it
+        existingCustomer.last_login = new Date();
+        await this.customerRepository.save(existingCustomer);
+        return this.issueCustomerTokens(existingCustomer);
+      }
+
+      // Create new customer from legacy user data
+      customer = this.customerRepository.create({
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        phone_number: user.phone_number,
+        password: user.password, // Already hashed
+        date_of_birth: user.date_of_birth,
+        time_of_birth: user.time_of_birth,
+        place_name: user.place_name,
+        latitude: user.latitude,
+        longitude: user.longitude,
+        timezone: user.timezone,
+        gender: user.gender,
+        avatar_url: user.avatar_url,
+        nakshatra: user.nakshatra,
+        pada: user.pada,
+        moon_longitude_deg: user.moon_longitude_deg,
+        dasha_at_birth: user.dasha_at_birth,
+        current_plan: user.current_plan || PlanType.FREE,
+        is_verified: user.is_verified || false,
+        last_login: new Date(),
+      });
+      customer = await this.customerRepository.save(customer);
+      return this.issueCustomerTokens(customer);
     }
 
     // Neither customer nor user found
@@ -485,6 +525,7 @@ export class AuthService {
 
   /**
    * Verify OTP and login (returns consistent format)
+   * Uses Customer table as main table for both app and web
    */
   async verifyOtpForLogin(
     phoneNumber: string,
@@ -498,25 +539,54 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Find or create user by phone number
-    let user = await this.findUserByPhone(phoneNumber);
+    // Find or create customer by phone number (Customer is the main table)
+    let customer = await this.findCustomerByPhone(phoneNumber);
 
-    if (!user) {
-      // Create new user
-      user = this.userRepository.create({
-        phone_number: phoneNumber,
-        role: UserRole.USER,
-        is_verified: true,
-        last_login: new Date(),
-      });
-      user = await this.userRepository.save(user);
+    if (!customer) {
+      // Check legacy User table for backward compatibility
+      const legacyUser = await this.findUserByPhone(phoneNumber);
+      if (legacyUser) {
+        // Migrate legacy user to customer
+        customer = this.customerRepository.create({
+          first_name: legacyUser.first_name,
+          last_name: legacyUser.last_name,
+          email: legacyUser.email,
+          phone_number: phoneNumber,
+          password: legacyUser.password,
+          date_of_birth: legacyUser.date_of_birth,
+          time_of_birth: legacyUser.time_of_birth,
+          place_name: legacyUser.place_name,
+          latitude: legacyUser.latitude,
+          longitude: legacyUser.longitude,
+          timezone: legacyUser.timezone,
+          gender: legacyUser.gender,
+          avatar_url: legacyUser.avatar_url,
+          nakshatra: legacyUser.nakshatra,
+          pada: legacyUser.pada,
+          moon_longitude_deg: legacyUser.moon_longitude_deg,
+          dasha_at_birth: legacyUser.dasha_at_birth,
+          current_plan: legacyUser.current_plan,
+          is_verified: true,
+          last_login: new Date(),
+        });
+        customer = await this.customerRepository.save(customer);
+      } else {
+        // Create new customer
+        customer = this.customerRepository.create({
+          phone_number: phoneNumber,
+          is_verified: true,
+          last_login: new Date(),
+        });
+        customer = await this.customerRepository.save(customer);
+      }
     } else {
       // Update last login
-      user.last_login = new Date();
-      await this.userRepository.save(user);
+      customer.last_login = new Date();
+      await this.customerRepository.save(customer);
     }
 
-    return this.issueTokens(user);
+    // Use app tokens with configurable session expiration
+    return this.issueCustomerAppTokens(customer);
   }
 
   /**

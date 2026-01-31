@@ -17,15 +17,19 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiBody,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUserPayload } from '../../common/types/jwt-payload.interface';
 import { ManifestationEnhancedService } from '../services/manifestation-enhanced.service';
 import { CreateManifestationEnhancedDto } from '../dtos/create-manifestation-enhanced.dto';
 import {
   AddAlignmentActionsDto,
   CommitIntentionDto,
 } from '../dtos/alignment-action.dto';
+import { CalculateResonanceDto } from '../dtos/calculate-resonance.dto';
+import { toNumber } from '../../common/utils/number.util';
 
 @ApiTags('Manifestation (App)')
 @Controller('app/manifestation')
@@ -47,33 +51,48 @@ export class AppManifestationController {
   @Post('add')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new manifestation with AI scoring' })
+  @ApiBody({
+    type: CreateManifestationEnhancedDto,
+    description: 'Manifestation description. Category, scores, and suggestions will be auto-generated based on your kundli.',
+    examples: {
+      career: {
+        summary: 'Career manifestation example',
+        value: {
+          description: 'I want to become a successful teacher in 2028 and make a positive impact on students\' lives through quality education.',
+        },
+      },
+      relationship: {
+        summary: 'Relationship manifestation example',
+        value: {
+          description: 'I want to find my soulmate and build a loving, committed relationship based on mutual respect, understanding, and shared values.',
+        },
+      },
+      money: {
+        summary: 'Money manifestation example',
+        value: {
+          description: 'I want to achieve financial freedom by 2025 through smart investments and building multiple income streams.',
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 201,
     description: 'Manifestation created successfully',
   })
   @ApiResponse({
     status: 400,
-    description: 'Validation failed (description too short, etc.)',
+    description: 'Validation failed (description too short, kundli missing, etc.)',
   })
   async createManifestation(
     @Body() dto: CreateManifestationEnhancedDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const manifestation = await this.manifestationService.createManifestation(
       user.id,
       dto,
     );
 
-    // Helper function to convert decimal/string to number
-    const toNumber = (value: any): number | null => {
-      if (value === null || value === undefined) return null;
-      if (typeof value === 'number') return value;
-      if (typeof value === 'string') {
-        const num = parseFloat(value);
-        return isNaN(num) ? null : num;
-      }
-      return null;
-    };
+    // Use common utility function for number conversion
 
     // Return only essential data for fast response
     // Other details (tips, insights, etc.) can be fetched via /:id endpoint
@@ -109,7 +128,10 @@ export class AppManifestationController {
     status: 200,
     description: 'Dashboard data retrieved successfully',
   })
-  async getDashboard(@CurrentUser() user: any) {
+  async getDashboard(@CurrentUser() user: CurrentUserPayload) {
+    if (!user.id) {
+      throw new BadRequestException('User ID is missing');
+    }
     const dashboard = await this.manifestationService.getDashboard(user.id);
 
     return {
@@ -131,22 +153,16 @@ export class AppManifestationController {
     status: 200,
     description: 'Manifestations retrieved successfully',
   })
-  async getAllManifestations(@CurrentUser() user: any) {
+  async getAllManifestations(@CurrentUser() user: CurrentUserPayload) {
+    if (!user.id) {
+      throw new BadRequestException('User ID is missing');
+    }
     const manifestations = await this.manifestationService.getAllManifestations(
       user.id,
       true,
     );
 
-    // Helper function to convert decimal/string to number
-    const toNumber = (value: any): number | null => {
-      if (value === null || value === undefined) return null;
-      if (typeof value === 'number') return value;
-      if (typeof value === 'string') {
-        const num = parseFloat(value);
-        return isNaN(num) ? null : num;
-      }
-      return null;
-    };
+    // Use common utility function for number conversion
 
     return {
       success: true,
@@ -181,15 +197,37 @@ export class AppManifestationController {
   @ApiOperation({
     summary: 'Calculate detailed resonance score with Dasha analysis',
   })
+  @ApiBody({
+    type: CalculateResonanceDto,
+    description: 'Manifestation description for resonance calculation',
+    examples: {
+      example1: {
+        summary: 'Career manifestation',
+        value: {
+          description: 'I want to become a successful teacher in 2028 and make a positive impact on students\' lives.',
+        },
+      },
+      example2: {
+        summary: 'Relationship manifestation',
+        value: {
+          description: 'I want to find my soulmate and build a loving, committed relationship based on mutual respect and understanding.',
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'Resonance score calculated successfully',
   })
+  @ApiResponse({
+    status: 400,
+    description: 'Description too short (minimum 15 characters)',
+  })
   async calculateResonance(
-    @Body() body: { description: string },
-    @CurrentUser() user: any,
+    @Body() dto: CalculateResonanceDto,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    if (!body.description || body.description.trim().length < 15) {
+    if (!dto.description || dto.description.trim().length < 15) {
       throw new BadRequestException(
         'Description must be at least 15 characters long.',
       );
@@ -197,7 +235,7 @@ export class AppManifestationController {
 
     const result = await this.manifestationService.calculateDetailedResonance(
       user.id,
-      body.description.trim(),
+      dto.description.trim(),
     );
 
     return {
@@ -215,6 +253,19 @@ export class AppManifestationController {
   @Post('alignment-actions/add')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Add selected alignment actions to karma ledger' })
+  @ApiBody({
+    type: AddAlignmentActionsDto,
+    description: 'Selected alignment actions to add to karma ledger',
+    examples: {
+      example1: {
+        summary: 'Add multiple actions',
+        value: {
+          manifestation_id: 123,
+          action_ids: [1, 2, 3],
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 201,
     description: 'Alignment actions added to karma ledger successfully',
@@ -225,7 +276,7 @@ export class AppManifestationController {
   })
   async addAlignmentActionsToKarma(
     @Body() dto: AddAlignmentActionsDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const result = await this.manifestationService.addAlignmentActionsToKarma(
       dto.manifestation_id,
@@ -248,6 +299,26 @@ export class AppManifestationController {
   @Post('commit')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Commit manifestation intention' })
+  @ApiBody({
+    type: CommitIntentionDto,
+    description: 'Commitment data for manifestation',
+    examples: {
+      example1: {
+        summary: 'Commit with message and target date',
+        value: {
+          manifestation_id: 123,
+          commitment_message: 'I am fully committed to achieving this goal',
+          target_date: '2025-12-31',
+        },
+      },
+      example2: {
+        summary: 'Simple commit',
+        value: {
+          manifestation_id: 123,
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'Manifestation committed successfully',
@@ -258,7 +329,7 @@ export class AppManifestationController {
   })
   async commitIntention(
     @Body() dto: CommitIntentionDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const result = await this.manifestationService.commitIntention(
       dto.manifestation_id,
@@ -296,23 +367,14 @@ export class AppManifestationController {
   })
   async getManifestation(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const manifestation = await this.manifestationService.getManifestationById(
       id,
       user.id,
     );
 
-    // Helper function to convert decimal/string to number
-    const toNumber = (value: any): number | null => {
-      if (value === null || value === undefined) return null;
-      if (typeof value === 'number') return value;
-      if (typeof value === 'string') {
-        const num = parseFloat(value);
-        return isNaN(num) ? null : num;
-      }
-      return null;
-    };
+    // Use common utility function for number conversion
 
     return {
       success: true,
@@ -362,7 +424,7 @@ export class AppManifestationController {
   })
   async archiveManifestation(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const manifestation = await this.manifestationService.archiveManifestation(
       id,
@@ -397,7 +459,7 @@ export class AppManifestationController {
   })
   async toggleLockManifestation(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const manifestation =
       await this.manifestationService.toggleLockManifestation(id, user.id);
@@ -432,7 +494,7 @@ export class AppManifestationController {
   })
   async getTips(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const tips = await this.manifestationService.getTips(id, user.id);
 
@@ -463,7 +525,7 @@ export class AppManifestationController {
   })
   async getResonanceScoreBreakdown(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const result = await this.manifestationService.getResonanceScoreBreakdown(
       id,
@@ -495,7 +557,7 @@ export class AppManifestationController {
   })
   async getAlignmentActions(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const result = await this.manifestationService.getAlignmentActions(
       id,
@@ -529,7 +591,7 @@ export class AppManifestationController {
   })
   async getCosmicSupportIndex(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const result = await this.manifestationService.getCosmicSupportIndex(
       id,
@@ -561,7 +623,7 @@ export class AppManifestationController {
   })
   async getAlignmentSummary(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const result = await this.manifestationService.getAlignmentSummary(
       id,
@@ -593,7 +655,7 @@ export class AppManifestationController {
   })
   async getJourneyTimeline(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const result = await this.manifestationService.getJourneyTimeline(
       id,
@@ -625,7 +687,7 @@ export class AppManifestationController {
   })
   async deleteManifestation(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     // Archive instead of hard delete
     await this.manifestationService.archiveManifestation(id, user.id);

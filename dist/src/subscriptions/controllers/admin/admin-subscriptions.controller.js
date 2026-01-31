@@ -35,7 +35,7 @@ let AdminSubscriptionsController = class AdminSubscriptionsController {
         const skip = (page - 1) * limit;
         const queryBuilder = this.subscriptionRepository
             .createQueryBuilder('subscription')
-            .leftJoinAndSelect('subscription.user', 'user')
+            .leftJoinAndSelect('subscription.customer', 'customer')
             .leftJoinAndSelect('subscription.plan', 'plan')
             .where('subscription.is_deleted = :isDeleted', { isDeleted: false });
         if (body.plan_type) {
@@ -54,7 +54,7 @@ let AdminSubscriptionsController = class AdminSubscriptionsController {
             });
         }
         if (body.search) {
-            queryBuilder.andWhere('(user.email ILIKE :search OR user.first_name ILIKE :search OR user.last_name ILIKE :search OR plan.name ILIKE :search)', { search: `%${body.search}%` });
+            queryBuilder.andWhere('(customer.email ILIKE :search OR customer.first_name ILIKE :search OR customer.last_name ILIKE :search OR plan.name ILIKE :search)', { search: `%${body.search}%` });
         }
         const total = await queryBuilder.getCount();
         const subscriptions = await queryBuilder
@@ -68,9 +68,9 @@ let AdminSubscriptionsController = class AdminSubscriptionsController {
                 id: sub.id,
                 unique_id: sub.unique_id,
                 user_id: sub.user_id,
-                user_email: sub.user?.email || null,
-                user_name: sub.user
-                    ? `${sub.user.first_name || ''} ${sub.user.last_name || ''}`.trim() || sub.user.email
+                user_email: sub.customer?.email || null,
+                user_name: sub.customer
+                    ? `${sub.customer.first_name || ''} ${sub.customer.last_name || ''}`.trim() || sub.customer.email
                     : null,
                 plan_id: sub.plan_id,
                 plan_name: sub.plan?.name || null,
@@ -95,7 +95,7 @@ let AdminSubscriptionsController = class AdminSubscriptionsController {
     async findOne(id) {
         const subscription = await this.subscriptionRepository.findOne({
             where: { id, is_deleted: false },
-            relations: ['user', 'plan', 'order'],
+            relations: ['customer', 'plan', 'order'],
         });
         if (!subscription) {
             throw new Error('Subscription not found');
@@ -106,12 +106,12 @@ let AdminSubscriptionsController = class AdminSubscriptionsController {
                 id: subscription.id,
                 unique_id: subscription.unique_id,
                 user_id: subscription.user_id,
-                user: subscription.user
+                user: subscription.customer
                     ? {
-                        id: subscription.user.id,
-                        email: subscription.user.email,
-                        first_name: subscription.user.first_name,
-                        last_name: subscription.user.last_name,
+                        id: subscription.customer.id,
+                        email: subscription.customer.email,
+                        first_name: subscription.customer.first_name,
+                        last_name: subscription.customer.last_name,
                     }
                     : null,
                 plan_id: subscription.plan_id,

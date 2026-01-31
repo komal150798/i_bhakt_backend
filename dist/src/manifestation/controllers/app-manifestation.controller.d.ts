@@ -1,10 +1,12 @@
+import { CurrentUserPayload } from '../../common/types/jwt-payload.interface';
 import { ManifestationEnhancedService } from '../services/manifestation-enhanced.service';
 import { CreateManifestationEnhancedDto } from '../dtos/create-manifestation-enhanced.dto';
 import { AddAlignmentActionsDto, CommitIntentionDto } from '../dtos/alignment-action.dto';
+import { CalculateResonanceDto } from '../dtos/calculate-resonance.dto';
 export declare class AppManifestationController {
     private readonly manifestationService;
     constructor(manifestationService: ManifestationEnhancedService);
-    createManifestation(dto: CreateManifestationEnhancedDto, user: any): Promise<{
+    createManifestation(dto: CreateManifestationEnhancedDto, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -23,7 +25,7 @@ export declare class AppManifestationController {
             coherence_score: number;
         };
     }>;
-    getDashboard(user: any): Promise<{
+    getDashboard(user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -53,7 +55,7 @@ export declare class AppManifestationController {
             }>;
         };
     }>;
-    getAllManifestations(user: any): Promise<{
+    getAllManifestations(user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -75,9 +77,7 @@ export declare class AppManifestationController {
             added_date: Date;
         }[];
     }>;
-    calculateResonance(body: {
-        description: string;
-    }, user: any): Promise<{
+    calculateResonance(dto: CalculateResonanceDto, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -130,7 +130,7 @@ export declare class AppManifestationController {
             insights: any;
         };
     }>;
-    addAlignmentActionsToKarma(dto: AddAlignmentActionsDto, user: any): Promise<{
+    addAlignmentActionsToKarma(dto: AddAlignmentActionsDto, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -144,7 +144,7 @@ export declare class AppManifestationController {
             }>;
         };
     }>;
-    commitIntention(dto: CommitIntentionDto, user: any): Promise<{
+    commitIntention(dto: CommitIntentionDto, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -157,7 +157,7 @@ export declare class AppManifestationController {
             target_date: string | null;
         };
     }>;
-    getManifestation(id: number, user: any): Promise<{
+    getManifestation(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -201,7 +201,7 @@ export declare class AppManifestationController {
             modify_date: Date;
         };
     }>;
-    archiveManifestation(id: number, user: any): Promise<{
+    archiveManifestation(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -210,7 +210,7 @@ export declare class AppManifestationController {
             is_archived: boolean;
         };
     }>;
-    toggleLockManifestation(id: number, user: any): Promise<{
+    toggleLockManifestation(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -219,7 +219,7 @@ export declare class AppManifestationController {
             is_locked: boolean;
         };
     }>;
-    getTips(id: number, user: any): Promise<{
+    getTips(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -233,7 +233,7 @@ export declare class AppManifestationController {
             };
         };
     }>;
-    getResonanceScoreBreakdown(id: number, user: any): Promise<{
+    getResonanceScoreBreakdown(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -246,7 +246,7 @@ export declare class AppManifestationController {
             insight: string;
         };
     }>;
-    getAlignmentActions(id: number, user: any): Promise<{
+    getAlignmentActions(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -262,7 +262,7 @@ export declare class AppManifestationController {
             }>;
         };
     }>;
-    getCosmicSupportIndex(id: number, user: any): Promise<{
+    getCosmicSupportIndex(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -285,7 +285,7 @@ export declare class AppManifestationController {
             guidance_message: string;
         };
     }>;
-    getAlignmentSummary(id: number, user: any): Promise<{
+    getAlignmentSummary(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -304,7 +304,7 @@ export declare class AppManifestationController {
             }>;
         };
     }>;
-    getJourneyTimeline(id: number, user: any): Promise<{
+    getJourneyTimeline(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;
@@ -326,7 +326,7 @@ export declare class AppManifestationController {
             };
         };
     }>;
-    deleteManifestation(id: number, user: any): Promise<{
+    deleteManifestation(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
         message: string;

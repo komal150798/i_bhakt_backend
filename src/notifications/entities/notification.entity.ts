@@ -1,13 +1,13 @@
 import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 
 @Entity('notifications')
 @Index(['user_id', 'is_read', 'is_deleted'])
 @Index(['user_id', 'added_date'])
 export class Notification extends BaseEntity {
   @Column({ type: 'bigint', name: 'user_id' })
-  user_id: number;
+  user_id: number; // Note: Still named user_id for backward compatibility, but references cst_customer.id
 
   @Column({ type: 'varchar', length: 255 })
   title: string;
@@ -30,8 +30,8 @@ export class Notification extends BaseEntity {
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any> | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Customer, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  user: User;
+  customer: Customer;
 }
 

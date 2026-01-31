@@ -10,6 +10,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.KundliPdfService = void 0;
 const common_1 = require("@nestjs/common");
 const PDFDocument = require("pdfkit");
+const date_util_1 = require("../../common/utils/date.util");
 let KundliPdfService = KundliPdfService_1 = class KundliPdfService {
     constructor() {
         this.logger = new common_1.Logger(KundliPdfService_1.name);
@@ -406,18 +407,7 @@ let KundliPdfService = KundliPdfService_1 = class KundliPdfService {
         }
     }
     formatDate(dateStr) {
-        if (!dateStr)
-            return 'N/A';
-        try {
-            const date = new Date(dateStr);
-            const day = date.getDate().toString().padStart(2, '0');
-            const month = (date.getMonth() + 1).toString().padStart(2, '0');
-            const year = date.getFullYear();
-            return `${day}/${month}/${year}`;
-        }
-        catch {
-            return dateStr;
-        }
+        return (0, date_util_1.formatDateDDMMYYYY)(dateStr);
     }
 };
 exports.KundliPdfService = KundliPdfService;

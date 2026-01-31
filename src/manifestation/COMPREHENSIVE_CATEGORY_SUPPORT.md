@@ -150,3 +150,4 @@ The manifestation system now supports **9 main categories** with comprehensive k
 - **Family vs Relationship**: Family is for family harmony, Relationship is for romantic relationships
 - **Dhandha vs Dhan**: "dhandha" = business, "dhan" = wealth (different words)
 
+

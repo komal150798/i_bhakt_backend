@@ -1,6 +1,6 @@
 import { Entity, Column, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { OrderStatus } from '../../common/enums/order-status.enum';
 import { Payment } from '../../payments/entities/payment.entity';
 import { Subscription } from '../../subscriptions/entities/subscription.entity';
@@ -41,9 +41,9 @@ export class Order extends BaseEntity {
   @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
   completed_at: Date | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Customer, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  user: User;
+  customer: Customer;
 
   @OneToMany(() => Payment, (payment) => payment.order)
   payments: Payment[];

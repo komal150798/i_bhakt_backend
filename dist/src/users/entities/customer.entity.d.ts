@@ -1,5 +1,9 @@
 import { BaseEntity } from '../../common/entities/base.entity';
 import { PlanType } from '../../common/enums/plan-type.enum';
+import { Subscription } from '../../subscriptions/entities/subscription.entity';
+import { Order } from '../../orders/entities/order.entity';
+import { Kundli } from '../../kundli/entities/kundli.entity';
+import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
 import { CustomerToken } from '../../auth/entities/customer-token.entity';
 export declare class Customer extends BaseEntity {
     first_name: string | null;
@@ -26,5 +30,9 @@ export declare class Customer extends BaseEntity {
     is_verified: boolean;
     last_login: Date | null;
     last_login_ip: string | null;
+    subscriptions: Subscription[];
+    orders: Order[];
+    kundlis: Kundli[];
+    manifestation_logs: ManifestationLog[];
     tokens: CustomerToken[];
 }

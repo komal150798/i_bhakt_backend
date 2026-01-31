@@ -18,10 +18,15 @@ import { KundliService } from '../../kundli/services/kundli.service';
 import { TextNormalizer } from '../utils/text-normalizer.util';
 import { ConfidenceScoring } from '../algorithms/confidence-scoring.util';
 import { NGramMatching } from '../algorithms/ngram-matching.util';
+import { formatDateToISO } from '../../common/utils/date.util';
+import { toNumber } from '../../common/utils/number.util';
 
 @Injectable()
 export class ManifestationEnhancedService {
   private readonly logger = new Logger(ManifestationEnhancedService.name);
+  
+  // Cache for compiled regex patterns to avoid recompilation
+  private readonly regexCache = new Map<string, RegExp>();
 
   constructor(
     @InjectRepository(Manifestation)
@@ -94,6 +99,12 @@ export class ManifestationEnhancedService {
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    // VALIDATE: Check if kundli exists or can be created before manifestation
+    const kundliValidation = await this.validateKundliForManifestation(user);
+    if (!kundliValidation.isValid) {
+      throw new BadRequestException(kundliValidation.message);
     }
 
     // FAST PATH: Get quick scores from rule-based analysis (no LLM, no kundli lookup)
@@ -342,7 +353,14 @@ export class ManifestationEnhancedService {
       const singleWordKeywords = keywords.filter(kw => !kw.includes(' '));
       for (const kw of singleWordKeywords) {
         // For single words, check for word boundary to avoid false matches
-        const wordBoundaryRegex = new RegExp(`\\b${kw}\\b`, 'i');
+        // Use cached regex to avoid recompilation
+        const regexKey = `word_${kw}`;
+        if (!this.regexCache.has(regexKey)) {
+          // Escape special regex characters
+          const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          this.regexCache.set(regexKey, new RegExp(`\\b${escaped}\\b`, 'i'));
+        }
+        const wordBoundaryRegex = this.regexCache.get(regexKey)!;
         if (wordBoundaryRegex.test(text)) {
           score += 1;
         } else {
@@ -556,7 +574,7 @@ export class ManifestationEnhancedService {
       // Calculate action windows
       const actionWindows = await this.calculateActionWindows(finalCategory, user as User);
 
-      // Get kundli data for enhanced tips
+      // Get kundli data for enhanced tips - fetch in parallel for better performance
       const kundli = await this.kundliRepository.findOne({
         where: { user_id: userId, is_deleted: false },
       });
@@ -568,12 +586,15 @@ export class ManifestationEnhancedService {
 
       if (kundli) {
         try {
-          planets = await this.kundliPlanetRepository.find({
-            where: { kundli_id: kundli.id, is_deleted: false },
-          });
-          houses = await this.kundliHouseRepository.find({
-            where: { kundli_id: kundli.id, is_deleted: false },
-          });
+          // Fetch planets and houses in parallel for better performance
+          [planets, houses] = await Promise.all([
+            this.kundliPlanetRepository.find({
+              where: { kundli_id: kundli.id, is_deleted: false },
+            }),
+            this.kundliHouseRepository.find({
+              where: { kundli_id: kundli.id, is_deleted: false },
+            }),
+          ]);
           this.logger.debug(`Found ${planets.length} planets and ${houses.length} houses for kundli ${kundli.id}`);
         } catch (error) {
           this.logger.warn('Could not fetch planets/houses, continuing without them:', error.message);
@@ -678,8 +699,16 @@ export class ManifestationEnhancedService {
       order: { added_date: 'ASC' },
     });
 
-    // Get LOCKED manifestations for dashboard calculations
-    const lockedManifestations = activeManifestations.filter(m => m.is_locked === true);
+    // Get LOCKED manifestations for dashboard calculations (filter at DB level for better performance)
+    const lockedManifestations = await this.manifestationRepository.find({
+      where: {
+        user_id: userId,
+        is_archived: false,
+        is_deleted: false,
+        is_locked: true,
+      },
+      order: { added_date: 'ASC' },
+    });
     
     this.logger.debug(`Total active manifestations: ${activeManifestations.length}`);
     this.logger.debug(`Locked manifestations: ${lockedManifestations.length}`);
@@ -701,38 +730,17 @@ export class ManifestationEnhancedService {
 
     if (lockedManifestations.length > 0) {
       // Calculate average scores from all locked manifestations
-      // Convert string/decimal values to numbers properly
+      // Use common toNumber utility for consistent conversion
       const totalResonance = lockedManifestations.reduce((sum, m) => {
-        let score: number = 0;
-        if (m.resonance_score !== null && m.resonance_score !== undefined) {
-          score = typeof m.resonance_score === 'string' 
-            ? parseFloat(m.resonance_score) 
-            : Number(m.resonance_score);
-          if (isNaN(score)) score = 0;
-        }
-        return sum + score;
+        return sum + (toNumber(m.resonance_score) || 0);
       }, 0);
       
       const totalAlignment = lockedManifestations.reduce((sum, m) => {
-        let score: number = 0;
-        if (m.alignment_score !== null && m.alignment_score !== undefined) {
-          score = typeof m.alignment_score === 'string' 
-            ? parseFloat(m.alignment_score) 
-            : Number(m.alignment_score);
-          if (isNaN(score)) score = 0;
-        }
-        return sum + score;
+        return sum + (toNumber(m.alignment_score) || 0);
       }, 0);
       
       const totalAstro = lockedManifestations.reduce((sum, m) => {
-        let score: number = 0;
-        if (m.astro_support_index !== null && m.astro_support_index !== undefined) {
-          score = typeof m.astro_support_index === 'string' 
-            ? parseFloat(m.astro_support_index) 
-            : Number(m.astro_support_index);
-          if (isNaN(score)) score = 0;
-        }
-        return sum + score;
+        return sum + (toNumber(m.astro_support_index) || 0);
       }, 0);
       
       // Calculate averages (always calculate, even if 0)
@@ -755,21 +763,9 @@ export class ManifestationEnhancedService {
     } else if (activeManifestations.length > 0) {
       // Fallback: if no locked manifestations, use the first active one (for backward compatibility)
       const topManifestation = activeManifestations[0];
-      top_resonance = topManifestation.resonance_score !== null && topManifestation.resonance_score !== undefined
-        ? (typeof topManifestation.resonance_score === 'string' 
-          ? parseFloat(topManifestation.resonance_score) || 0
-          : Number(topManifestation.resonance_score) || 0)
-        : 0;
-      alignment_score = topManifestation.alignment_score !== null && topManifestation.alignment_score !== undefined
-        ? (typeof topManifestation.alignment_score === 'string' 
-          ? parseFloat(topManifestation.alignment_score) || 0
-          : Number(topManifestation.alignment_score) || 0)
-        : 0;
-      astro_support = topManifestation.astro_support_index !== null && topManifestation.astro_support_index !== undefined
-        ? (typeof topManifestation.astro_support_index === 'string' 
-          ? parseFloat(topManifestation.astro_support_index) || 0
-          : Number(topManifestation.astro_support_index) || 0)
-        : 0;
+      top_resonance = toNumber(topManifestation.resonance_score) || 0;
+      alignment_score = toNumber(topManifestation.alignment_score) || 0;
+      astro_support = toNumber(topManifestation.astro_support_index) || 0;
       energy_state = topManifestation.insights?.energy_state || 'aligned';
     }
 
@@ -781,8 +777,11 @@ export class ManifestationEnhancedService {
       energy_state: energy_state || 'aligned',
     };
 
-    this.logger.debug(`Dashboard summary calculated:`, JSON.stringify(summary));
-    this.logger.debug(`Locked manifestations count: ${lockedManifestations.length}`);
+    // Only stringify in debug mode to avoid performance overhead (check log level)
+    if (process.env.LOG_LEVEL === 'debug' || process.env.NODE_ENV === 'development') {
+      this.logger.debug(`Dashboard summary calculated:`, JSON.stringify(summary));
+      this.logger.debug(`Locked manifestations count: ${lockedManifestations.length}`);
+    }
 
     return {
       summary,
@@ -790,21 +789,11 @@ export class ManifestationEnhancedService {
         id: m.id,
         title: m.title,
         description: m.description,
-        resonance_score: typeof m.resonance_score === 'string' 
-          ? parseFloat(m.resonance_score) 
-          : (m.resonance_score || null),
-        alignment_score: typeof m.alignment_score === 'string' 
-          ? parseFloat(m.alignment_score) 
-          : (m.alignment_score || null),
-        coherence_score: typeof m.coherence_score === 'string' 
-          ? parseFloat(m.coherence_score) 
-          : (m.coherence_score || null),
-        mfp_score: typeof m.mfp_score === 'string' 
-          ? parseFloat(m.mfp_score) 
-          : (m.mfp_score || null),
-        astro_support_index: typeof m.astro_support_index === 'string' 
-          ? parseFloat(m.astro_support_index) 
-          : (m.astro_support_index || null),
+        resonance_score: toNumber(m.resonance_score),
+        alignment_score: toNumber(m.alignment_score),
+        coherence_score: toNumber(m.coherence_score),
+        mfp_score: toNumber(m.mfp_score),
+        astro_support_index: toNumber(m.astro_support_index),
         is_archived: m.is_archived,
         is_locked: m.is_locked,
         added_date: m.added_date,
@@ -1321,7 +1310,86 @@ export class ManifestationEnhancedService {
   }
 
   /**
+   * Validate kundli for manifestation creation
+   * Returns validation result with message
+   */
+  private async validateKundliForManifestation(
+    user: User | Customer,
+  ): Promise<{ isValid: boolean; message?: string }> {
+    try {
+      // Check if kundli already exists
+      const existingKundli = await this.kundliRepository.findOne({
+        where: { user_id: user.id, is_deleted: false },
+      });
+
+      if (existingKundli) {
+        this.logger.debug(`Kundli exists for user ${user.id}`);
+        return { isValid: true };
+      }
+
+      // Check if user has required birth data
+      const birthDate = (user as any).date_of_birth || (user as any).birth_date;
+      const birthTime = (user as any).time_of_birth || (user as any).birth_time;
+      const latitude = (user as any).latitude;
+      const longitude = (user as any).longitude;
+      const placeName = (user as any).place_name || (user as any).birth_place;
+
+      // Check what's missing
+      const missingFields: string[] = [];
+      if (!birthDate) missingFields.push('Date of Birth');
+      if (!birthTime) missingFields.push('Time of Birth');
+      if (!placeName) missingFields.push('Place of Birth');
+      if (!latitude || !longitude) missingFields.push('Birth Location (Latitude/Longitude)');
+
+      if (missingFields.length > 0) {
+        const missingFieldsText = missingFields.join(', ');
+        return {
+          isValid: false,
+          message: `Kundli is required for personalized manifestation suggestions. Please update your profile with the following information: ${missingFieldsText}. You can update your profile from the settings or generate your kundli first.`,
+        };
+      }
+
+      // All data available, try to create kundli
+      try {
+        this.logger.log(`Creating kundli for user ${user.id} before manifestation`);
+        const firstName = (user as any).first_name || 'User';
+        const lastName = (user as any).last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        
+        await this.kundliService.generateKundli(
+          {
+            name: fullName,
+            birth_date: formatDateToISO(birthDate) || birthDate,
+            birth_time: birthTime,
+            birth_place: placeName || 'Unknown',
+            latitude,
+            longitude,
+            timezone: (user as any).timezone || 'Asia/Kolkata',
+          },
+          user.id,
+        );
+
+        this.logger.log(`Kundli created successfully for user ${user.id}`);
+        return { isValid: true };
+      } catch (kundliError) {
+        this.logger.error(`Failed to create kundli for user ${user.id}:`, kundliError);
+        return {
+          isValid: false,
+          message: 'Failed to generate your kundli. Please ensure your birth details are correct and try again. If the problem persists, please contact support.',
+        };
+      }
+    } catch (error) {
+      this.logger.error(`Error validating kundli for user ${user.id}:`, error);
+      return {
+        isValid: false,
+        message: 'Unable to validate kundli. Please try again or contact support.',
+      };
+    }
+  }
+
+  /**
    * Ensure kundli exists for user, calculate and store if not
+   * @deprecated Use validateKundliForManifestation instead for better error handling
    */
   private async ensureKundliExists(user: User | Customer): Promise<void> {
     try {
@@ -1356,7 +1424,7 @@ export class ManifestationEnhancedService {
       await this.kundliService.generateKundli(
         {
           name: fullName,
-          birth_date: birthDate instanceof Date ? birthDate.toISOString().split('T')[0] : birthDate,
+          birth_date: formatDateToISO(birthDate) || birthDate,
           birth_time: birthTime,
           birth_place: placeName || 'Unknown',
           latitude,

@@ -1,6 +1,6 @@
 import { Entity, Column, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { KundliPlanet } from './kundli-planet.entity';
 import { KundliHouse } from './kundli-house.entity';
 
@@ -8,7 +8,7 @@ import { KundliHouse } from './kundli-house.entity';
 @Index(['user_id', 'is_deleted'])
 export class Kundli extends BaseEntity {
   @Column({ type: 'bigint', name: 'user_id' })
-  user_id: number;
+  user_id: number; // Note: Still named user_id for backward compatibility, but references cst_customer.id
 
   @Column({ type: 'date', name: 'birth_date' })
   birth_date: Date;
@@ -61,9 +61,9 @@ export class Kundli extends BaseEntity {
   @Column({ type: 'jsonb', nullable: true, name: 'navamsa_data' })
   navamsa_data: Record<string, any> | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Customer, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  user: User;
+  customer: Customer;
 
   @OneToMany(() => KundliPlanet, (planet) => planet.kundli, { cascade: true })
   planets: KundliPlanet[];

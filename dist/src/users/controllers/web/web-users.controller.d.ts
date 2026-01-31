@@ -1,13 +1,16 @@
+import { UpdateCustomerProfileDto } from '../../dtos/update-customer-profile.dto';
+import { CurrentUserPayload } from '../../../common/types/jwt-payload.interface';
 import { UsersService } from '../../services/users.service';
+import { CustomerService } from '../../services/customer.service';
 import { SubscriptionsService } from '../../../subscriptions/services/subscriptions.service';
 import { UsageTrackingService } from '../../../subscriptions/services/usage-tracking.service';
-import { User } from '../../entities/user.entity';
 export declare class WebUsersController {
     private readonly usersService;
+    private readonly customerService;
     private readonly subscriptionsService;
     private readonly usageTrackingService;
-    constructor(usersService: UsersService, subscriptionsService: SubscriptionsService, usageTrackingService: UsageTrackingService);
-    getProfile(user: any): Promise<{
+    constructor(usersService: UsersService, customerService: CustomerService, subscriptionsService: SubscriptionsService, usageTrackingService: UsageTrackingService);
+    getProfile(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             unique_id: string;
@@ -25,7 +28,7 @@ export declare class WebUsersController {
             avatar_url: string;
         };
     }>;
-    updateProfile(user: any, updateData: Partial<User>): Promise<{
+    updateProfile(user: CurrentUserPayload, updateData: UpdateCustomerProfileDto): Promise<{
         success: boolean;
         data: {
             unique_id: string;
@@ -35,7 +38,7 @@ export declare class WebUsersController {
             message: string;
         };
     }>;
-    getCurrentPlan(user: any): Promise<{
+    getCurrentPlan(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             plan_type: import("../../../common/enums/plan-type.enum").PlanType;
@@ -48,13 +51,13 @@ export declare class WebUsersController {
             };
         };
     }>;
-    getAllowedModules(user: any): Promise<{
+    getAllowedModules(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             modules: string[];
         };
     }>;
-    getUsageLimits(user: any): Promise<{
+    getUsageLimits(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: Record<string, any>;
     }>;

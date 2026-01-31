@@ -1,5 +1,5 @@
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { KundliPlanet } from './kundli-planet.entity';
 import { KundliHouse } from './kundli-house.entity';
 export declare class Kundli extends BaseEntity {
@@ -21,7 +21,7 @@ export declare class Kundli extends BaseEntity {
     full_data: Record<string, any> | null;
     dasha_timeline: Record<string, any>[] | null;
     navamsa_data: Record<string, any> | null;
-    user: User;
+    customer: Customer;
     planets: KundliPlanet[];
     houses: KundliHouse[];
 }

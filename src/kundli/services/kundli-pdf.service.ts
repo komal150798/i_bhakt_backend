@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as PDFDocument from 'pdfkit';
+import { formatDateDDMMYYYY } from '../../common/utils/date.util';
 
 export interface DetailedDashaPeriod {
   mahadasha: string;
@@ -718,17 +719,9 @@ export class KundliPdfService {
 
   /**
    * Format date string to dd/mm/yyyy format
+   * Uses common utility function
    */
   private formatDate(dateStr: string): string {
-    if (!dateStr) return 'N/A';
-    try {
-      const date = new Date(dateStr);
-      const day = date.getDate().toString().padStart(2, '0');
-      const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      const year = date.getFullYear();
-      return `${day}/${month}/${year}`;
-    } catch {
-      return dateStr;
-    }
+    return formatDateDDMMYYYY(dateStr);
   }
 }

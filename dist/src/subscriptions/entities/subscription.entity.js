@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Subscription = void 0;
 const typeorm_1 = require("typeorm");
 const base_entity_1 = require("../../common/entities/base.entity");
-const user_entity_1 = require("../../users/entities/user.entity");
+const customer_entity_1 = require("../../users/entities/customer.entity");
 const plan_entity_1 = require("../../plans/entities/plan.entity");
 const plan_type_enum_1 = require("../../common/enums/plan-type.enum");
 const order_entity_1 = require("../../orders/entities/order.entity");
@@ -62,10 +62,10 @@ __decorate([
     __metadata("design:type", String)
 ], Subscription.prototype, "cancellation_reason", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, { onDelete: 'CASCADE' }),
+    (0, typeorm_1.ManyToOne)(() => customer_entity_1.Customer, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)({ name: 'user_id', referencedColumnName: 'id' }),
-    __metadata("design:type", user_entity_1.User)
-], Subscription.prototype, "user", void 0);
+    __metadata("design:type", customer_entity_1.Customer)
+], Subscription.prototype, "customer", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => plan_entity_1.Plan, { onDelete: 'RESTRICT' }),
     (0, typeorm_1.JoinColumn)({ name: 'plan_id', referencedColumnName: 'id' }),

@@ -13,6 +13,10 @@ exports.Customer = void 0;
 const typeorm_1 = require("typeorm");
 const base_entity_1 = require("../../common/entities/base.entity");
 const plan_type_enum_1 = require("../../common/enums/plan-type.enum");
+const subscription_entity_1 = require("../../subscriptions/entities/subscription.entity");
+const order_entity_1 = require("../../orders/entities/order.entity");
+const kundli_entity_1 = require("../../kundli/entities/kundli.entity");
+const manifestation_log_entity_1 = require("../../manifestation/entities/manifestation-log.entity");
 const customer_token_entity_1 = require("../../auth/entities/customer-token.entity");
 let Customer = class Customer extends base_entity_1.BaseEntity {
 };
@@ -114,6 +118,22 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'varchar', length: 50, nullable: true, name: 'last_login_ip' }),
     __metadata("design:type", String)
 ], Customer.prototype, "last_login_ip", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => subscription_entity_1.Subscription, (subscription) => subscription.customer),
+    __metadata("design:type", Array)
+], Customer.prototype, "subscriptions", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => order_entity_1.Order, (order) => order.customer),
+    __metadata("design:type", Array)
+], Customer.prototype, "orders", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => kundli_entity_1.Kundli, (kundli) => kundli.customer),
+    __metadata("design:type", Array)
+], Customer.prototype, "kundlis", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => manifestation_log_entity_1.ManifestationLog, (manifestation) => manifestation.customer),
+    __metadata("design:type", Array)
+], Customer.prototype, "manifestation_logs", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => customer_token_entity_1.CustomerToken, (token) => token.customer),
     __metadata("design:type", Array)

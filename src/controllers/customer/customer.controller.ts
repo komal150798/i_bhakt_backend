@@ -8,14 +8,16 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { PlansService } from '../../plans/services/plans.service';
 import { PlanResponseDto } from '../../plans/dtos/plan-response.dto';
 import { CustomerService } from '../../users/services/customer.service';
 import { UpdateCustomerProfileDto } from '../../users/dtos/update-customer-profile.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUserPayload } from '../../common/types/jwt-payload.interface';
 
 @ApiTags('Customer')
 @Controller('customer')
@@ -51,7 +53,10 @@ export class CustomerController {
   @ApiOperation({ summary: 'Get current customer profile' })
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
-  async getProfile(@CurrentUser() user: any) {
+  async getProfile(@CurrentUser() user: CurrentUserPayload) {
+    if (!user.id) {
+      throw new BadRequestException('User ID is missing');
+    }
     const profile = await this.customerService.getProfile(user.id);
     return {
       success: true,
@@ -64,11 +69,38 @@ export class CustomerController {
   @Put('profile')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update customer profile' })
+  @ApiBody({
+    type: UpdateCustomerProfileDto,
+    description: 'Profile update data. All fields are optional.',
+    examples: {
+      basic: {
+        summary: 'Basic profile update',
+        value: {
+          first_name: 'John',
+          last_name: 'Doe',
+          email: 'john.doe@example.com',
+        },
+      },
+      withBirthData: {
+        summary: 'Update with birth data for kundli',
+        value: {
+          first_name: 'John',
+          last_name: 'Doe',
+          date_of_birth: '1990-01-15',
+          time_of_birth: '10:30:00',
+          place_name: 'Mumbai',
+          latitude: 19.0760,
+          longitude: 72.8777,
+          timezone: 'Asia/Kolkata',
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   async updateProfile(
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserPayload,
     @Body() updateData: UpdateCustomerProfileDto,
   ) {
     const updated = await this.customerService.updateProfile(user.id, updateData);

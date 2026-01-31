@@ -162,3 +162,4 @@ Category Detection: Matches "job" → career
 3. Add machine learning for typo correction
 4. Support for more transliteration schemes
 
+

@@ -1,5 +1,5 @@
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { Subscription } from './subscription.entity';
 export declare class UsageTracking extends BaseEntity {
     user_id: number;
@@ -10,6 +10,6 @@ export declare class UsageTracking extends BaseEntity {
     limit: number | null;
     period: Date;
     metadata: Record<string, any> | null;
-    user: User;
+    customer: Customer;
     subscription: Subscription | null;
 }

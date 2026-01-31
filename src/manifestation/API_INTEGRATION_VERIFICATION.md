@@ -157,3 +157,4 @@ The API will automatically:
 3. Support all 9 categories (career, love, personal, money, business, farming, family, health, spiritual)
 4. Provide personalized suggestions based on kundli data
 
+

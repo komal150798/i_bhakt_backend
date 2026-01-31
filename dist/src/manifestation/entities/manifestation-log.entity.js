@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ManifestationLog = void 0;
 const typeorm_1 = require("typeorm");
 const base_entity_1 = require("../../common/entities/base.entity");
-const user_entity_1 = require("../../users/entities/user.entity");
+const customer_entity_1 = require("../../users/entities/customer.entity");
 let ManifestationLog = class ManifestationLog extends base_entity_1.BaseEntity {
 };
 exports.ManifestationLog = ManifestationLog;
@@ -53,10 +53,10 @@ __decorate([
     __metadata("design:type", Object)
 ], ManifestationLog.prototype, "metadata", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, { onDelete: 'CASCADE' }),
+    (0, typeorm_1.ManyToOne)(() => customer_entity_1.Customer, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)({ name: 'user_id', referencedColumnName: 'id' }),
-    __metadata("design:type", user_entity_1.User)
-], ManifestationLog.prototype, "user", void 0);
+    __metadata("design:type", customer_entity_1.Customer)
+], ManifestationLog.prototype, "customer", void 0);
 exports.ManifestationLog = ManifestationLog = __decorate([
     (0, typeorm_1.Entity)('manifestation_logs'),
     (0, typeorm_1.Index)(['user_id', 'is_deleted'])

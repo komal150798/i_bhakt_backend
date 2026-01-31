@@ -18,6 +18,7 @@ const swagger_1 = require("@nestjs/swagger");
 const karma_service_1 = require("../services/karma.service");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
+const add_karma_input_dto_1 = require("../dtos/add-karma-input.dto");
 let AppKarmaController = class AppKarmaController {
     constructor(karmaService) {
         this.karmaService = karmaService;
@@ -47,11 +48,11 @@ let AppKarmaController = class AppKarmaController {
             },
         };
     }
-    async addKarmaInput(body, user) {
+    async addKarmaInput(inputDto, user) {
         const dto = {
             user_id: user.id,
-            action_text: body.action_text,
-            timestamp: body.timestamp ? new Date(body.timestamp) : new Date(),
+            action_text: inputDto.action_text,
+            timestamp: inputDto.timestamp ? new Date(inputDto.timestamp) : new Date(),
         };
         const entry = await this.karmaService.addKarmaAction(dto);
         return {
@@ -67,6 +68,9 @@ let AppKarmaController = class AppKarmaController {
         };
     }
     async getKarmaScores(user) {
+        if (!user.id) {
+            throw new common_1.BadRequestException('User ID is missing');
+        }
         const userId = user.id;
         const summary = await this.karmaService.getUserKarmaSummary(userId);
         const weeklyInsights = await this.karmaService.getWeeklyInsights(userId);
@@ -83,6 +87,9 @@ let AppKarmaController = class AppKarmaController {
         };
     }
     async getDashboard(user) {
+        if (!user.id) {
+            throw new common_1.BadRequestException('User ID is missing');
+        }
         const userId = user.id;
         const dashboard = await this.karmaService.getDashboardSummary(userId);
         return {
@@ -138,6 +145,19 @@ __decorate([
     (0, common_1.Post)('input'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     (0, swagger_1.ApiOperation)({ summary: 'Add karma input/action (Mobile App)' }),
+    (0, swagger_1.ApiBody)({
+        type: add_karma_input_dto_1.AddKarmaInputDto,
+        description: 'Karma action details',
+        examples: {
+            example1: {
+                summary: 'Add karma action',
+                value: {
+                    action_text: 'Helped an elderly person cross the road',
+                    timestamp: '2024-01-15T10:30:00Z',
+                },
+            },
+        },
+    }),
     (0, swagger_1.ApiResponse)({
         status: 201,
         description: 'Karma input added successfully',
@@ -145,7 +165,7 @@ __decorate([
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [add_karma_input_dto_1.AddKarmaInputDto, Object]),
     __metadata("design:returntype", Promise)
 ], AppKarmaController.prototype, "addKarmaInput", null);
 __decorate([

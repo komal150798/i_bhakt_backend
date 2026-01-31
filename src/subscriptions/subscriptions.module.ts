@@ -5,7 +5,7 @@ import { UsageTrackingService } from './services/usage-tracking.service';
 import { EntitlementsService } from './services/entitlements.service';
 import { Subscription } from './entities/subscription.entity';
 import { UsageTracking } from './entities/usage-tracking.entity';
-import { User } from '../users/entities/user.entity';
+import { Customer } from '../users/entities/customer.entity';
 import { Plan } from '../plans/entities/plan.entity';
 import { AppSubscriptionController } from './controllers/app-subscription.controller';
 import { AppEntitlementsController } from './controllers/app-entitlements.controller';
@@ -14,7 +14,7 @@ import { PlansModule } from '../plans/plans.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Subscription, UsageTracking, User, Plan]),
+    TypeOrmModule.forFeature([Subscription, UsageTracking, Customer, Plan]),
     PlansModule,
   ],
   controllers: [

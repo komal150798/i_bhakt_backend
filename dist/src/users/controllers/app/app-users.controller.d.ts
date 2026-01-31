@@ -1,25 +1,28 @@
+import { CurrentUserPayload } from '../../../common/types/jwt-payload.interface';
 import { UsersService } from '../../services/users.service';
+import { CustomerService } from '../../services/customer.service';
 import { SubscriptionsService } from '../../../subscriptions/services/subscriptions.service';
 import { UsageTrackingService } from '../../../subscriptions/services/usage-tracking.service';
-import { User } from '../../entities/user.entity';
+import { UpdateCustomerProfileDto } from '../../dtos/update-customer-profile.dto';
 export declare class AppUsersController {
     private readonly usersService;
+    private readonly customerService;
     private readonly subscriptionsService;
     private readonly usageTrackingService;
-    constructor(usersService: UsersService, subscriptionsService: SubscriptionsService, usageTrackingService: UsageTrackingService);
-    getProfile(user: any): Promise<{
+    constructor(usersService: UsersService, customerService: CustomerService, subscriptionsService: SubscriptionsService, usageTrackingService: UsageTrackingService);
+    getProfile(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             id: string;
             name: string;
             email: string;
             phone: string;
-            plan: import("../../../common/enums/plan-type.enum").PlanType;
-            avatar: string;
-            verified: boolean;
+            plan: any;
+            avatar: any;
+            verified: any;
         };
     }>;
-    updateProfile(user: any, updateData: Partial<User>): Promise<{
+    updateProfile(user: CurrentUserPayload, updateData: UpdateCustomerProfileDto): Promise<{
         success: boolean;
         data: {
             id: string;
@@ -27,7 +30,7 @@ export declare class AppUsersController {
             message: string;
         };
     }>;
-    getCurrentPlan(user: any): Promise<{
+    getCurrentPlan(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             plan: import("../../../common/enums/plan-type.enum").PlanType;
@@ -35,16 +38,16 @@ export declare class AppUsersController {
             expires: Date;
         };
     }>;
-    getModules(user: any): Promise<{
+    getModules(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
             modules: string[];
         };
     }>;
-    getStats(user: any): Promise<{
+    getStats(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {
-            plan: import("../../../common/enums/plan-type.enum").PlanType;
+            plan: any;
             referral_code: string;
             verified: boolean;
             usage: Record<string, any>;

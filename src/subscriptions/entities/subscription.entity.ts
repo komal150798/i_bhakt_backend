@@ -1,6 +1,6 @@
 import { Entity, Column, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { Plan } from '../../plans/entities/plan.entity';
 import { PlanType } from '../../common/enums/plan-type.enum';
 import { Order } from '../../orders/entities/order.entity';
@@ -11,7 +11,7 @@ import { UsageTracking } from './usage-tracking.entity';
 @Index(['plan_id', 'is_active'])
 export class Subscription extends BaseEntity {
   @Column({ type: 'bigint', name: 'user_id' })
-  user_id: number;
+  user_id: number; // Note: Still named user_id for backward compatibility, but references cst_customer.id
 
   @Column({ type: 'bigint', name: 'plan_id' })
   plan_id: number;
@@ -41,9 +41,9 @@ export class Subscription extends BaseEntity {
   @Column({ type: 'text', nullable: true, name: 'cancellation_reason' })
   cancellation_reason: string | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Customer, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  user: User;
+  customer: Customer;
 
   @ManyToOne(() => Plan, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'plan_id', referencedColumnName: 'id' })

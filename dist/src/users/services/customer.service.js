@@ -18,6 +18,7 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const customer_entity_1 = require("../entities/customer.entity");
+const date_util_1 = require("../../common/utils/date.util");
 const kundli_service_1 = require("../../kundli/services/kundli.service");
 const common_2 = require("@nestjs/common");
 let CustomerService = CustomerService_1 = class CustomerService {
@@ -74,7 +75,7 @@ let CustomerService = CustomerService_1 = class CustomerService {
             customer.email = updateData.email;
         }
         if (updateData.date_of_birth !== undefined) {
-            customer.date_of_birth = updateData.date_of_birth ? new Date(updateData.date_of_birth) : null;
+            customer.date_of_birth = (0, date_util_1.parseDateString)(updateData.date_of_birth) || null;
         }
         if (updateData.time_of_birth !== undefined) {
             customer.time_of_birth = updateData.time_of_birth || null;
@@ -119,10 +120,10 @@ let CustomerService = CustomerService_1 = class CustomerService {
                 this.logger.debug(`Incomplete birth data for customer ${userId}, skipping kundli update`);
                 return;
             }
-            const birthDateObj = customer.date_of_birth instanceof Date
-                ? customer.date_of_birth
-                : new Date(customer.date_of_birth);
-            const birthDate = birthDateObj.toISOString().split('T')[0];
+            const birthDate = (0, date_util_1.formatDateToISO)(customer.date_of_birth) ||
+                (customer.date_of_birth instanceof Date
+                    ? customer.date_of_birth.toISOString().split('T')[0]
+                    : String(customer.date_of_birth));
             const birthTime = customer.time_of_birth || '12:00:00';
             const existingKundli = await this.kundliRepository.findOneByUserId(userId, { is_deleted: false });
             if (!existingKundli) {
