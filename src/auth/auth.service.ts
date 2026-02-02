@@ -848,20 +848,48 @@ export class AuthService {
       throw new BadRequestException('Either email or phone_number is required');
     }
 
-    // Check if customer already exists
-    const existingCustomer = await this.customerRepository.findOne({
-      where: [
-        ...(email ? [{ email, is_deleted: false }] : []),
-        ...(phone_number ? [{ phone_number, is_deleted: false }] : []),
-      ],
-    });
+    // Validate email format if provided
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new BadRequestException('Invalid email format');
+      }
+    }
 
-    if (existingCustomer) {
-      throw new ConflictException(
-        email && existingCustomer.email === email
-          ? 'Email already registered'
-          : 'Phone number already registered',
-      );
+    // Check if email already exists in Customer table
+    if (email) {
+      const existingCustomerByEmail = await this.customerRepository.findOne({
+        where: { email, is_deleted: false },
+      });
+      if (existingCustomerByEmail) {
+        throw new ConflictException('This email is already registered. Please use a different email or try logging in.');
+      }
+
+      // Also check User table for legacy users
+      const existingUserByEmail = await this.userRepository.findOne({
+        where: { email, is_deleted: false },
+      });
+      if (existingUserByEmail) {
+        throw new ConflictException('This email is already registered. Please use a different email or try logging in.');
+      }
+    }
+
+    // Check if phone number already exists in Customer table
+    if (phone_number) {
+      const existingCustomerByPhone = await this.customerRepository.findOne({
+        where: { phone_number, is_deleted: false },
+      });
+      if (existingCustomerByPhone) {
+        throw new ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
+      }
+
+      // Also check User table for legacy users
+      const existingUserByPhone = await this.userRepository.findOne({
+        where: { phone_number, is_deleted: false },
+      });
+      if (existingUserByPhone) {
+        throw new ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
+      }
     }
 
     // Hash password
