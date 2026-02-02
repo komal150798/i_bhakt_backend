@@ -545,16 +545,39 @@ let AuthService = class AuthService {
         if (!email && !phone_number) {
             throw new common_1.BadRequestException('Either email or phone_number is required');
         }
-        const existingCustomer = await this.customerRepository.findOne({
-            where: [
-                ...(email ? [{ email, is_deleted: false }] : []),
-                ...(phone_number ? [{ phone_number, is_deleted: false }] : []),
-            ],
-        });
-        if (existingCustomer) {
-            throw new common_1.ConflictException(email && existingCustomer.email === email
-                ? 'Email already registered'
-                : 'Phone number already registered');
+        if (email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                throw new common_1.BadRequestException('Invalid email format');
+            }
+        }
+        if (email) {
+            const existingCustomerByEmail = await this.customerRepository.findOne({
+                where: { email, is_deleted: false },
+            });
+            if (existingCustomerByEmail) {
+                throw new common_1.ConflictException('This email is already registered. Please use a different email or try logging in.');
+            }
+            const existingUserByEmail = await this.userRepository.findOne({
+                where: { email, is_deleted: false },
+            });
+            if (existingUserByEmail) {
+                throw new common_1.ConflictException('This email is already registered. Please use a different email or try logging in.');
+            }
+        }
+        if (phone_number) {
+            const existingCustomerByPhone = await this.customerRepository.findOne({
+                where: { phone_number, is_deleted: false },
+            });
+            if (existingCustomerByPhone) {
+                throw new common_1.ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
+            }
+            const existingUserByPhone = await this.userRepository.findOne({
+                where: { phone_number, is_deleted: false },
+            });
+            if (existingUserByPhone) {
+                throw new common_1.ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
+            }
         }
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
