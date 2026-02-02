@@ -5,6 +5,7 @@ exports.safeTrim = safeTrim;
 exports.isEmpty = isEmpty;
 exports.capitalize = capitalize;
 exports.splitFullName = splitFullName;
+exports.normalizePhoneNumber = normalizePhoneNumber;
 function formatFullName(firstName, lastName, fallback = 'User') {
     const parts = [];
     if (firstName)
@@ -38,5 +39,18 @@ function splitFullName(fullName) {
         first_name: trimmed.substring(0, spaceIndex).trim(),
         last_name: trimmed.substring(spaceIndex + 1).trim(),
     };
+}
+function normalizePhoneNumber(phoneNumber) {
+    if (!phoneNumber) {
+        return '';
+    }
+    const trimmed = phoneNumber.trim();
+    if (trimmed.startsWith('e_')) {
+        return trimmed;
+    }
+    if (trimmed.startsWith('+')) {
+        return trimmed.substring(1);
+    }
+    return trimmed;
 }
 //# sourceMappingURL=string.util.js.map

@@ -1,15 +1,13 @@
 import { CurrentUserPayload } from '../../../common/types/jwt-payload.interface';
-import { UsersService } from '../../services/users.service';
 import { CustomerService } from '../../services/customer.service';
 import { SubscriptionsService } from '../../../subscriptions/services/subscriptions.service';
 import { UsageTrackingService } from '../../../subscriptions/services/usage-tracking.service';
 import { UpdateCustomerProfileDto } from '../../dtos/update-customer-profile.dto';
 export declare class AppUsersController {
-    private readonly usersService;
     private readonly customerService;
     private readonly subscriptionsService;
     private readonly usageTrackingService;
-    constructor(usersService: UsersService, customerService: CustomerService, subscriptionsService: SubscriptionsService, usageTrackingService: UsageTrackingService);
+    constructor(customerService: CustomerService, subscriptionsService: SubscriptionsService, usageTrackingService: UsageTrackingService);
     getProfile(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {

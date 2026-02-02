@@ -1,4 +1,4 @@
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { ManifestationLLMAnalyzerService } from './manifestation-llm-analyzer.service';
 import { ManifestationBackendConfigService } from './manifestation-backend-config.service';
 import { ConstantsService } from '../../common/constants/constants.service';
@@ -39,7 +39,7 @@ export declare class ManifestationAIEvaluationService {
     private getCategoryPlanets;
     private detectCategoryWithBackendConfig;
     private detectCategory;
-    evaluateManifestation(title: string, description: string, category?: string, user?: User): Promise<{
+    evaluateManifestation(title: string, description: string, category?: string, user?: Customer): Promise<{
         scores: ManifestationScores;
         tips: ManifestationTips;
         insights: ManifestationInsights;

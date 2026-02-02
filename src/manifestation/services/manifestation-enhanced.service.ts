@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { Manifestation } from '../entities/manifestation.entity';
 import { CreateManifestationEnhancedDto } from '../dtos/create-manifestation-enhanced.dto';
 import { ManifestationAIEvaluationService } from './manifestation-ai-evaluation.service';
-import { User } from '../../users/entities/user.entity';
 import { Customer } from '../../users/entities/customer.entity';
 import { SwissEphemerisService } from '../../astrology/services/swiss-ephemeris.service';
 import { DashaRecord } from '../../database/entities/dasha-record.entity';
@@ -32,8 +31,6 @@ export class ManifestationEnhancedService {
   constructor(
     @InjectRepository(Manifestation)
     private manifestationRepository: Repository<Manifestation>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
     @InjectRepository(DashaRecord)
@@ -88,16 +85,8 @@ export class ManifestationEnhancedService {
       title = title.substring(0, 197) + '...';
     }
 
-    // Get user - check Customer table first (new normalized structure), then fallback to User table
-    let user: User | Customer | null = null;
-
-    // Try Customer table first
-    user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
-
-    // Fallback to legacy User table
-    if (!user) {
-      user = await this.userRepository.findOne({ where: { id: userId, is_deleted: false } });
-    }
+    // Get user from Customer table only
+    const user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -530,7 +519,7 @@ export class ManifestationEnhancedService {
     userId: number,
     title: string,
     description: string,
-    user: User | Customer,
+    user: Customer,
   ): Promise<void> {
     try {
       this.logger.log(`Starting async enhancement for manifestation ${manifestationId}`);
@@ -543,7 +532,7 @@ export class ManifestationEnhancedService {
         title,
         description,
         undefined,
-        user as User,
+        user,
       );
 
       const finalCategory = evaluation.detectedCategory || null;
@@ -574,7 +563,7 @@ export class ManifestationEnhancedService {
       });
 
       // Calculate action windows
-      const actionWindows = await this.calculateActionWindows(finalCategory, user as User);
+      const actionWindows = await this.calculateActionWindows(finalCategory, user);
 
       // Get kundli data for enhanced tips - fetch in parallel for better performance
       const kundli = await this.kundliRepository.findOne({
@@ -949,7 +938,7 @@ export class ManifestationEnhancedService {
    */
   private async calculateActionWindows(
     category: string | null,
-    user: User | null,
+    user: Customer | null,
   ): Promise<{
     optimal_dates: string[];
     next_optimal_date: string | null;
@@ -1373,7 +1362,7 @@ export class ManifestationEnhancedService {
    * Returns validation result with message
    */
   private async validateKundliForManifestation(
-    user: User | Customer,
+    user: Customer,
   ): Promise<{ isValid: boolean; message?: string }> {
     try {
       // Check if kundli already exists
@@ -1450,7 +1439,7 @@ export class ManifestationEnhancedService {
    * Ensure kundli exists for user, calculate and store if not
    * @deprecated Use validateKundliForManifestation instead for better error handling
    */
-  private async ensureKundliExists(user: User | Customer): Promise<void> {
+  private async ensureKundliExists(user: Customer): Promise<void> {
     try {
       // Check if kundli exists
       const existingKundli = await this.kundliRepository.findOne({
@@ -1502,7 +1491,7 @@ export class ManifestationEnhancedService {
    * Calculate Vimshottari Dasha periods from nakshatra and birth date
    * IMPORTANT: Includes proper balance calculation for the first Mahadasha
    */
-  private async calculateAndStoreDashaPeriods(userId: number, user: User | Customer): Promise<void> {
+  private async calculateAndStoreDashaPeriods(userId: number, user: Customer): Promise<void> {
     try {
       // Check if Dasha records already exist
       const existingDasha = await this.dashaRepository.findOne({
@@ -1793,12 +1782,8 @@ export class ManifestationEnhancedService {
     tips: any;
     insights: any;
   }> {
-    // Get user
-    let user: User | Customer | null = null;
-    user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
-    if (!user) {
-      user = await this.userRepository.findOne({ where: { id: userId, is_deleted: false } });
-    }
+    // Get user from Customer table only
+    const user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -1817,7 +1802,7 @@ export class ManifestationEnhancedService {
       title,
       description,
       null,
-      user as User,
+      user,
     );
 
     const resonanceScore = evaluation.scores.resonance_score;

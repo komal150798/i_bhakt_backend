@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { User } from '../../users/entities/user.entity';
+import { Customer } from '../../users/entities/customer.entity';
 import { ManifestationLLMAnalyzerService } from './manifestation-llm-analyzer.service';
 import { ManifestationBackendConfigService } from './manifestation-backend-config.service';
 import { ConstantsService } from '../../common/constants/constants.service';
@@ -148,7 +148,7 @@ export class ManifestationAIEvaluationService {
     title: string,
     description: string,
     category?: string,
-    user?: User,
+    user?: Customer,
   ): Promise<{
     scores: ManifestationScores;
     tips: ManifestationTips;
@@ -264,7 +264,7 @@ export class ManifestationAIEvaluationService {
     title: string,
     description: string,
     category?: string,
-    user?: User,
+    user?: Customer,
   ): Promise<{
     scores: ManifestationScores;
     tips: ManifestationTips;
@@ -544,7 +544,7 @@ export class ManifestationAIEvaluationService {
   private async computeAstroSupportIndex(
     category?: string,
     text?: string,
-    user?: User,
+    user?: Customer,
   ): Promise<number> {
     // Base score
     let score = 60;

@@ -96,6 +96,40 @@ export function splitFullName(fullName: string | null | undefined): { first_name
   };
 }
 
+/**
+ * Normalize phone number by removing "+" prefix
+ * Only normalizes actual phone numbers (starts with "+"), 
+ * leaves email placeholders (starts with "e_") unchanged
+ * 
+ * @param phoneNumber - Phone number string to normalize
+ * @returns Normalized phone number without "+" prefix
+ * 
+ * @example
+ * normalizePhoneNumber('+919876543210') // '919876543210'
+ * normalizePhoneNumber('+917696750100') // '917696750100'
+ * normalizePhoneNumber('7696750100') // '7696750100'
+ * normalizePhoneNumber('e_a3VjOTgx_17179147') // 'e_a3VjOTgx_17179147' (unchanged)
+ */
+export function normalizePhoneNumber(phoneNumber: string | null | undefined): string {
+  if (!phoneNumber) {
+    return '';
+  }
+  
+  const trimmed = phoneNumber.trim();
+  
+  // If it's an email placeholder (starts with "e_"), don't normalize
+  if (trimmed.startsWith('e_')) {
+    return trimmed;
+  }
+  
+  // Remove "+" prefix if present
+  if (trimmed.startsWith('+')) {
+    return trimmed.substring(1);
+  }
+  
+  return trimmed;
+}
+
 
 
 

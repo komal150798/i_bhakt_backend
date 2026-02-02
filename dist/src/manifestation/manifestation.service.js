@@ -18,12 +18,12 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const manifestation_log_entity_1 = require("./entities/manifestation-log.entity");
 const swiss_ephemeris_service_1 = require("../astrology/services/swiss-ephemeris.service");
-const user_entity_1 = require("../users/entities/user.entity");
+const customer_entity_1 = require("../users/entities/customer.entity");
 const constants_service_1 = require("../common/constants/constants.service");
 let ManifestationService = class ManifestationService {
-    constructor(manifestationRepository, userRepository, swissEphemerisService, constantsService) {
+    constructor(manifestationRepository, customerRepository, swissEphemerisService, constantsService) {
         this.manifestationRepository = manifestationRepository;
-        this.userRepository = userRepository;
+        this.customerRepository = customerRepository;
         this.swissEphemerisService = swissEphemerisService;
         this.constantsService = constantsService;
     }
@@ -31,8 +31,8 @@ let ManifestationService = class ManifestationService {
         if (!dto.title || dto.title.trim().length === 0) {
             throw new common_1.BadRequestException('Manifestation title is required');
         }
-        const user = await this.userRepository.findOne({
-            where: { id: userId },
+        const user = await this.customerRepository.findOne({
+            where: { id: userId, is_deleted: false },
         });
         const clarity = await this.calculateClarity(dto.title);
         const coherence = await this.calculateCoherence(dto.title);
@@ -236,7 +236,7 @@ exports.ManifestationService = ManifestationService;
 exports.ManifestationService = ManifestationService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(manifestation_log_entity_1.ManifestationLog)),
-    __param(1, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
+    __param(1, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         swiss_ephemeris_service_1.SwissEphemerisService,

@@ -2,7 +2,6 @@ import { Repository } from 'typeorm';
 import { Manifestation } from '../entities/manifestation.entity';
 import { CreateManifestationEnhancedDto } from '../dtos/create-manifestation-enhanced.dto';
 import { ManifestationAIEvaluationService } from './manifestation-ai-evaluation.service';
-import { User } from '../../users/entities/user.entity';
 import { Customer } from '../../users/entities/customer.entity';
 import { SwissEphemerisService } from '../../astrology/services/swiss-ephemeris.service';
 import { DashaRecord } from '../../database/entities/dasha-record.entity';
@@ -16,7 +15,6 @@ import { KundliService } from '../../kundli/services/kundli.service';
 import { ManifestationAlignmentService } from './manifestation-alignment.service';
 export declare class ManifestationEnhancedService {
     private manifestationRepository;
-    private userRepository;
     private customerRepository;
     private dashaRepository;
     private antardashaRepository;
@@ -31,7 +29,7 @@ export declare class ManifestationEnhancedService {
     private alignmentService;
     private readonly logger;
     private readonly regexCache;
-    constructor(manifestationRepository: Repository<Manifestation>, userRepository: Repository<User>, customerRepository: Repository<Customer>, dashaRepository: Repository<DashaRecord>, antardashaRepository: Repository<AntardashaRecord>, pratyantarRepository: Repository<PratyantarDashaRecord>, sukshmaRepository: Repository<SukshmaDashaRecord>, kundliRepository: Repository<Kundli>, kundliPlanetRepository: Repository<KundliPlanet>, kundliHouseRepository: Repository<KundliHouse>, aiEvaluationService: ManifestationAIEvaluationService, swissEphemerisService: SwissEphemerisService, kundliService: KundliService, alignmentService: ManifestationAlignmentService);
+    constructor(manifestationRepository: Repository<Manifestation>, customerRepository: Repository<Customer>, dashaRepository: Repository<DashaRecord>, antardashaRepository: Repository<AntardashaRecord>, pratyantarRepository: Repository<PratyantarDashaRecord>, sukshmaRepository: Repository<SukshmaDashaRecord>, kundliRepository: Repository<Kundli>, kundliPlanetRepository: Repository<KundliPlanet>, kundliHouseRepository: Repository<KundliHouse>, aiEvaluationService: ManifestationAIEvaluationService, swissEphemerisService: SwissEphemerisService, kundliService: KundliService, alignmentService: ManifestationAlignmentService);
     createManifestation(userId: number, dto: CreateManifestationEnhancedDto): Promise<Manifestation>;
     private getQuickScores;
     private enhanceManifestationAsync;

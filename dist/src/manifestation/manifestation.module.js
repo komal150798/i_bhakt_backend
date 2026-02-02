@@ -18,7 +18,6 @@ const manifestation_ai_evaluation_service_1 = require("./services/manifestation-
 const app_manifestation_controller_1 = require("./controllers/app-manifestation.controller");
 const cache_module_1 = require("../cache/cache.module");
 const astrology_module_1 = require("../astrology/astrology.module");
-const user_entity_1 = require("../users/entities/user.entity");
 const customer_entity_1 = require("../users/entities/customer.entity");
 const axios_1 = require("@nestjs/axios");
 const manifestation_llm_analyzer_service_1 = require("./services/manifestation-llm-analyzer.service");
@@ -45,7 +44,6 @@ exports.ManifestationModule = ManifestationModule = __decorate([
             typeorm_1.TypeOrmModule.forFeature([
                 manifestation_log_entity_1.ManifestationLog,
                 manifestation_entity_1.Manifestation,
-                user_entity_1.User,
                 customer_entity_1.Customer,
                 dasha_record_entity_1.DashaRecord,
                 antardasha_record_entity_1.AntardashaRecord,

@@ -16,18 +16,15 @@ import { splitFullName } from '../../../common/utils/string.util';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { CurrentUserPayload } from '../../../common/types/jwt-payload.interface';
-import { UsersService } from '../../services/users.service';
 import { CustomerService } from '../../services/customer.service';
 import { SubscriptionsService } from '../../../subscriptions/services/subscriptions.service';
 import { UsageTrackingService } from '../../../subscriptions/services/usage-tracking.service';
-import { User } from '../../entities/user.entity';
 import { Customer } from '../../entities/customer.entity';
 
 @ApiTags('web-users')
 @Controller('web/users')
 export class WebUsersController {
   constructor(
-    private readonly usersService: UsersService,
     private readonly customerService: CustomerService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly usageTrackingService: UsageTrackingService,
@@ -42,19 +39,8 @@ export class WebUsersController {
       throw new BadRequestException('User unique_id is missing');
     }
     
-    // Check both Customer and User tables (Google login creates Customers)
-    let fullUser: User | Customer;
-    try {
-      // Try Customer table first (for Google logins and new users)
-      fullUser = await this.customerService.findByUniqueId(user.unique_id);
-    } catch (error) {
-      // If not found in Customer, try User table (for legacy users)
-      try {
-        fullUser = await this.usersService.findOneByUniqueId(user.unique_id);
-      } catch (userError) {
-        throw new NotFoundException(`User with unique ID ${user.unique_id} not found in Customer or User table`);
-      }
-    }
+    // Get user from Customer table only
+    const fullUser = await this.customerService.findByUniqueId(user.unique_id);
     
     return {
       success: true,
@@ -100,59 +86,11 @@ export class WebUsersController {
       throw new BadRequestException('User unique_id is missing');
     }
     
-    // Check both Customer and User tables
-    let fullUser: User | Customer;
-    let isCustomer = false;
-    try {
-      fullUser = await this.customerService.findByUniqueId(user.unique_id);
-      isCustomer = true;
-    } catch (error) {
-      try {
-        fullUser = await this.usersService.findOneByUniqueId(user.unique_id);
-        isCustomer = false;
-      } catch (userError) {
-        throw new NotFoundException(`User with unique ID ${user.unique_id} not found`);
-      }
-    }
+    // Get user from Customer table only
+    const fullUser = await this.customerService.findByUniqueId(user.unique_id);
     
-    // Update based on user type
-    let updated: User | Customer;
-    if (isCustomer) {
-      // Update Customer
-      updated = await this.customerService.updateProfile(user.id, updateData);
-    } else {
-      // Update User - convert DTO to User entity format (handle date conversion)
-      const userUpdateData: Partial<User> = {};
-      
-      // Handle full_name - split into first_name and last_name if provided
-      if (updateData.full_name !== undefined && updateData.full_name !== null) {
-        const { first_name, last_name } = splitFullName(updateData.full_name);
-        userUpdateData.first_name = first_name || null;
-        userUpdateData.last_name = last_name || null;
-      }
-      
-      // Copy all fields except date_of_birth and full_name
-      Object.keys(updateData).forEach(key => {
-        if (key !== 'date_of_birth' && key !== 'full_name') {
-          (userUpdateData as any)[key] = (updateData as any)[key];
-        }
-      });
-      
-      // Only set first_name/last_name if full_name was not provided
-      if (updateData.full_name === undefined) {
-        if (updateData.first_name !== undefined) {
-          userUpdateData.first_name = updateData.first_name;
-        }
-        if (updateData.last_name !== undefined) {
-          userUpdateData.last_name = updateData.last_name;
-        }
-      }
-      
-      if (updateData.date_of_birth) {
-        userUpdateData.date_of_birth = parseDateString(updateData.date_of_birth);
-      }
-      updated = await this.usersService.update(user.unique_id, userUpdateData, user.id);
-    }
+    // Update Customer
+    const updated = await this.customerService.updateProfile(user.id, updateData);
     
     return {
       success: true,

@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { User } from '../users/entities/user.entity';
 import { Customer } from '../users/entities/customer.entity';
 import { AdminUser } from '../users/entities/admin-user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -15,12 +14,11 @@ import { JwtPayload } from './strategies/jwt.strategy';
 import { UserRole } from '../common/enums/user-role.enum';
 import { PlanType } from '../common/enums/plan-type.enum';
 import { HoroscopeService } from '../horoscope/services/horoscope.service';
+import { normalizePhoneNumber } from '../common/utils/string.util';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
     @InjectRepository(AdminUser)
@@ -47,7 +45,9 @@ export class AuthService {
   }
 
   async sendOtp(phoneNumber: string): Promise<{ message: string; debug_code?: string }> {
-    const code = this.otpService.issueOtp(phoneNumber);
+    // Normalize phone number before storing in OTP cache
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    const code = this.otpService.issueOtp(normalizedPhone);
     const response: { message: string; debug_code?: string } = {
       message: 'OTP sent successfully',
     };
@@ -86,46 +86,38 @@ export class AuthService {
     refresh_token: string;
     user_id?: number;
   }> {
-    if (!this.otpService.verifyOtp(phoneNumber, otpCode)) {
+    // Normalize phone number before verification
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    
+    if (!this.otpService.verifyOtp(normalizedPhone, otpCode)) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Check Customer table first (new normalized structure)
-    let customer = await this.findCustomerByPhone(phoneNumber);
-    
-    // Fallback to User table for backward compatibility
-    let user = customer ? null : await this.findUserByPhone(phoneNumber);
+    // Check Customer table
+    const customer = await this.findCustomerByPhone(normalizedPhone);
 
-    // If login attempt, customer/user must exist
-    if (isLogin && !customer && !user) {
+    // If login attempt, customer must exist
+    if (isLogin && !customer) {
       throw new NotFoundException('User not found. Please register first or check your phone number.');
     }
 
     // Generate tokens with app session expiration
     const appSessionExpiration = this.getAppSessionExpiration();
     let userId: number | null = null;
-    let role = UserRole.USER;
+    const role = UserRole.USER;
 
     if (customer) {
       // Use customer
       userId = customer.id;
-      role = UserRole.USER;
       // Update last login
       customer.last_login = new Date();
       await this.customerRepository.save(customer);
-    } else if (user) {
-      // Use legacy user
-      userId = user.id;
-      role = user.role;
-      // Update last login
-      user.last_login = new Date();
-      await this.userRepository.save(user);
     }
-    // If neither exists and not login, userId remains null (for registration flow)
+    // If customer doesn't exist and not login, userId remains null (for registration flow)
 
     const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
       sub: userId || 0,
-      phone_number: phoneNumber,
+      phone_number: normalizedPhone,
       role: role,
       type: 'user',
     };
@@ -133,11 +125,9 @@ export class AuthService {
     const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
     const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
 
-    // Store refresh token if customer/user exists
+    // Store refresh token if customer exists
     if (customer) {
       await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'otp');
-    } else if (user) {
-      await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
     }
 
     return {
@@ -158,38 +148,27 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Check Customer table first (new normalized structure)
-    let customer = await this.findCustomerByEmail(email);
-    
-    // Fallback to User table for backward compatibility
-    let user = customer ? null : await this.findUserByEmail(email);
+    // Check Customer table
+    const customer = await this.findCustomerByEmail(email);
 
-    // If login attempt, customer/user must exist
-    if (isLogin && !customer && !user) {
+    // If login attempt, customer must exist
+    if (isLogin && !customer) {
       throw new NotFoundException('User not found. Please register first or check your email.');
     }
 
     // Generate tokens with app session expiration
     const appSessionExpiration = this.getAppSessionExpiration();
     let userId: number | null = null;
-    let role = UserRole.USER;
+    const role = UserRole.USER;
 
     if (customer) {
       // Use customer
       userId = customer.id;
-      role = UserRole.USER;
       // Update last login
       customer.last_login = new Date();
       await this.customerRepository.save(customer);
-    } else if (user) {
-      // Use legacy user
-      userId = user.id;
-      role = user.role;
-      // Update last login
-      user.last_login = new Date();
-      await this.userRepository.save(user);
     }
-    // If neither exists and not login, userId remains null (for registration flow)
+    // If customer doesn't exist and not login, userId remains null (for registration flow)
 
     const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
       sub: userId || 0,
@@ -201,11 +180,9 @@ export class AuthService {
     const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
     const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
 
-    // Store refresh token if customer/user exists
+    // Store refresh token if customer exists
     if (customer) {
       await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'otp');
-    } else if (user) {
-      await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
     }
 
     return {
@@ -221,19 +198,16 @@ export class AuthService {
    * Used for forgot password flow to verify user exists before sending OTP
    */
   async checkUserExists(phoneNumber: string | null, email: string | null): Promise<boolean> {
-    // Check Customer table first
+    // Check Customer table only
     if (phoneNumber) {
-      const customer = await this.findCustomerByPhone(phoneNumber);
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
+      const customer = await this.findCustomerByPhone(normalizedPhone);
       if (customer) return true;
-      const user = await this.findUserByPhone(phoneNumber);
-      if (user) return true;
     }
 
     if (email) {
       const customer = await this.findCustomerByEmail(email);
       if (customer) return true;
-      const user = await this.findUserByEmail(email);
-      if (user) return true;
     }
 
     return false;
@@ -260,25 +234,16 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Find customer first
+    // Find customer
     let customer: Customer | null = null;
     if (phoneNumber) {
-      customer = await this.findCustomerByPhone(phoneNumber);
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
+      customer = await this.findCustomerByPhone(normalizedPhone);
     } else if (email) {
       customer = await this.findCustomerByEmail(email);
     }
 
-    // If customer not found, try User table for backward compatibility
-    let user: User | null = null;
     if (!customer) {
-      if (phoneNumber) {
-        user = await this.findUserByPhone(phoneNumber);
-      } else if (email) {
-        user = await this.findUserByEmail(email);
-      }
-    }
-
-    if (!customer && !user) {
       throw new NotFoundException('User not found. Please check your phone number or email.');
     }
 
@@ -286,13 +251,8 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update password
-    if (customer) {
-      customer.password = hashedPassword;
-      await this.customerRepository.save(customer);
-    } else if (user) {
-      user.password = hashedPassword;
-      await this.userRepository.save(user);
-    }
+    customer.password = hashedPassword;
+    await this.customerRepository.save(customer);
 
     return {
       success: true,
@@ -400,11 +360,17 @@ export class AuthService {
     username: string,
     password: string,
   ): Promise<Customer | null> {
+    // Normalize phone number if it looks like a phone number (starts with + or is all digits)
+    const normalizedUsername = username.startsWith('+') || /^\d+$/.test(username) 
+      ? normalizePhoneNumber(username) 
+      : username;
+    
     // Find customer by email or phone_number
     const customer = await this.customerRepository.findOne({
       where: [
         { email: username, is_deleted: false },
-        { phone_number: username, is_deleted: false },
+        { phone_number: normalizedUsername, is_deleted: false },
+        { phone_number: username, is_deleted: false }, // Also check original for backward compatibility
       ],
     });
 
@@ -421,38 +387,10 @@ export class AuthService {
     return customer;
   }
 
-  /**
-   * Validate user by username/email and password (Legacy - for backward compatibility)
-   */
-  async validateUserByPassword(
-    username: string,
-    password: string,
-  ): Promise<User | null> {
-    // Find user by email or username (assuming email can be used as username)
-    const user = await this.userRepository.findOne({
-      where: [
-        { email: username, is_deleted: false },
-        // If you have a username field, add it here
-      ],
-    });
-
-    if (!user || !user.password) {
-      return null;
-    }
-
-    // Compare password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return null;
-    }
-
-    return user;
-  }
 
   /**
    * Login with username/email and password
-   * Checks Customer table first, then falls back to User table for backward compatibility
-   * Migrates users from User table to Customer table on successful login
+   * Checks Customer table only
    */
   async loginWithPassword(
     username: string,
@@ -462,70 +400,22 @@ export class AuthService {
     refresh_token: string;
     user: any;
   }> {
-    // First, try to find customer (new normalized structure)
-    let customer = await this.validateCustomerByPassword(username, password);
+    // Find customer
+    const customer = await this.validateCustomerByPassword(username, password);
     
-    if (customer) {
-      // Update last login
-      customer.last_login = new Date();
-      await this.customerRepository.save(customer);
-      return this.issueCustomerTokens(customer);
+    if (!customer) {
+      throw new UnauthorizedException('Invalid username or password');
     }
 
-    // Fallback to legacy User table for backward compatibility
-    const user = await this.validateUserByPassword(username, password);
-    if (user) {
-      // Migrate legacy user to Customer table
-      // Check if customer already exists by email or phone
-      let existingCustomer = null;
-      if (user.email) {
-        existingCustomer = await this.findCustomerByEmail(user.email);
-      }
-      if (!existingCustomer && user.phone_number) {
-        existingCustomer = await this.findCustomerByPhone(user.phone_number);
-      }
-
-      if (existingCustomer) {
-        // Customer already exists, update last login and use it
-        existingCustomer.last_login = new Date();
-        await this.customerRepository.save(existingCustomer);
-        return this.issueCustomerTokens(existingCustomer);
-      }
-
-      // Create new customer from legacy user data
-      customer = this.customerRepository.create({
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        phone_number: user.phone_number,
-        password: user.password, // Already hashed
-        date_of_birth: user.date_of_birth,
-        time_of_birth: user.time_of_birth,
-        place_name: user.place_name,
-        latitude: user.latitude,
-        longitude: user.longitude,
-        timezone: user.timezone,
-        gender: user.gender,
-        avatar_url: user.avatar_url,
-        nakshatra: user.nakshatra,
-        pada: user.pada,
-        moon_longitude_deg: user.moon_longitude_deg,
-        dasha_at_birth: user.dasha_at_birth,
-        current_plan: user.current_plan || PlanType.FREE,
-        is_verified: user.is_verified || false,
-        last_login: new Date(),
-      });
-      customer = await this.customerRepository.save(customer);
-      return this.issueCustomerTokens(customer);
-    }
-
-    // Neither customer nor user found
-    throw new UnauthorizedException('Invalid username or password');
+    // Update last login
+    customer.last_login = new Date();
+    await this.customerRepository.save(customer);
+    return this.issueCustomerTokens(customer);
   }
 
   /**
    * Verify OTP and login (returns consistent format)
-   * Uses Customer table as main table for both app and web
+   * Uses Customer table only
    */
   async verifyOtpForLogin(
     phoneNumber: string,
@@ -535,50 +425,24 @@ export class AuthService {
     refresh_token: string;
     user: any;
   }> {
-    if (!this.otpService.verifyOtp(phoneNumber, otpCode)) {
+    // Normalize phone number before verification
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    
+    if (!this.otpService.verifyOtp(normalizedPhone, otpCode)) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Find or create customer by phone number (Customer is the main table)
-    let customer = await this.findCustomerByPhone(phoneNumber);
+    // Find or create customer by phone number
+    let customer = await this.findCustomerByPhone(normalizedPhone);
 
     if (!customer) {
-      // Check legacy User table for backward compatibility
-      const legacyUser = await this.findUserByPhone(phoneNumber);
-      if (legacyUser) {
-        // Migrate legacy user to customer
-        customer = this.customerRepository.create({
-          first_name: legacyUser.first_name,
-          last_name: legacyUser.last_name,
-          email: legacyUser.email,
-          phone_number: phoneNumber,
-          password: legacyUser.password,
-          date_of_birth: legacyUser.date_of_birth,
-          time_of_birth: legacyUser.time_of_birth,
-          place_name: legacyUser.place_name,
-          latitude: legacyUser.latitude,
-          longitude: legacyUser.longitude,
-          timezone: legacyUser.timezone,
-          gender: legacyUser.gender,
-          avatar_url: legacyUser.avatar_url,
-          nakshatra: legacyUser.nakshatra,
-          pada: legacyUser.pada,
-          moon_longitude_deg: legacyUser.moon_longitude_deg,
-          dasha_at_birth: legacyUser.dasha_at_birth,
-          current_plan: legacyUser.current_plan,
-          is_verified: true,
-          last_login: new Date(),
-        });
-        customer = await this.customerRepository.save(customer);
-      } else {
-        // Create new customer
-        customer = this.customerRepository.create({
-          phone_number: phoneNumber,
-          is_verified: true,
-          last_login: new Date(),
-        });
-        customer = await this.customerRepository.save(customer);
-      }
+      // Create new customer
+      customer = this.customerRepository.create({
+        phone_number: normalizedPhone,
+        is_verified: true,
+        last_login: new Date(),
+      });
+      customer = await this.customerRepository.save(customer);
     } else {
       // Update last login
       customer.last_login = new Date();
@@ -591,7 +455,7 @@ export class AuthService {
 
   /**
    * Login with Google ID token
-   * Checks Customer table first, then falls back to User table for backward compatibility
+   * Uses Customer table only
    */
   async loginWithGoogle(
     idToken: string,
@@ -606,7 +470,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Google ID token');
     }
 
-    // Check Customer table first (new normalized structure)
+    // Check Customer table
     let customer = await this.findCustomerByEmail(googleProfile.email);
     
     if (customer) {
@@ -622,23 +486,7 @@ export class AuthService {
       return this.issueCustomerAppTokens(customer);
     }
 
-    // Fallback to legacy User table for backward compatibility
-    let user = await this.findUserByEmail(googleProfile.email);
-    
-    if (user) {
-      // Update avatar if provided and different
-      if (googleProfile.picture && user.avatar_url !== googleProfile.picture) {
-        user.avatar_url = googleProfile.picture;
-      }
-      // Update last login
-      user.last_login = new Date();
-      await this.userRepository.save(user);
-      
-      // Use app tokens with configurable session expiration
-      return this.issueAppTokens(user);
-    }
-
-    // Create new customer (prefer Customer table for new users)
+    // Create new customer
     customer = await this.findOrCreateGoogleCustomer(googleProfile);
     customer.last_login = new Date();
     await this.customerRepository.save(customer);
@@ -647,71 +495,6 @@ export class AuthService {
     return this.issueCustomerAppTokens(customer);
   }
 
-  /**
-   * Issue tokens and return formatted response
-   */
-  async issueTokens(user: User): Promise<{
-    access_token: string;
-    refresh_token: string;
-    user: any;
-  }> {
-    const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
-      sub: user.id,
-      email: user.email || undefined,
-      phone_number: user.phone_number || undefined,
-      role: user.role,
-      type: 'user',
-    };
-
-    const accessToken = this.jwtService.generateAccessToken(payload);
-    const refreshToken = this.jwtService.generateRefreshToken(payload);
-
-    // Store refresh token
-    await this.storeRefreshToken(refreshToken, user.id, null);
-
-    // Format user response
-    const userResponse = this.formatUserResponse(user);
-
-    return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      user: userResponse,
-    };
-  }
-
-  /**
-   * Issue tokens for app with configurable session expiration (default 90 days)
-   */
-  async issueAppTokens(user: User): Promise<{
-    access_token: string;
-    refresh_token: string;
-    user: any;
-  }> {
-    const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
-      sub: user.id,
-      email: user.email || undefined,
-      phone_number: user.phone_number || undefined,
-      role: user.role,
-      type: 'user',
-    };
-
-    // Get app session expiration from environment variable
-    const appSessionExpiration = this.getAppSessionExpiration();
-    const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
-    const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
-
-    // Store refresh token with app session expiration
-    await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
-
-    // Format user response
-    const userResponse = this.formatUserResponse(user);
-
-    return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      user: userResponse,
-    };
-  }
 
   /**
    * Find or create customer from Google profile (for new Google logins)
@@ -864,14 +647,6 @@ export class AuthService {
       if (existingCustomerByEmail) {
         throw new ConflictException('This email is already registered. Please use a different email or try logging in.');
       }
-
-      // Also check User table for legacy users
-      const existingUserByEmail = await this.userRepository.findOne({
-        where: { email, is_deleted: false },
-      });
-      if (existingUserByEmail) {
-        throw new ConflictException('This email is already registered. Please use a different email or try logging in.');
-      }
     }
 
     // Check if phone number already exists in Customer table
@@ -880,14 +655,6 @@ export class AuthService {
         where: { phone_number, is_deleted: false },
       });
       if (existingCustomerByPhone) {
-        throw new ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
-      }
-
-      // Also check User table for legacy users
-      const existingUserByPhone = await this.userRepository.findOne({
-        where: { phone_number, is_deleted: false },
-      });
-      if (existingUserByPhone) {
         throw new ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
       }
     }
@@ -919,6 +686,9 @@ export class AuthService {
       finalPhoneNumber = `e_${emailHash}_${shortTimestamp}`;
     } else if (!finalPhoneNumber) {
       throw new BadRequestException('Either email or phone_number is required');
+    } else {
+      // Normalize phone number: remove "+" prefix if present
+      finalPhoneNumber = normalizePhoneNumber(finalPhoneNumber);
     }
 
     // Create new customer
@@ -1104,23 +874,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Format user response for API
-   */
-  private formatUserResponse(user: User): any {
-    return {
-      id: user.id,
-      unique_id: user.unique_id,
-      name: user.first_name && user.last_name
-        ? `${user.first_name} ${user.last_name}`
-        : user.first_name || user.last_name || null,
-      email: user.email,
-      phone_number: user.phone_number,
-      avatar_url: user.avatar_url,
-      role: user.role,
-      created_at: user.added_date,
-    };
-  }
 
   /**
    * Get current authenticated user information
@@ -1153,25 +906,16 @@ export class AuthService {
         created_at: admin.added_date,
       };
     } else {
-      // Check Customer table first
+      // Check Customer table only
       const customer = await this.customerRepository.findOne({
         where: { id: userId, is_deleted: false },
       });
 
-      if (customer) {
-        return this.formatCustomerResponse(customer);
-      }
-
-      // Fallback to legacy User table
-      const user = await this.userRepository.findOne({
-        where: { id: userId, is_deleted: false },
-      });
-
-      if (!user) {
+      if (!customer) {
         throw new UnauthorizedException('User not found');
       }
 
-      return this.formatUserResponse(user);
+      return this.formatCustomerResponse(customer);
     }
   }
 
@@ -1189,40 +933,98 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // Check if token exists in database and is not revoked
+    // Check CustomerToken table first (new normalized structure)
+    let customerToken = await this.customerTokenRepository.findOne({
+      where: { token: refreshTokenString, is_revoked: false },
+    });
+
+    if (customerToken) {
+      // Token is in CustomerToken table
+      if (customerToken.expires_at < new Date()) {
+        throw new UnauthorizedException('Refresh token expired or revoked');
+      }
+
+      // Get customer
+      const customer = await this.customerRepository.findOne({
+        where: { id: customerToken.customer_id, is_deleted: false },
+      });
+
+      if (!customer) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      // Check if this is an app token by comparing expiration with configured app session duration
+      const appSessionDays = this.configService.get<number>('APP_SESSION_DAYS', 90);
+      const originalExpiration = payload.exp ? payload.exp * 1000 : 0;
+      const now = Date.now();
+      const daysUntilExpiration = (originalExpiration - now) / (1000 * 60 * 60 * 24);
+      const isAppToken = daysUntilExpiration >= (appSessionDays - 5) && daysUntilExpiration <= (appSessionDays + 5);
+
+      // Generate new tokens
+      const newPayload: Omit<JwtPayload, 'iat' | 'exp'> = {
+        sub: customer.id,
+        phone_number: customer.phone_number || undefined,
+        email: customer.email || undefined,
+        role: UserRole.USER,
+        type: 'user',
+      };
+
+      // Use app session expiration for app tokens, default for others
+      const expiresIn = isAppToken ? this.getAppSessionExpiration() : undefined;
+      const newAccessToken = this.jwtService.generateAccessToken(newPayload, expiresIn);
+      const newRefreshToken = this.jwtService.generateRefreshToken(newPayload, expiresIn);
+
+      // Revoke old token
+      customerToken.is_revoked = true;
+      await this.customerTokenRepository.save(customerToken);
+
+      // Store new refresh token
+      await this.storeCustomerRefreshToken(
+        newRefreshToken,
+        customer.id,
+        expiresIn,
+        customerToken.login_method || 'password',
+      );
+
+      return {
+        access_token: newAccessToken,
+        refresh_token: newRefreshToken,
+        user: this.formatCustomerResponse(customer),
+      };
+    }
+
+    // Fallback to legacy RefreshToken table for backward compatibility
     const tokenRecord = await this.refreshTokenRepository.findOne({
       where: { token: refreshTokenString, is_revoked: false },
-      relations: ['user', 'admin'],
     });
 
     if (!tokenRecord || tokenRecord.expires_at < new Date()) {
       throw new UnauthorizedException('Refresh token expired or revoked');
     }
 
-    // Get user
-    const user = await this.userRepository.findOne({
+    // Get customer from legacy token
+    const customer = await this.customerRepository.findOne({
       where: { id: payload.sub, is_deleted: false },
     });
 
-    if (!user) {
+    if (!customer) {
       throw new UnauthorizedException('User not found');
     }
 
-    // Check if this is an app token by comparing expiration with configured app session duration
+    // Check if this is an app token
     const appSessionDays = this.configService.get<number>('APP_SESSION_DAYS', 90);
     const originalExpiration = payload.exp ? payload.exp * 1000 : 0;
     const now = Date.now();
     const daysUntilExpiration = (originalExpiration - now) / (1000 * 60 * 60 * 24);
-    // Check if expiration is within 5 days of configured app session duration (with tolerance)
     const isAppToken = daysUntilExpiration >= (appSessionDays - 5) && daysUntilExpiration <= (appSessionDays + 5);
 
     // Generate new tokens
     const newPayload: Omit<JwtPayload, 'iat' | 'exp'> = {
-      sub: payload.sub,
-      phone_number: payload.phone_number,
-      email: payload.email,
-      role: payload.role,
-      type: payload.type,
+      sub: customer.id,
+      phone_number: customer.phone_number || undefined,
+      email: customer.email || undefined,
+      role: UserRole.USER,
+      type: 'user',
     };
 
     // Use app session expiration for app tokens, default for others
@@ -1234,18 +1036,18 @@ export class AuthService {
     tokenRecord.is_revoked = true;
     await this.refreshTokenRepository.save(tokenRecord);
 
-    // Store new refresh token with same expiration as original if app token
-    await this.storeRefreshToken(
+    // Store new refresh token in CustomerToken table
+    await this.storeCustomerRefreshToken(
       newRefreshToken,
-      payload.type === 'user' ? payload.sub : null,
-      payload.type === 'admin' ? payload.sub : null,
+      customer.id,
       expiresIn,
+      'password',
     );
 
     return {
       access_token: newAccessToken,
       refresh_token: newRefreshToken,
-      user: this.formatUserResponse(user),
+      user: this.formatCustomerResponse(customer),
     };
   }
 
@@ -1253,14 +1055,18 @@ export class AuthService {
    * Find customer by phone number (checks Customer table first)
    */
   private async findCustomerByPhone(phoneNumber: string): Promise<Customer | null> {
-    // Normalize phone number (remove non-digits, handle variations)
-    const normalized = phoneNumber.replace(/\D+/g, '');
+    // First normalize: remove "+" prefix if present
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    
+    // Also try variations (remove all non-digits, last 10 digits)
+    const digitsOnly = normalizedPhone.replace(/\D+/g, '');
     
     // Try multiple variations
     const variations = [
-      phoneNumber.trim(),
-      normalized,
-      normalized.slice(-10), // Last 10 digits
+      normalizedPhone.trim(),
+      digitsOnly,
+      digitsOnly.slice(-10), // Last 10 digits
+      phoneNumber.trim(), // Original for backward compatibility
     ];
 
     for (const variation of variations) {
@@ -1286,41 +1092,5 @@ export class AuthService {
     return customer || null;
   }
 
-  /**
-   * Find user by phone number (legacy User table)
-   */
-  private async findUserByPhone(phoneNumber: string): Promise<User | null> {
-    // Normalize phone number (remove non-digits, handle variations)
-    const normalized = phoneNumber.replace(/\D+/g, '');
-    
-    // Try multiple variations
-    const variations = [
-      phoneNumber.trim(),
-      normalized,
-      normalized.slice(-10), // Last 10 digits
-    ];
-
-    for (const variation of variations) {
-      const user = await this.userRepository.findOne({
-        where: { phone_number: variation, is_deleted: false },
-      });
-      if (user) return user;
-    }
-
-    return null;
-  }
-
-  /**
-   * Find user by email (legacy User table)
-   */
-  private async findUserByEmail(email: string): Promise<User | null> {
-    const normalizedEmail = email.trim().toLowerCase();
-    
-    const user = await this.userRepository.findOne({
-      where: { email: normalizedEmail, is_deleted: false },
-    });
-
-    return user || null;
-  }
 }
 

@@ -18,7 +18,6 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const config_1 = require("@nestjs/config");
 const bcrypt = require("bcrypt");
-const user_entity_1 = require("../users/entities/user.entity");
 const customer_entity_1 = require("../users/entities/customer.entity");
 const admin_user_entity_1 = require("../users/entities/admin-user.entity");
 const refresh_token_entity_1 = require("./entities/refresh-token.entity");
@@ -27,11 +26,10 @@ const admin_token_entity_1 = require("./entities/admin-token.entity");
 const otp_service_1 = require("./services/otp.service");
 const jwt_service_1 = require("./services/jwt.service");
 const user_role_enum_1 = require("../common/enums/user-role.enum");
-const plan_type_enum_1 = require("../common/enums/plan-type.enum");
 const horoscope_service_1 = require("../horoscope/services/horoscope.service");
+const string_util_1 = require("../common/utils/string.util");
 let AuthService = class AuthService {
-    constructor(userRepository, customerRepository, adminUserRepository, refreshTokenRepository, customerTokenRepository, adminTokenRepository, otpService, jwtService, configService, horoscopeService) {
-        this.userRepository = userRepository;
+    constructor(customerRepository, adminUserRepository, refreshTokenRepository, customerTokenRepository, adminTokenRepository, otpService, jwtService, configService, horoscopeService) {
         this.customerRepository = customerRepository;
         this.adminUserRepository = adminUserRepository;
         this.refreshTokenRepository = refreshTokenRepository;
@@ -47,7 +45,8 @@ let AuthService = class AuthService {
         return `${days}d`;
     }
     async sendOtp(phoneNumber) {
-        const code = this.otpService.issueOtp(phoneNumber);
+        const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
+        const code = this.otpService.issueOtp(normalizedPhone);
         const response = {
             message: 'OTP sent successfully',
         };
@@ -67,32 +66,25 @@ let AuthService = class AuthService {
         return response;
     }
     async verifyOtp(phoneNumber, otpCode, isLogin = false) {
-        if (!this.otpService.verifyOtp(phoneNumber, otpCode)) {
+        const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
+        if (!this.otpService.verifyOtp(normalizedPhone, otpCode)) {
             throw new common_1.UnauthorizedException('Invalid or expired OTP');
         }
-        let customer = await this.findCustomerByPhone(phoneNumber);
-        let user = customer ? null : await this.findUserByPhone(phoneNumber);
-        if (isLogin && !customer && !user) {
+        const customer = await this.findCustomerByPhone(normalizedPhone);
+        if (isLogin && !customer) {
             throw new common_1.NotFoundException('User not found. Please register first or check your phone number.');
         }
         const appSessionExpiration = this.getAppSessionExpiration();
         let userId = null;
-        let role = user_role_enum_1.UserRole.USER;
+        const role = user_role_enum_1.UserRole.USER;
         if (customer) {
             userId = customer.id;
-            role = user_role_enum_1.UserRole.USER;
             customer.last_login = new Date();
             await this.customerRepository.save(customer);
         }
-        else if (user) {
-            userId = user.id;
-            role = user.role;
-            user.last_login = new Date();
-            await this.userRepository.save(user);
-        }
         const payload = {
             sub: userId || 0,
-            phone_number: phoneNumber,
+            phone_number: normalizedPhone,
             role: role,
             type: 'user',
         };
@@ -100,9 +92,6 @@ let AuthService = class AuthService {
         const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
         if (customer) {
             await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'otp');
-        }
-        else if (user) {
-            await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
         }
         return {
             success: true,
@@ -115,25 +104,17 @@ let AuthService = class AuthService {
         if (!this.otpService.verifyOtp(email, otpCode)) {
             throw new common_1.UnauthorizedException('Invalid or expired OTP');
         }
-        let customer = await this.findCustomerByEmail(email);
-        let user = customer ? null : await this.findUserByEmail(email);
-        if (isLogin && !customer && !user) {
+        const customer = await this.findCustomerByEmail(email);
+        if (isLogin && !customer) {
             throw new common_1.NotFoundException('User not found. Please register first or check your email.');
         }
         const appSessionExpiration = this.getAppSessionExpiration();
         let userId = null;
-        let role = user_role_enum_1.UserRole.USER;
+        const role = user_role_enum_1.UserRole.USER;
         if (customer) {
             userId = customer.id;
-            role = user_role_enum_1.UserRole.USER;
             customer.last_login = new Date();
             await this.customerRepository.save(customer);
-        }
-        else if (user) {
-            userId = user.id;
-            role = user.role;
-            user.last_login = new Date();
-            await this.userRepository.save(user);
         }
         const payload = {
             sub: userId || 0,
@@ -146,9 +127,6 @@ let AuthService = class AuthService {
         if (customer) {
             await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'otp');
         }
-        else if (user) {
-            await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
-        }
         return {
             success: true,
             access_token: accessToken,
@@ -158,19 +136,14 @@ let AuthService = class AuthService {
     }
     async checkUserExists(phoneNumber, email) {
         if (phoneNumber) {
-            const customer = await this.findCustomerByPhone(phoneNumber);
+            const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
+            const customer = await this.findCustomerByPhone(normalizedPhone);
             if (customer)
-                return true;
-            const user = await this.findUserByPhone(phoneNumber);
-            if (user)
                 return true;
         }
         if (email) {
             const customer = await this.findCustomerByEmail(email);
             if (customer)
-                return true;
-            const user = await this.findUserByEmail(email);
-            if (user)
                 return true;
         }
         return false;
@@ -185,32 +158,18 @@ let AuthService = class AuthService {
         }
         let customer = null;
         if (phoneNumber) {
-            customer = await this.findCustomerByPhone(phoneNumber);
+            const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
+            customer = await this.findCustomerByPhone(normalizedPhone);
         }
         else if (email) {
             customer = await this.findCustomerByEmail(email);
         }
-        let user = null;
         if (!customer) {
-            if (phoneNumber) {
-                user = await this.findUserByPhone(phoneNumber);
-            }
-            else if (email) {
-                user = await this.findUserByEmail(email);
-            }
-        }
-        if (!customer && !user) {
             throw new common_1.NotFoundException('User not found. Please check your phone number or email.');
         }
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        if (customer) {
-            customer.password = hashedPassword;
-            await this.customerRepository.save(customer);
-        }
-        else if (user) {
-            user.password = hashedPassword;
-            await this.userRepository.save(user);
-        }
+        customer.password = hashedPassword;
+        await this.customerRepository.save(customer);
         return {
             success: true,
             message: 'Password reset successfully',
@@ -283,9 +242,13 @@ let AuthService = class AuthService {
         }
     }
     async validateCustomerByPassword(username, password) {
+        const normalizedUsername = username.startsWith('+') || /^\d+$/.test(username)
+            ? (0, string_util_1.normalizePhoneNumber)(username)
+            : username;
         const customer = await this.customerRepository.findOne({
             where: [
                 { email: username, is_deleted: false },
+                { phone_number: normalizedUsername, is_deleted: false },
                 { phone_number: username, is_deleted: false },
             ],
         });
@@ -298,109 +261,28 @@ let AuthService = class AuthService {
         }
         return customer;
     }
-    async validateUserByPassword(username, password) {
-        const user = await this.userRepository.findOne({
-            where: [
-                { email: username, is_deleted: false },
-            ],
-        });
-        if (!user || !user.password) {
-            return null;
-        }
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-            return null;
-        }
-        return user;
-    }
     async loginWithPassword(username, password) {
-        let customer = await this.validateCustomerByPassword(username, password);
-        if (customer) {
-            customer.last_login = new Date();
-            await this.customerRepository.save(customer);
-            return this.issueCustomerTokens(customer);
+        const customer = await this.validateCustomerByPassword(username, password);
+        if (!customer) {
+            throw new common_1.UnauthorizedException('Invalid username or password');
         }
-        const user = await this.validateUserByPassword(username, password);
-        if (user) {
-            let existingCustomer = null;
-            if (user.email) {
-                existingCustomer = await this.findCustomerByEmail(user.email);
-            }
-            if (!existingCustomer && user.phone_number) {
-                existingCustomer = await this.findCustomerByPhone(user.phone_number);
-            }
-            if (existingCustomer) {
-                existingCustomer.last_login = new Date();
-                await this.customerRepository.save(existingCustomer);
-                return this.issueCustomerTokens(existingCustomer);
-            }
+        customer.last_login = new Date();
+        await this.customerRepository.save(customer);
+        return this.issueCustomerTokens(customer);
+    }
+    async verifyOtpForLogin(phoneNumber, otpCode) {
+        const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
+        if (!this.otpService.verifyOtp(normalizedPhone, otpCode)) {
+            throw new common_1.UnauthorizedException('Invalid or expired OTP');
+        }
+        let customer = await this.findCustomerByPhone(normalizedPhone);
+        if (!customer) {
             customer = this.customerRepository.create({
-                first_name: user.first_name,
-                last_name: user.last_name,
-                email: user.email,
-                phone_number: user.phone_number,
-                password: user.password,
-                date_of_birth: user.date_of_birth,
-                time_of_birth: user.time_of_birth,
-                place_name: user.place_name,
-                latitude: user.latitude,
-                longitude: user.longitude,
-                timezone: user.timezone,
-                gender: user.gender,
-                avatar_url: user.avatar_url,
-                nakshatra: user.nakshatra,
-                pada: user.pada,
-                moon_longitude_deg: user.moon_longitude_deg,
-                dasha_at_birth: user.dasha_at_birth,
-                current_plan: user.current_plan || plan_type_enum_1.PlanType.FREE,
-                is_verified: user.is_verified || false,
+                phone_number: normalizedPhone,
+                is_verified: true,
                 last_login: new Date(),
             });
             customer = await this.customerRepository.save(customer);
-            return this.issueCustomerTokens(customer);
-        }
-        throw new common_1.UnauthorizedException('Invalid username or password');
-    }
-    async verifyOtpForLogin(phoneNumber, otpCode) {
-        if (!this.otpService.verifyOtp(phoneNumber, otpCode)) {
-            throw new common_1.UnauthorizedException('Invalid or expired OTP');
-        }
-        let customer = await this.findCustomerByPhone(phoneNumber);
-        if (!customer) {
-            const legacyUser = await this.findUserByPhone(phoneNumber);
-            if (legacyUser) {
-                customer = this.customerRepository.create({
-                    first_name: legacyUser.first_name,
-                    last_name: legacyUser.last_name,
-                    email: legacyUser.email,
-                    phone_number: phoneNumber,
-                    password: legacyUser.password,
-                    date_of_birth: legacyUser.date_of_birth,
-                    time_of_birth: legacyUser.time_of_birth,
-                    place_name: legacyUser.place_name,
-                    latitude: legacyUser.latitude,
-                    longitude: legacyUser.longitude,
-                    timezone: legacyUser.timezone,
-                    gender: legacyUser.gender,
-                    avatar_url: legacyUser.avatar_url,
-                    nakshatra: legacyUser.nakshatra,
-                    pada: legacyUser.pada,
-                    moon_longitude_deg: legacyUser.moon_longitude_deg,
-                    dasha_at_birth: legacyUser.dasha_at_birth,
-                    current_plan: legacyUser.current_plan,
-                    is_verified: true,
-                    last_login: new Date(),
-                });
-                customer = await this.customerRepository.save(customer);
-            }
-            else {
-                customer = this.customerRepository.create({
-                    phone_number: phoneNumber,
-                    is_verified: true,
-                    last_login: new Date(),
-                });
-                customer = await this.customerRepository.save(customer);
-            }
         }
         else {
             customer.last_login = new Date();
@@ -422,56 +304,10 @@ let AuthService = class AuthService {
             await this.customerRepository.save(customer);
             return this.issueCustomerAppTokens(customer);
         }
-        let user = await this.findUserByEmail(googleProfile.email);
-        if (user) {
-            if (googleProfile.picture && user.avatar_url !== googleProfile.picture) {
-                user.avatar_url = googleProfile.picture;
-            }
-            user.last_login = new Date();
-            await this.userRepository.save(user);
-            return this.issueAppTokens(user);
-        }
         customer = await this.findOrCreateGoogleCustomer(googleProfile);
         customer.last_login = new Date();
         await this.customerRepository.save(customer);
         return this.issueCustomerAppTokens(customer);
-    }
-    async issueTokens(user) {
-        const payload = {
-            sub: user.id,
-            email: user.email || undefined,
-            phone_number: user.phone_number || undefined,
-            role: user.role,
-            type: 'user',
-        };
-        const accessToken = this.jwtService.generateAccessToken(payload);
-        const refreshToken = this.jwtService.generateRefreshToken(payload);
-        await this.storeRefreshToken(refreshToken, user.id, null);
-        const userResponse = this.formatUserResponse(user);
-        return {
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            user: userResponse,
-        };
-    }
-    async issueAppTokens(user) {
-        const payload = {
-            sub: user.id,
-            email: user.email || undefined,
-            phone_number: user.phone_number || undefined,
-            role: user.role,
-            type: 'user',
-        };
-        const appSessionExpiration = this.getAppSessionExpiration();
-        const accessToken = this.jwtService.generateAccessToken(payload, appSessionExpiration);
-        const refreshToken = this.jwtService.generateRefreshToken(payload, appSessionExpiration);
-        await this.storeRefreshToken(refreshToken, user.id, null, appSessionExpiration);
-        const userResponse = this.formatUserResponse(user);
-        return {
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            user: userResponse,
-        };
     }
     async findOrCreateGoogleCustomer(googleProfile) {
         const nameParts = googleProfile.name.split(' ');
@@ -558,24 +394,12 @@ let AuthService = class AuthService {
             if (existingCustomerByEmail) {
                 throw new common_1.ConflictException('This email is already registered. Please use a different email or try logging in.');
             }
-            const existingUserByEmail = await this.userRepository.findOne({
-                where: { email, is_deleted: false },
-            });
-            if (existingUserByEmail) {
-                throw new common_1.ConflictException('This email is already registered. Please use a different email or try logging in.');
-            }
         }
         if (phone_number) {
             const existingCustomerByPhone = await this.customerRepository.findOne({
                 where: { phone_number, is_deleted: false },
             });
             if (existingCustomerByPhone) {
-                throw new common_1.ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
-            }
-            const existingUserByPhone = await this.userRepository.findOne({
-                where: { phone_number, is_deleted: false },
-            });
-            if (existingUserByPhone) {
                 throw new common_1.ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
             }
         }
@@ -599,6 +423,9 @@ let AuthService = class AuthService {
         }
         else if (!finalPhoneNumber) {
             throw new common_1.BadRequestException('Either email or phone_number is required');
+        }
+        else {
+            finalPhoneNumber = (0, string_util_1.normalizePhoneNumber)(finalPhoneNumber);
         }
         const customer = this.customerRepository.create({
             first_name,
@@ -711,20 +538,6 @@ let AuthService = class AuthService {
             created_at: customer.added_date,
         };
     }
-    formatUserResponse(user) {
-        return {
-            id: user.id,
-            unique_id: user.unique_id,
-            name: user.first_name && user.last_name
-                ? `${user.first_name} ${user.last_name}`
-                : user.first_name || user.last_name || null,
-            email: user.email,
-            phone_number: user.phone_number,
-            avatar_url: user.avatar_url,
-            role: user.role,
-            created_at: user.added_date,
-        };
-    }
     async getCurrentUser(userPayload) {
         const userId = userPayload.id;
         const userType = userPayload.type || 'user';
@@ -754,16 +567,10 @@ let AuthService = class AuthService {
             const customer = await this.customerRepository.findOne({
                 where: { id: userId, is_deleted: false },
             });
-            if (customer) {
-                return this.formatCustomerResponse(customer);
-            }
-            const user = await this.userRepository.findOne({
-                where: { id: userId, is_deleted: false },
-            });
-            if (!user) {
+            if (!customer) {
                 throw new common_1.UnauthorizedException('User not found');
             }
-            return this.formatUserResponse(user);
+            return this.formatCustomerResponse(customer);
         }
     }
     async refreshAccessToken(refreshTokenString) {
@@ -771,17 +578,53 @@ let AuthService = class AuthService {
         if (!payload) {
             throw new common_1.UnauthorizedException('Invalid refresh token');
         }
+        let customerToken = await this.customerTokenRepository.findOne({
+            where: { token: refreshTokenString, is_revoked: false },
+        });
+        if (customerToken) {
+            if (customerToken.expires_at < new Date()) {
+                throw new common_1.UnauthorizedException('Refresh token expired or revoked');
+            }
+            const customer = await this.customerRepository.findOne({
+                where: { id: customerToken.customer_id, is_deleted: false },
+            });
+            if (!customer) {
+                throw new common_1.UnauthorizedException('User not found');
+            }
+            const appSessionDays = this.configService.get('APP_SESSION_DAYS', 90);
+            const originalExpiration = payload.exp ? payload.exp * 1000 : 0;
+            const now = Date.now();
+            const daysUntilExpiration = (originalExpiration - now) / (1000 * 60 * 60 * 24);
+            const isAppToken = daysUntilExpiration >= (appSessionDays - 5) && daysUntilExpiration <= (appSessionDays + 5);
+            const newPayload = {
+                sub: customer.id,
+                phone_number: customer.phone_number || undefined,
+                email: customer.email || undefined,
+                role: user_role_enum_1.UserRole.USER,
+                type: 'user',
+            };
+            const expiresIn = isAppToken ? this.getAppSessionExpiration() : undefined;
+            const newAccessToken = this.jwtService.generateAccessToken(newPayload, expiresIn);
+            const newRefreshToken = this.jwtService.generateRefreshToken(newPayload, expiresIn);
+            customerToken.is_revoked = true;
+            await this.customerTokenRepository.save(customerToken);
+            await this.storeCustomerRefreshToken(newRefreshToken, customer.id, expiresIn, customerToken.login_method || 'password');
+            return {
+                access_token: newAccessToken,
+                refresh_token: newRefreshToken,
+                user: this.formatCustomerResponse(customer),
+            };
+        }
         const tokenRecord = await this.refreshTokenRepository.findOne({
             where: { token: refreshTokenString, is_revoked: false },
-            relations: ['user', 'admin'],
         });
         if (!tokenRecord || tokenRecord.expires_at < new Date()) {
             throw new common_1.UnauthorizedException('Refresh token expired or revoked');
         }
-        const user = await this.userRepository.findOne({
+        const customer = await this.customerRepository.findOne({
             where: { id: payload.sub, is_deleted: false },
         });
-        if (!user) {
+        if (!customer) {
             throw new common_1.UnauthorizedException('User not found');
         }
         const appSessionDays = this.configService.get('APP_SESSION_DAYS', 90);
@@ -790,30 +633,32 @@ let AuthService = class AuthService {
         const daysUntilExpiration = (originalExpiration - now) / (1000 * 60 * 60 * 24);
         const isAppToken = daysUntilExpiration >= (appSessionDays - 5) && daysUntilExpiration <= (appSessionDays + 5);
         const newPayload = {
-            sub: payload.sub,
-            phone_number: payload.phone_number,
-            email: payload.email,
-            role: payload.role,
-            type: payload.type,
+            sub: customer.id,
+            phone_number: customer.phone_number || undefined,
+            email: customer.email || undefined,
+            role: user_role_enum_1.UserRole.USER,
+            type: 'user',
         };
         const expiresIn = isAppToken ? this.getAppSessionExpiration() : undefined;
         const newAccessToken = this.jwtService.generateAccessToken(newPayload, expiresIn);
         const newRefreshToken = this.jwtService.generateRefreshToken(newPayload, expiresIn);
         tokenRecord.is_revoked = true;
         await this.refreshTokenRepository.save(tokenRecord);
-        await this.storeRefreshToken(newRefreshToken, payload.type === 'user' ? payload.sub : null, payload.type === 'admin' ? payload.sub : null, expiresIn);
+        await this.storeCustomerRefreshToken(newRefreshToken, customer.id, expiresIn, 'password');
         return {
             access_token: newAccessToken,
             refresh_token: newRefreshToken,
-            user: this.formatUserResponse(user),
+            user: this.formatCustomerResponse(customer),
         };
     }
     async findCustomerByPhone(phoneNumber) {
-        const normalized = phoneNumber.replace(/\D+/g, '');
+        const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
+        const digitsOnly = normalizedPhone.replace(/\D+/g, '');
         const variations = [
+            normalizedPhone.trim(),
+            digitsOnly,
+            digitsOnly.slice(-10),
             phoneNumber.trim(),
-            normalized,
-            normalized.slice(-10),
         ];
         for (const variation of variations) {
             const customer = await this.customerRepository.findOne({
@@ -831,41 +676,16 @@ let AuthService = class AuthService {
         });
         return customer || null;
     }
-    async findUserByPhone(phoneNumber) {
-        const normalized = phoneNumber.replace(/\D+/g, '');
-        const variations = [
-            phoneNumber.trim(),
-            normalized,
-            normalized.slice(-10),
-        ];
-        for (const variation of variations) {
-            const user = await this.userRepository.findOne({
-                where: { phone_number: variation, is_deleted: false },
-            });
-            if (user)
-                return user;
-        }
-        return null;
-    }
-    async findUserByEmail(email) {
-        const normalizedEmail = email.trim().toLowerCase();
-        const user = await this.userRepository.findOne({
-            where: { email: normalizedEmail, is_deleted: false },
-        });
-        return user || null;
-    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
-    __param(1, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
-    __param(2, (0, typeorm_1.InjectRepository)(admin_user_entity_1.AdminUser)),
-    __param(3, (0, typeorm_1.InjectRepository)(refresh_token_entity_1.RefreshToken)),
-    __param(4, (0, typeorm_1.InjectRepository)(customer_token_entity_1.CustomerToken)),
-    __param(5, (0, typeorm_1.InjectRepository)(admin_token_entity_1.AdminToken)),
+    __param(0, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
+    __param(1, (0, typeorm_1.InjectRepository)(admin_user_entity_1.AdminUser)),
+    __param(2, (0, typeorm_1.InjectRepository)(refresh_token_entity_1.RefreshToken)),
+    __param(3, (0, typeorm_1.InjectRepository)(customer_token_entity_1.CustomerToken)),
+    __param(4, (0, typeorm_1.InjectRepository)(admin_token_entity_1.AdminToken)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,

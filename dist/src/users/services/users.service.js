@@ -16,77 +16,72 @@ exports.UsersService = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
-const user_entity_1 = require("../entities/user.entity");
+const customer_entity_1 = require("../entities/customer.entity");
 const admin_user_entity_1 = require("../entities/admin-user.entity");
 const karma_entry_entity_1 = require("../../karma/entities/karma-entry.entity");
 const plan_type_enum_1 = require("../../common/enums/plan-type.enum");
-const user_role_enum_1 = require("../../common/enums/user-role.enum");
 let UsersService = class UsersService {
-    constructor(userRepository, adminUserRepository, karmaEntryRepository) {
-        this.userRepository = userRepository;
+    constructor(customerRepository, adminUserRepository, karmaEntryRepository) {
+        this.customerRepository = customerRepository;
         this.adminUserRepository = adminUserRepository;
         this.karmaEntryRepository = karmaEntryRepository;
     }
     async create(userData, addedBy) {
-        const existing = await this.userRepository.findOne({
+        const existing = await this.customerRepository.findOne({
             where: { phone_number: userData.phone_number, is_deleted: false },
         });
         if (existing) {
             throw new common_1.ConflictException('User with this phone number already exists');
         }
-        const user = this.userRepository.create({
+        const customer = this.customerRepository.create({
             ...userData,
             current_plan: plan_type_enum_1.PlanType.FREE,
             referral_code: this.generateReferralCode(),
             added_by: addedBy || null,
             modify_by: addedBy || null,
-            role: userData.role || user_role_enum_1.UserRole.USER,
         });
-        return this.userRepository.save(user);
+        return this.customerRepository.save(customer);
     }
     async findOneByUniqueId(uniqueId) {
-        const user = await this.userRepository.findOne({
+        const customer = await this.customerRepository.findOne({
             where: { unique_id: uniqueId, is_deleted: false },
         });
-        if (!user) {
+        if (!customer) {
             throw new common_1.NotFoundException(`User with unique ID ${uniqueId} not found`);
         }
-        return user;
+        return customer;
     }
     async findOneById(id) {
-        const user = await this.userRepository.findOne({
+        const customer = await this.customerRepository.findOne({
             where: { id, is_deleted: false },
         });
-        if (!user) {
+        if (!customer) {
             throw new common_1.NotFoundException(`User with ID ${id} not found`);
         }
-        return user;
+        return customer;
     }
     async findAll(options) {
-        const { page = 1, limit = 10, search, plan, is_verified, role } = options || {};
+        const { page = 1, limit = 10, search, plan, is_verified } = options || {};
         const skip = (page - 1) * limit;
-        const queryBuilder = this.userRepository
-            .createQueryBuilder('user')
-            .where('user.is_deleted = :deleted', { deleted: false });
+        const queryBuilder = this.customerRepository
+            .createQueryBuilder('customer')
+            .where('customer.is_deleted = :deleted', { deleted: false });
         if (search) {
-            queryBuilder.andWhere('(user.first_name ILIKE :search OR user.last_name ILIKE :search OR user.phone_number ILIKE :search OR user.email ILIKE :search)', { search: `%${search}%` });
+            queryBuilder.andWhere('(customer.first_name ILIKE :search OR customer.last_name ILIKE :search OR customer.phone_number ILIKE :search OR customer.email ILIKE :search)', { search: `%${search}%` });
         }
         if (plan) {
-            queryBuilder.andWhere('user.current_plan = :plan', { plan });
+            queryBuilder.andWhere('customer.current_plan = :plan', { plan });
         }
         if (is_verified !== undefined) {
-            queryBuilder.andWhere('user.is_verified = :verified', { verified: is_verified });
+            queryBuilder.andWhere('customer.is_verified = :verified', { verified: is_verified });
         }
-        if (role) {
-            queryBuilder.andWhere('user.role = :role', { role });
-        }
-        const [users, total] = await queryBuilder
+        const [customers, total] = await queryBuilder
             .skip(skip)
             .take(limit)
-            .orderBy('user.added_date', 'DESC')
+            .orderBy('customer.added_date', 'DESC')
             .getManyAndCount();
         return {
-            data: users,
+            data: customers,
             meta: {
                 total,
                 page,
@@ -96,50 +91,47 @@ let UsersService = class UsersService {
         };
     }
     async update(uniqueId, updateData, modifiedBy) {
-        const user = await this.findOneByUniqueId(uniqueId);
-        Object.assign(user, updateData);
+        const customer = await this.findOneByUniqueId(uniqueId);
+        Object.assign(customer, updateData);
         if (modifiedBy) {
-            user.modify_by = modifiedBy;
+            customer.modify_by = modifiedBy;
         }
-        return this.userRepository.save(user);
+        return this.customerRepository.save(customer);
     }
     async remove(uniqueId, deletedBy) {
-        const user = await this.findOneByUniqueId(uniqueId);
-        user.is_deleted = true;
-        user.modify_by = deletedBy;
-        await this.userRepository.save(user);
+        const customer = await this.findOneByUniqueId(uniqueId);
+        customer.is_deleted = true;
+        customer.modify_by = deletedBy;
+        await this.customerRepository.save(customer);
     }
     async updatePlan(userId, planType) {
-        await this.userRepository.update({ id: userId }, { current_plan: planType });
+        await this.customerRepository.update({ id: userId }, { current_plan: planType });
     }
     async getDashboardStats() {
         const [totalUsers, activeUsers, verifiedUsers, usersToday, usersThisWeek, usersThisMonth,] = await Promise.all([
-            this.userRepository.count({
-                where: { is_deleted: false, role: user_role_enum_1.UserRole.USER },
+            this.customerRepository.count({
+                where: { is_deleted: false },
             }),
-            this.userRepository.count({
-                where: { is_deleted: false, is_enabled: true, role: user_role_enum_1.UserRole.USER },
+            this.customerRepository.count({
+                where: { is_deleted: false, is_enabled: true },
             }),
-            this.userRepository.count({
-                where: { is_deleted: false, is_verified: true, role: user_role_enum_1.UserRole.USER },
+            this.customerRepository.count({
+                where: { is_deleted: false, is_verified: true },
             }),
-            this.userRepository
-                .createQueryBuilder('user')
-                .where('user.is_deleted = :deleted', { deleted: false })
-                .andWhere('user.role = :role', { role: user_role_enum_1.UserRole.USER })
-                .andWhere('DATE(user.added_date) = CURRENT_DATE')
+            this.customerRepository
+                .createQueryBuilder('customer')
+                .where('customer.is_deleted = :deleted', { deleted: false })
+                .andWhere('DATE(customer.added_date) = CURRENT_DATE')
                 .getCount(),
-            this.userRepository
-                .createQueryBuilder('user')
-                .where('user.is_deleted = :deleted', { deleted: false })
-                .andWhere('user.role = :role', { role: user_role_enum_1.UserRole.USER })
-                .andWhere('user.added_date >= DATE_TRUNC(\'week\', CURRENT_DATE)')
+            this.customerRepository
+                .createQueryBuilder('customer')
+                .where('customer.is_deleted = :deleted', { deleted: false })
+                .andWhere('customer.added_date >= DATE_TRUNC(\'week\', CURRENT_DATE)')
                 .getCount(),
-            this.userRepository
-                .createQueryBuilder('user')
-                .where('user.is_deleted = :deleted', { deleted: false })
-                .andWhere('user.role = :role', { role: user_role_enum_1.UserRole.USER })
-                .andWhere('user.added_date >= DATE_TRUNC(\'month\', CURRENT_DATE)')
+            this.customerRepository
+                .createQueryBuilder('customer')
+                .where('customer.is_deleted = :deleted', { deleted: false })
+                .andWhere('customer.added_date >= DATE_TRUNC(\'month\', CURRENT_DATE)')
                 .getCount(),
         ]);
         const totalAdminUsers = await this.adminUserRepository.count({
@@ -161,29 +153,27 @@ let UsersService = class UsersService {
         };
     }
     async getDashboardCharts() {
-        const userSignups = await this.userRepository
-            .createQueryBuilder('user')
-            .select('DATE(user.added_date)', 'date')
+        const userSignups = await this.customerRepository
+            .createQueryBuilder('customer')
+            .select('DATE(customer.added_date)', 'date')
             .addSelect('COUNT(*)', 'count')
-            .where('user.is_deleted = :deleted', { deleted: false })
-            .andWhere('user.role = :role', { role: user_role_enum_1.UserRole.USER })
-            .andWhere('user.added_date >= CURRENT_DATE - INTERVAL \'30 days\'')
-            .groupBy('DATE(user.added_date)')
-            .orderBy('DATE(user.added_date)', 'ASC')
+            .where('customer.is_deleted = :deleted', { deleted: false })
+            .andWhere('customer.added_date >= CURRENT_DATE - INTERVAL \'30 days\'')
+            .groupBy('DATE(customer.added_date)')
+            .orderBy('DATE(customer.added_date)', 'ASC')
             .getRawMany();
         const userSignupsData = userSignups.map((item) => ({
             date: item.date,
             count: parseInt(item.count, 10),
         }));
-        const weeklySignups = await this.userRepository
-            .createQueryBuilder('user')
-            .select('DATE(user.added_date)', 'date')
+        const weeklySignups = await this.customerRepository
+            .createQueryBuilder('customer')
+            .select('DATE(customer.added_date)', 'date')
             .addSelect('COUNT(*)', 'count')
-            .where('user.is_deleted = :deleted', { deleted: false })
-            .andWhere('user.role = :role', { role: user_role_enum_1.UserRole.USER })
-            .andWhere('user.added_date >= CURRENT_DATE - INTERVAL \'7 days\'')
-            .groupBy('DATE(user.added_date)')
-            .orderBy('DATE(user.added_date)', 'ASC')
+            .where('customer.is_deleted = :deleted', { deleted: false })
+            .andWhere('customer.added_date >= CURRENT_DATE - INTERVAL \'7 days\'')
+            .groupBy('DATE(customer.added_date)')
+            .orderBy('DATE(customer.added_date)', 'ASC')
             .getRawMany();
         const weeklySignupsData = weeklySignups.map((item) => ({
             date: item.date,
@@ -232,7 +222,7 @@ let UsersService = class UsersService {
 exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
+    __param(0, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
     __param(1, (0, typeorm_1.InjectRepository)(admin_user_entity_1.AdminUser)),
     __param(2, (0, typeorm_1.InjectRepository)(karma_entry_entity_1.KarmaEntry)),
     __metadata("design:paramtypes", [typeorm_2.Repository,

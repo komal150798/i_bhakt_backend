@@ -2,14 +2,14 @@ import { Repository } from 'typeorm';
 import { ManifestationLog } from './entities/manifestation-log.entity';
 import { CreateManifestationDto } from './dto/create-manifestation.dto';
 import { SwissEphemerisService } from '../astrology/services/swiss-ephemeris.service';
-import { User } from '../users/entities/user.entity';
+import { Customer } from '../users/entities/customer.entity';
 import { ConstantsService } from '../common/constants/constants.service';
 export declare class ManifestationService {
     private manifestationRepository;
-    private userRepository;
+    private customerRepository;
     private swissEphemerisService;
     private constantsService;
-    constructor(manifestationRepository: Repository<ManifestationLog>, userRepository: Repository<User>, swissEphemerisService: SwissEphemerisService, constantsService: ConstantsService);
+    constructor(manifestationRepository: Repository<ManifestationLog>, customerRepository: Repository<Customer>, swissEphemerisService: SwissEphemerisService, constantsService: ConstantsService);
     createManifestation(userId: number, dto: CreateManifestationDto): Promise<ManifestationLog>;
     getUserManifestations(userId: number): Promise<ManifestationLog[]>;
     getManifestationById(userId: number, manifestationId: number): Promise<ManifestationLog>;

@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { ManifestationLog } from './entities/manifestation-log.entity';
 import { CreateManifestationDto } from './dto/create-manifestation.dto';
 import { SwissEphemerisService } from '../astrology/services/swiss-ephemeris.service';
-import { User } from '../users/entities/user.entity';
+import { Customer } from '../users/entities/customer.entity';
 import { ConstantsService } from '../common/constants/constants.service';
 
 @Injectable()
@@ -12,8 +12,8 @@ export class ManifestationService {
   constructor(
     @InjectRepository(ManifestationLog)
     private manifestationRepository: Repository<ManifestationLog>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    @InjectRepository(Customer)
+    private customerRepository: Repository<Customer>,
     private swissEphemerisService: SwissEphemerisService,
     private constantsService: ConstantsService,
   ) {}
@@ -31,8 +31,8 @@ export class ManifestationService {
     }
 
     // Get user for birth data (if available)
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
+    const user = await this.customerRepository.findOne({
+      where: { id: userId, is_deleted: false },
     });
 
     // Calculate clarity (linguistic clarity)
@@ -233,7 +233,7 @@ export class ManifestationService {
    * Uses Swiss Ephemeris for accurate planetary calculations
    */
   private async calculateAstroIndex(
-    user: User | null,
+    user: Customer | null,
     desireText: string,
   ): Promise<number> {
     if (!user) {
@@ -310,7 +310,7 @@ export class ManifestationService {
    * Calculate best manifestation date
    */
   private async calculateBestManifestationDate(
-    user: User | null,
+    user: Customer | null,
     astroIndex: number,
   ): Promise<Date | null> {
     // TODO: Use Swiss Ephemeris to find optimal dates based on:

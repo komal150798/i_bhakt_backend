@@ -2,16 +2,15 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { User } from '../../users/entities/user.entity';
-import { UserRole } from '../../common/enums/user-role.enum';
+import { AdminUser } from '../../users/entities/admin-user.entity';
 
 @Injectable()
 export class SeedService implements OnModuleInit {
   private readonly logger = new Logger(SeedService.name);
 
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    @InjectRepository(AdminUser)
+    private adminUserRepository: Repository<AdminUser>,
   ) {}
 
   async onModuleInit() {
@@ -24,25 +23,19 @@ export class SeedService implements OnModuleInit {
   private async seedAdminUser(): Promise<void> {
     const adminUsername = 'komal';
     const adminPassword = 'komal';
+    const adminEmail = `${adminUsername}@admin.com`;
 
     try {
       // Check if admin already exists
-      const existingAdmin = await this.userRepository.findOne({
+      const existingAdmin = await this.adminUserRepository.findOne({
         where: [
-          { email: `${adminUsername}@admin.com`, is_deleted: false },
-          { phone_number: adminUsername, is_deleted: false },
+          { email: adminEmail, is_deleted: false },
+          { username: adminUsername, is_deleted: false },
         ],
       });
 
       if (existingAdmin) {
         this.logger.log('Default admin user already exists, skipping seed');
-        
-        // Update role if not admin
-        if (existingAdmin.role !== UserRole.ADMIN && existingAdmin.role !== UserRole.SUPER_ADMIN) {
-          existingAdmin.role = UserRole.ADMIN;
-          await this.userRepository.save(existingAdmin);
-          this.logger.log('Updated existing user to admin role');
-        }
         return;
       }
 
@@ -51,20 +44,21 @@ export class SeedService implements OnModuleInit {
       const hashedPassword = await bcrypt.hash(adminPassword, saltRounds);
 
       // Create admin user
-      const admin = this.userRepository.create({
+      const admin = this.adminUserRepository.create({
+        username: adminUsername,
+        email: adminEmail,
+        password: hashedPassword,
         first_name: 'Admin',
         last_name: 'User',
-        email: `${adminUsername}@admin.com`,
-        phone_number: adminUsername,
-        password: hashedPassword, // Store hashed password
-        role: UserRole.ADMIN,
-        is_verified: true,
-        current_plan: null as any, // Admin doesn't need a plan (nullable)
+        is_active: true,
+        is_enabled: true,
+        role_id: null, // Can be set later if role system is configured
       });
 
-      await this.userRepository.save(admin);
+      await this.adminUserRepository.save(admin);
       this.logger.log('✅ Default admin user created successfully');
       this.logger.log(`   Username: ${adminUsername}`);
+      this.logger.log(`   Email: ${adminEmail}`);
       this.logger.log(`   Password: ${adminPassword}`);
       this.logger.warn('⚠️  Please change the default password after first login!');
     } catch (error) {

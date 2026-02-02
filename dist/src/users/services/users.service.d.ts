@@ -1,17 +1,17 @@
 import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity';
+import { Customer } from '../entities/customer.entity';
 import { AdminUser } from '../entities/admin-user.entity';
 import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
 import { PlanType } from '../../common/enums/plan-type.enum';
 import { UserRole } from '../../common/enums/user-role.enum';
 export declare class UsersService {
-    private userRepository;
+    private customerRepository;
     private adminUserRepository;
     private karmaEntryRepository;
-    constructor(userRepository: Repository<User>, adminUserRepository: Repository<AdminUser>, karmaEntryRepository: Repository<KarmaEntry>);
-    create(userData: Partial<User>, addedBy?: number): Promise<User>;
-    findOneByUniqueId(uniqueId: string): Promise<User>;
-    findOneById(id: number): Promise<User>;
+    constructor(customerRepository: Repository<Customer>, adminUserRepository: Repository<AdminUser>, karmaEntryRepository: Repository<KarmaEntry>);
+    create(userData: Partial<Customer>, addedBy?: number): Promise<Customer>;
+    findOneByUniqueId(uniqueId: string): Promise<Customer>;
+    findOneById(id: number): Promise<Customer>;
     findAll(options?: {
         page?: number;
         limit?: number;
@@ -20,10 +20,10 @@ export declare class UsersService {
         is_verified?: boolean;
         role?: UserRole;
     }): Promise<{
-        data: User[];
+        data: Customer[];
         meta: any;
     }>;
-    update(uniqueId: string, updateData: Partial<User>, modifiedBy?: number): Promise<User>;
+    update(uniqueId: string, updateData: Partial<Customer>, modifiedBy?: number): Promise<Customer>;
     remove(uniqueId: string, deletedBy: number): Promise<void>;
     updatePlan(userId: number, planType: PlanType): Promise<void>;
     getDashboardStats(): Promise<{

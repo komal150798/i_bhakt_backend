@@ -4,7 +4,6 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
 import { Customer } from '../../users/entities/customer.entity';
 import { AdminUser } from '../../users/entities/admin-user.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -24,8 +23,6 @@ export interface JwtPayload {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
     @InjectRepository(AdminUser)
@@ -68,39 +65,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         type: 'admin',
       };
     } else {
-      // For regular users, check Customer table first (new normalized structure)
-      let customer = await this.customerRepository.findOne({
+      // For regular users, check Customer table only
+      const customer = await this.customerRepository.findOne({
         where: { id: userId, is_deleted: false },
       });
 
-      if (customer) {
-        return {
-          id: customer.id,
-          unique_id: customer.unique_id,
-          email: customer.email,
-          phone_number: customer.phone_number,
-          role: UserRole.USER,
-          type: 'user',
-        };
-      }
-
-      // Fallback to legacy User table for backward compatibility
-      const user = await this.userRepository.findOne({
-        where: { id: userId, is_deleted: false },
-      });
-
-      if (!user) {
-        console.warn(`User not found for ID: ${userId}, type: ${userType}`);
+      if (!customer) {
+        console.warn(`Customer not found for ID: ${userId}, type: ${userType}`);
         throw new UnauthorizedException('User not found');
       }
 
       return {
-        id: user.id,
-        unique_id: user.unique_id,
-        email: user.email,
-        phone_number: user.phone_number,
-        role: user.role,
-        type: payload.type || 'user',
+        id: customer.id,
+        unique_id: customer.unique_id,
+        email: customer.email,
+        phone_number: customer.phone_number,
+        role: UserRole.USER,
+        type: 'user',
       };
     }
   }

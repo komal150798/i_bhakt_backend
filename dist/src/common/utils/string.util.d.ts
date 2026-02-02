@@ -6,3 +6,4 @@ export declare function splitFullName(fullName: string | null | undefined): {
     first_name: string;
     last_name: string;
 };
+export declare function normalizePhoneNumber(phoneNumber: string | null | undefined): string;

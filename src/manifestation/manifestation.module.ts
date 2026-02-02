@@ -22,7 +22,6 @@ import { ManifestationAIEvaluationService } from './services/manifestation-ai-ev
 import { AppManifestationController } from './controllers/app-manifestation.controller';
 import { CacheModule } from '../cache/cache.module';
 import { AstrologyModule } from '../astrology/astrology.module';
-import { User } from '../users/entities/user.entity';
 import { SwissEphemerisService } from '../astrology/services/swiss-ephemeris.service';
 import { Customer } from '../users/entities/customer.entity';
 import { HttpModule } from '@nestjs/axios';
@@ -47,7 +46,6 @@ import { SeedManifestationMasterDataService } from './seeds/seed-manifestation-m
     TypeOrmModule.forFeature([
       ManifestationLog,
       Manifestation,
-      User,
       Customer,
       DashaRecord, // For Dasha period analysis
       AntardashaRecord,

@@ -5,7 +5,6 @@ import { WebUsersController } from './controllers/web/web-users.controller';
 import { AppUsersController } from './controllers/app/app-users.controller';
 import { UsersService } from './services/users.service';
 import { CustomerService } from './services/customer.service';
-import { User } from './entities/user.entity';
 import { Customer } from './entities/customer.entity';
 import { AdminUser } from './entities/admin-user.entity';
 import { KarmaEntry } from '../karma/entities/karma-entry.entity';
@@ -15,7 +14,7 @@ import { RepositoriesModule } from '../infrastructure/repositories/repositories.
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Customer, AdminUser, KarmaEntry]),
+    TypeOrmModule.forFeature([Customer, AdminUser, KarmaEntry]),
     SubscriptionsModule,
     KundliModule, // For kundli calculation and update
     RepositoriesModule, // For kundli repository

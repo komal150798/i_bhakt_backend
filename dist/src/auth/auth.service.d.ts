@@ -1,6 +1,5 @@
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { User } from '../users/entities/user.entity';
 import { Customer } from '../users/entities/customer.entity';
 import { AdminUser } from '../users/entities/admin-user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -10,7 +9,6 @@ import { OtpService } from './services/otp.service';
 import { AuthJwtService } from './services/jwt.service';
 import { HoroscopeService } from '../horoscope/services/horoscope.service';
 export declare class AuthService {
-    private userRepository;
     private customerRepository;
     private adminUserRepository;
     private refreshTokenRepository;
@@ -20,7 +18,7 @@ export declare class AuthService {
     private jwtService;
     private configService;
     private horoscopeService;
-    constructor(userRepository: Repository<User>, customerRepository: Repository<Customer>, adminUserRepository: Repository<AdminUser>, refreshTokenRepository: Repository<RefreshToken>, customerTokenRepository: Repository<CustomerToken>, adminTokenRepository: Repository<AdminToken>, otpService: OtpService, jwtService: AuthJwtService, configService: ConfigService, horoscopeService: HoroscopeService);
+    constructor(customerRepository: Repository<Customer>, adminUserRepository: Repository<AdminUser>, refreshTokenRepository: Repository<RefreshToken>, customerTokenRepository: Repository<CustomerToken>, adminTokenRepository: Repository<AdminToken>, otpService: OtpService, jwtService: AuthJwtService, configService: ConfigService, horoscopeService: HoroscopeService);
     private getAppSessionExpiration;
     sendOtp(phoneNumber: string): Promise<{
         message: string;
@@ -51,7 +49,6 @@ export declare class AuthService {
     private storeRefreshToken;
     private parseExpiresIn;
     validateCustomerByPassword(username: string, password: string): Promise<Customer | null>;
-    validateUserByPassword(username: string, password: string): Promise<User | null>;
     loginWithPassword(username: string, password: string): Promise<{
         access_token: string;
         refresh_token: string;
@@ -63,16 +60,6 @@ export declare class AuthService {
         user: any;
     }>;
     loginWithGoogle(idToken: string): Promise<{
-        access_token: string;
-        refresh_token: string;
-        user: any;
-    }>;
-    issueTokens(user: User): Promise<{
-        access_token: string;
-        refresh_token: string;
-        user: any;
-    }>;
-    issueAppTokens(user: User): Promise<{
         access_token: string;
         refresh_token: string;
         user: any;
@@ -94,7 +81,6 @@ export declare class AuthService {
     private storeCustomerToken;
     private storeCustomerRefreshToken;
     private formatCustomerResponse;
-    private formatUserResponse;
     getCurrentUser(userPayload: any): Promise<any>;
     refreshAccessToken(refreshTokenString: string): Promise<{
         access_token: string;
@@ -103,6 +89,4 @@ export declare class AuthService {
     }>;
     private findCustomerByPhone;
     private findCustomerByEmail;
-    private findUserByPhone;
-    private findUserByEmail;
 }

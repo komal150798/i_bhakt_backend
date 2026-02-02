@@ -14,7 +14,6 @@ const web_users_controller_1 = require("./controllers/web/web-users.controller")
 const app_users_controller_1 = require("./controllers/app/app-users.controller");
 const users_service_1 = require("./services/users.service");
 const customer_service_1 = require("./services/customer.service");
-const user_entity_1 = require("./entities/user.entity");
 const customer_entity_1 = require("./entities/customer.entity");
 const admin_user_entity_1 = require("./entities/admin-user.entity");
 const karma_entry_entity_1 = require("../karma/entities/karma-entry.entity");
@@ -27,7 +26,7 @@ exports.UsersModule = UsersModule;
 exports.UsersModule = UsersModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, customer_entity_1.Customer, admin_user_entity_1.AdminUser, karma_entry_entity_1.KarmaEntry]),
+            typeorm_1.TypeOrmModule.forFeature([customer_entity_1.Customer, admin_user_entity_1.AdminUser, karma_entry_entity_1.KarmaEntry]),
             subscriptions_module_1.SubscriptionsModule,
             kundli_module_1.KundliModule,
             repositories_module_1.RepositoriesModule,

@@ -18,11 +18,10 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const bcrypt = require("bcrypt");
-const user_entity_1 = require("../../users/entities/user.entity");
-const user_role_enum_1 = require("../../common/enums/user-role.enum");
+const admin_user_entity_1 = require("../../users/entities/admin-user.entity");
 let SeedService = SeedService_1 = class SeedService {
-    constructor(userRepository) {
-        this.userRepository = userRepository;
+    constructor(adminUserRepository) {
+        this.adminUserRepository = adminUserRepository;
         this.logger = new common_1.Logger(SeedService_1.name);
     }
     async onModuleInit() {
@@ -31,37 +30,34 @@ let SeedService = SeedService_1 = class SeedService {
     async seedAdminUser() {
         const adminUsername = 'komal';
         const adminPassword = 'komal';
+        const adminEmail = `${adminUsername}@admin.com`;
         try {
-            const existingAdmin = await this.userRepository.findOne({
+            const existingAdmin = await this.adminUserRepository.findOne({
                 where: [
-                    { email: `${adminUsername}@admin.com`, is_deleted: false },
-                    { phone_number: adminUsername, is_deleted: false },
+                    { email: adminEmail, is_deleted: false },
+                    { username: adminUsername, is_deleted: false },
                 ],
             });
             if (existingAdmin) {
                 this.logger.log('Default admin user already exists, skipping seed');
-                if (existingAdmin.role !== user_role_enum_1.UserRole.ADMIN && existingAdmin.role !== user_role_enum_1.UserRole.SUPER_ADMIN) {
-                    existingAdmin.role = user_role_enum_1.UserRole.ADMIN;
-                    await this.userRepository.save(existingAdmin);
-                    this.logger.log('Updated existing user to admin role');
-                }
                 return;
             }
             const saltRounds = 10;
             const hashedPassword = await bcrypt.hash(adminPassword, saltRounds);
-            const admin = this.userRepository.create({
+            const admin = this.adminUserRepository.create({
+                username: adminUsername,
+                email: adminEmail,
+                password: hashedPassword,
                 first_name: 'Admin',
                 last_name: 'User',
-                email: `${adminUsername}@admin.com`,
-                phone_number: adminUsername,
-                password: hashedPassword,
-                role: user_role_enum_1.UserRole.ADMIN,
-                is_verified: true,
-                current_plan: null,
+                is_active: true,
+                is_enabled: true,
+                role_id: null,
             });
-            await this.userRepository.save(admin);
+            await this.adminUserRepository.save(admin);
             this.logger.log('✅ Default admin user created successfully');
             this.logger.log(`   Username: ${adminUsername}`);
+            this.logger.log(`   Email: ${adminEmail}`);
             this.logger.log(`   Password: ${adminPassword}`);
             this.logger.warn('⚠️  Please change the default password after first login!');
         }
@@ -73,7 +69,7 @@ let SeedService = SeedService_1 = class SeedService {
 exports.SeedService = SeedService;
 exports.SeedService = SeedService = SeedService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
+    __param(0, (0, typeorm_1.InjectRepository)(admin_user_entity_1.AdminUser)),
     __metadata("design:paramtypes", [typeorm_2.Repository])
 ], SeedService);
 //# sourceMappingURL=seed.service.js.map

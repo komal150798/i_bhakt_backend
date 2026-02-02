@@ -1,10 +1,10 @@
 import { OnModuleInit } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+import { AdminUser } from '../../users/entities/admin-user.entity';
 export declare class SeedService implements OnModuleInit {
-    private userRepository;
+    private adminUserRepository;
     private readonly logger;
-    constructor(userRepository: Repository<User>);
+    constructor(adminUserRepository: Repository<AdminUser>);
     onModuleInit(): Promise<void>;
     private seedAdminUser;
 }

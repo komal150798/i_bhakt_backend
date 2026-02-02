@@ -12,7 +12,6 @@ import { AdminAuthService } from './services/admin-auth.service';
 import { OtpService } from './services/otp.service';
 import { AuthJwtService } from './services/jwt.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { User } from '../users/entities/user.entity';
 import { Customer } from '../users/entities/customer.entity';
 import { AdminUser } from '../users/entities/admin-user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -35,7 +34,7 @@ import { HoroscopeModule } from '../horoscope/horoscope.module';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([User, Customer, AdminUser, RefreshToken, CustomerToken, AdminToken, AdmRole]),
+    TypeOrmModule.forFeature([Customer, AdminUser, RefreshToken, CustomerToken, AdminToken, AdmRole]),
     AdminRbacModule,
     HoroscopeModule,
   ],

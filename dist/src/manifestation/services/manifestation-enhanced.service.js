@@ -19,7 +19,6 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const manifestation_entity_1 = require("../entities/manifestation.entity");
 const manifestation_ai_evaluation_service_1 = require("./manifestation-ai-evaluation.service");
-const user_entity_1 = require("../../users/entities/user.entity");
 const customer_entity_1 = require("../../users/entities/customer.entity");
 const swiss_ephemeris_service_1 = require("../../astrology/services/swiss-ephemeris.service");
 const dasha_record_entity_1 = require("../../database/entities/dasha-record.entity");
@@ -37,9 +36,8 @@ const date_util_1 = require("../../common/utils/date.util");
 const number_util_1 = require("../../common/utils/number.util");
 const manifestation_alignment_service_1 = require("./manifestation-alignment.service");
 let ManifestationEnhancedService = ManifestationEnhancedService_1 = class ManifestationEnhancedService {
-    constructor(manifestationRepository, userRepository, customerRepository, dashaRepository, antardashaRepository, pratyantarRepository, sukshmaRepository, kundliRepository, kundliPlanetRepository, kundliHouseRepository, aiEvaluationService, swissEphemerisService, kundliService, alignmentService) {
+    constructor(manifestationRepository, customerRepository, dashaRepository, antardashaRepository, pratyantarRepository, sukshmaRepository, kundliRepository, kundliPlanetRepository, kundliHouseRepository, aiEvaluationService, swissEphemerisService, kundliService, alignmentService) {
         this.manifestationRepository = manifestationRepository;
-        this.userRepository = userRepository;
         this.customerRepository = customerRepository;
         this.dashaRepository = dashaRepository;
         this.antardashaRepository = antardashaRepository;
@@ -74,11 +72,7 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         if (title.length > 200) {
             title = title.substring(0, 197) + '...';
         }
-        let user = null;
-        user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
-        if (!user) {
-            user = await this.userRepository.findOne({ where: { id: userId, is_deleted: false } });
-        }
+        const user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
         if (!user) {
             throw new common_1.NotFoundException('User not found');
         }
@@ -1242,11 +1236,7 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         }
     }
     async calculateDetailedResonance(userId, description) {
-        let user = null;
-        user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
-        if (!user) {
-            user = await this.userRepository.findOne({ where: { id: userId, is_deleted: false } });
-        }
+        const user = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
         if (!user) {
             throw new common_1.NotFoundException('User not found');
         }
@@ -2533,17 +2523,15 @@ exports.ManifestationEnhancedService = ManifestationEnhancedService;
 exports.ManifestationEnhancedService = ManifestationEnhancedService = ManifestationEnhancedService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(manifestation_entity_1.Manifestation)),
-    __param(1, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
-    __param(2, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
-    __param(3, (0, typeorm_1.InjectRepository)(dasha_record_entity_1.DashaRecord)),
-    __param(4, (0, typeorm_1.InjectRepository)(antardasha_record_entity_1.AntardashaRecord)),
-    __param(5, (0, typeorm_1.InjectRepository)(pratyantar_dasha_record_entity_1.PratyantarDashaRecord)),
-    __param(6, (0, typeorm_1.InjectRepository)(sukshma_dasha_record_entity_1.SukshmaDashaRecord)),
-    __param(7, (0, typeorm_1.InjectRepository)(kundli_entity_1.Kundli)),
-    __param(8, (0, typeorm_1.InjectRepository)(kundli_planet_entity_1.KundliPlanet)),
-    __param(9, (0, typeorm_1.InjectRepository)(kundli_house_entity_1.KundliHouse)),
+    __param(1, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
+    __param(2, (0, typeorm_1.InjectRepository)(dasha_record_entity_1.DashaRecord)),
+    __param(3, (0, typeorm_1.InjectRepository)(antardasha_record_entity_1.AntardashaRecord)),
+    __param(4, (0, typeorm_1.InjectRepository)(pratyantar_dasha_record_entity_1.PratyantarDashaRecord)),
+    __param(5, (0, typeorm_1.InjectRepository)(sukshma_dasha_record_entity_1.SukshmaDashaRecord)),
+    __param(6, (0, typeorm_1.InjectRepository)(kundli_entity_1.Kundli)),
+    __param(7, (0, typeorm_1.InjectRepository)(kundli_planet_entity_1.KundliPlanet)),
+    __param(8, (0, typeorm_1.InjectRepository)(kundli_house_entity_1.KundliHouse)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,

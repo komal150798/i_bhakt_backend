@@ -21,7 +21,6 @@ const admin_auth_service_1 = require("./services/admin-auth.service");
 const otp_service_1 = require("./services/otp.service");
 const jwt_service_1 = require("./services/jwt.service");
 const jwt_strategy_1 = require("./strategies/jwt.strategy");
-const user_entity_1 = require("../users/entities/user.entity");
 const customer_entity_1 = require("../users/entities/customer.entity");
 const admin_user_entity_1 = require("../users/entities/admin-user.entity");
 const refresh_token_entity_1 = require("./entities/refresh-token.entity");
@@ -47,7 +46,7 @@ exports.AuthModule = AuthModule = __decorate([
                 }),
                 inject: [config_1.ConfigService],
             }),
-            typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, customer_entity_1.Customer, admin_user_entity_1.AdminUser, refresh_token_entity_1.RefreshToken, customer_token_entity_1.CustomerToken, admin_token_entity_1.AdminToken, adm_role_entity_1.AdmRole]),
+            typeorm_1.TypeOrmModule.forFeature([customer_entity_1.Customer, admin_user_entity_1.AdminUser, refresh_token_entity_1.RefreshToken, customer_token_entity_1.CustomerToken, admin_token_entity_1.AdminToken, adm_role_entity_1.AdmRole]),
             admin_rbac_module_1.AdminRbacModule,
             horoscope_module_1.HoroscopeModule,
         ],
