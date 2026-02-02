@@ -22,6 +22,9 @@ export class Customer extends BaseEntity {
   @Column({ type: 'varchar', length: 100, nullable: true })
   last_name: string | null;
 
+  @Column({ type: 'varchar', length: 200, nullable: true, name: 'full_name' })
+  full_name: string | null;
+
   @Column({ type: 'varchar', length: 100, unique: true, nullable: true })
   email: string | null;
 
@@ -70,6 +73,18 @@ export class Customer extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   avatar_url: string | null;
+
+  @Column({ type: 'text', nullable: true, name: 'avatar_img' })
+  avatar_img: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true, name: 'life_role' })
+  life_role: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, name: 'relationship_status' })
+  relationship_status: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  interests: string | null; // JSON array stored as text
 
   @Column({ type: 'enum', enum: PlanType, default: PlanType.FREE, name: 'current_plan' })
   current_plan: PlanType;

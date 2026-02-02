@@ -16,6 +16,12 @@ class UpdateCustomerProfileDto {
 }
 exports.UpdateCustomerProfileDto = UpdateCustomerProfileDto;
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Full name (will be split into first_name and last_name - first word becomes first_name, rest becomes last_name)' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateCustomerProfileDto.prototype, "full_name", void 0);
+__decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'First name' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
@@ -85,4 +91,29 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateCustomerProfileDto.prototype, "avatar_url", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Avatar image (alternative to avatar_url)' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateCustomerProfileDto.prototype, "avatar_img", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Life role' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateCustomerProfileDto.prototype, "life_role", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Relationship status' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateCustomerProfileDto.prototype, "relationship_status", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Interests (array of strings)', type: [String] }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], UpdateCustomerProfileDto.prototype, "interests", void 0);
 //# sourceMappingURL=update-customer-profile.dto.js.map

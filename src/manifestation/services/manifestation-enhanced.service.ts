@@ -20,6 +20,7 @@ import { ConfidenceScoring } from '../algorithms/confidence-scoring.util';
 import { NGramMatching } from '../algorithms/ngram-matching.util';
 import { formatDateToISO } from '../../common/utils/date.util';
 import { toNumber } from '../../common/utils/number.util';
+import { ManifestationAlignmentService } from './manifestation-alignment.service';
 
 @Injectable()
 export class ManifestationEnhancedService {
@@ -52,6 +53,7 @@ export class ManifestationEnhancedService {
     private aiEvaluationService: ManifestationAIEvaluationService,
     private swissEphemerisService: SwissEphemerisService,
     private kundliService: KundliService,
+    private alignmentService: ManifestationAlignmentService,
   ) {}
 
   /**
@@ -807,6 +809,7 @@ export class ManifestationEnhancedService {
 
   /**
    * Get manifestation by ID with full details
+   * Applies Kundli alignment updates if needed (deterministic)
    */
   async getManifestationById(id: number, userId: number): Promise<Manifestation> {
     const manifestation = await this.manifestationRepository.findOne({
@@ -815,6 +818,62 @@ export class ManifestationEnhancedService {
 
     if (!manifestation) {
       throw new NotFoundException('Manifestation not found');
+    }
+
+    // Apply Kundli alignment updates (deterministic - same input = same output)
+    try {
+      const kundli = await this.kundliRepository.findOne({
+        where: { user_id: userId, is_deleted: false },
+      });
+
+      if (kundli) {
+        const [planets, houses] = await Promise.all([
+          this.kundliPlanetRepository.find({
+            where: { kundli_id: kundli.id, is_deleted: false },
+          }),
+          this.kundliHouseRepository.find({
+            where: { kundli_id: kundli.id, is_deleted: false },
+          }),
+        ]);
+
+        // Analyze and apply alignment updates
+        const analysis = this.alignmentService.analyzeManifestationText(
+          manifestation,
+          kundli,
+          planets,
+          houses,
+        );
+
+        if (analysis.shouldRewrite && analysis.rewrittenTitle && analysis.rewrittenDescription) {
+          const updates = this.alignmentService.applySafeResponseUpdate(
+            manifestation,
+            analysis.rewrittenTitle,
+            analysis.rewrittenDescription,
+            analysis.kundliProfile!,
+            analysis.alignmentImprovement,
+          );
+
+          // Apply updates to database (deterministic - same input = same output)
+          if (Object.keys(updates).length > 0) {
+            await this.manifestationRepository.update(id, updates);
+            
+            // Reload manifestation to get updated data
+            const updatedManifestation = await this.manifestationRepository.findOne({
+              where: { id, user_id: userId, is_deleted: false },
+            });
+            
+            if (updatedManifestation) {
+              return updatedManifestation;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to apply alignment updates for manifestation ${id}:`,
+        error.message,
+      );
+      // Continue without alignment updates if error occurs
     }
 
     return manifestation;

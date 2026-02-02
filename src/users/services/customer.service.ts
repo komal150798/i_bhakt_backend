@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Customer } from '../entities/customer.entity';
 import { UpdateCustomerProfileDto } from '../dtos/update-customer-profile.dto';
 import { parseDateString, formatDateToISO } from '../../common/utils/date.util';
+import { splitFullName } from '../../common/utils/string.util';
 import { ListUsersDto } from '../dtos/list-users.dto';
 import { PlanType } from '../../common/enums/plan-type.enum';
 import { KundliService } from '../../kundli/services/kundli.service';
@@ -74,11 +75,18 @@ export class CustomerService {
   async updateProfile(id: number, updateData: UpdateCustomerProfileDto): Promise<Customer> {
     const customer = await this.findOne(id);
 
-    // Update fields
-    if (updateData.first_name !== undefined) {
+    // Handle full_name - split into first_name and last_name if provided
+    if (updateData.full_name !== undefined && updateData.full_name !== null) {
+      const { first_name, last_name } = splitFullName(updateData.full_name);
+      customer.first_name = first_name || null;
+      customer.last_name = last_name || null;
+    }
+
+    // Update fields (only if not already set by full_name)
+    if (updateData.first_name !== undefined && updateData.full_name === undefined) {
       customer.first_name = updateData.first_name;
     }
-    if (updateData.last_name !== undefined) {
+    if (updateData.last_name !== undefined && updateData.full_name === undefined) {
       customer.last_name = updateData.last_name;
     }
     if (updateData.email !== undefined) {
@@ -107,6 +115,23 @@ export class CustomerService {
     }
     if (updateData.avatar_url !== undefined) {
       customer.avatar_url = updateData.avatar_url || null;
+    }
+    if (updateData.avatar_img !== undefined) {
+      customer.avatar_img = updateData.avatar_img || null;
+    }
+    if (updateData.life_role !== undefined) {
+      customer.life_role = updateData.life_role || null;
+    }
+    if (updateData.relationship_status !== undefined) {
+      customer.relationship_status = updateData.relationship_status || null;
+    }
+    if (updateData.interests !== undefined) {
+      // Convert array to JSON string, or null if empty
+      if (updateData.interests && updateData.interests.length > 0) {
+        customer.interests = JSON.stringify(updateData.interests);
+      } else {
+        customer.interests = null;
+      }
     }
 
     // Update modify_date

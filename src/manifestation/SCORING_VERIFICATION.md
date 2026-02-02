@@ -177,3 +177,5 @@ The scoring logic:
 - ✅ Updates astro support async with kundli data
 
 
+
+

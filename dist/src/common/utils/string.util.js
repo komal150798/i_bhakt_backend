@@ -4,6 +4,7 @@ exports.formatFullName = formatFullName;
 exports.safeTrim = safeTrim;
 exports.isEmpty = isEmpty;
 exports.capitalize = capitalize;
+exports.splitFullName = splitFullName;
 function formatFullName(firstName, lastName, fallback = 'User') {
     const parts = [];
     if (firstName)
@@ -23,5 +24,19 @@ function capitalize(value) {
     if (!value)
         return '';
     return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+function splitFullName(fullName) {
+    if (!fullName || !fullName.trim()) {
+        return { first_name: '', last_name: '' };
+    }
+    const trimmed = fullName.trim();
+    const spaceIndex = trimmed.indexOf(' ');
+    if (spaceIndex === -1) {
+        return { first_name: trimmed, last_name: '' };
+    }
+    return {
+        first_name: trimmed.substring(0, spaceIndex).trim(),
+        last_name: trimmed.substring(spaceIndex + 1).trim(),
+    };
 }
 //# sourceMappingURL=string.util.js.map

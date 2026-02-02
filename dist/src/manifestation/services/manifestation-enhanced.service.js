@@ -35,8 +35,9 @@ const confidence_scoring_util_1 = require("../algorithms/confidence-scoring.util
 const ngram_matching_util_1 = require("../algorithms/ngram-matching.util");
 const date_util_1 = require("../../common/utils/date.util");
 const number_util_1 = require("../../common/utils/number.util");
+const manifestation_alignment_service_1 = require("./manifestation-alignment.service");
 let ManifestationEnhancedService = ManifestationEnhancedService_1 = class ManifestationEnhancedService {
-    constructor(manifestationRepository, userRepository, customerRepository, dashaRepository, antardashaRepository, pratyantarRepository, sukshmaRepository, kundliRepository, kundliPlanetRepository, kundliHouseRepository, aiEvaluationService, swissEphemerisService, kundliService) {
+    constructor(manifestationRepository, userRepository, customerRepository, dashaRepository, antardashaRepository, pratyantarRepository, sukshmaRepository, kundliRepository, kundliPlanetRepository, kundliHouseRepository, aiEvaluationService, swissEphemerisService, kundliService, alignmentService) {
         this.manifestationRepository = manifestationRepository;
         this.userRepository = userRepository;
         this.customerRepository = customerRepository;
@@ -50,6 +51,7 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         this.aiEvaluationService = aiEvaluationService;
         this.swissEphemerisService = swissEphemerisService;
         this.kundliService = kundliService;
+        this.alignmentService = alignmentService;
         this.logger = new common_1.Logger(ManifestationEnhancedService_1.name);
         this.regexCache = new Map();
     }
@@ -568,6 +570,37 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         });
         if (!manifestation) {
             throw new common_1.NotFoundException('Manifestation not found');
+        }
+        try {
+            const kundli = await this.kundliRepository.findOne({
+                where: { user_id: userId, is_deleted: false },
+            });
+            if (kundli) {
+                const [planets, houses] = await Promise.all([
+                    this.kundliPlanetRepository.find({
+                        where: { kundli_id: kundli.id, is_deleted: false },
+                    }),
+                    this.kundliHouseRepository.find({
+                        where: { kundli_id: kundli.id, is_deleted: false },
+                    }),
+                ]);
+                const analysis = this.alignmentService.analyzeManifestationText(manifestation, kundli, planets, houses);
+                if (analysis.shouldRewrite && analysis.rewrittenTitle && analysis.rewrittenDescription) {
+                    const updates = this.alignmentService.applySafeResponseUpdate(manifestation, analysis.rewrittenTitle, analysis.rewrittenDescription, analysis.kundliProfile, analysis.alignmentImprovement);
+                    if (Object.keys(updates).length > 0) {
+                        await this.manifestationRepository.update(id, updates);
+                        const updatedManifestation = await this.manifestationRepository.findOne({
+                            where: { id, user_id: userId, is_deleted: false },
+                        });
+                        if (updatedManifestation) {
+                            return updatedManifestation;
+                        }
+                    }
+                }
+            }
+        }
+        catch (error) {
+            this.logger.warn(`Failed to apply alignment updates for manifestation ${id}:`, error.message);
         }
         return manifestation;
     }
@@ -2521,6 +2554,7 @@ exports.ManifestationEnhancedService = ManifestationEnhancedService = Manifestat
         typeorm_2.Repository,
         manifestation_ai_evaluation_service_1.ManifestationAIEvaluationService,
         swiss_ephemeris_service_1.SwissEphemerisService,
-        kundli_service_1.KundliService])
+        kundli_service_1.KundliService,
+        manifestation_alignment_service_1.ManifestationAlignmentService])
 ], ManifestationEnhancedService);
 //# sourceMappingURL=manifestation-enhanced.service.js.map

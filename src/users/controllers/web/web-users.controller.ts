@@ -12,6 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { UpdateCustomerProfileDto } from '../../dtos/update-customer-profile.dto';
 import { parseDateString } from '../../../common/utils/date.util';
+import { splitFullName } from '../../../common/utils/string.util';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { CurrentUserPayload } from '../../../common/types/jwt-payload.interface';
@@ -122,12 +123,31 @@ export class WebUsersController {
     } else {
       // Update User - convert DTO to User entity format (handle date conversion)
       const userUpdateData: Partial<User> = {};
-      // Copy all fields except date_of_birth
+      
+      // Handle full_name - split into first_name and last_name if provided
+      if (updateData.full_name !== undefined && updateData.full_name !== null) {
+        const { first_name, last_name } = splitFullName(updateData.full_name);
+        userUpdateData.first_name = first_name || null;
+        userUpdateData.last_name = last_name || null;
+      }
+      
+      // Copy all fields except date_of_birth and full_name
       Object.keys(updateData).forEach(key => {
-        if (key !== 'date_of_birth') {
+        if (key !== 'date_of_birth' && key !== 'full_name') {
           (userUpdateData as any)[key] = (updateData as any)[key];
         }
       });
+      
+      // Only set first_name/last_name if full_name was not provided
+      if (updateData.full_name === undefined) {
+        if (updateData.first_name !== undefined) {
+          userUpdateData.first_name = updateData.first_name;
+        }
+        if (updateData.last_name !== undefined) {
+          userUpdateData.last_name = updateData.last_name;
+        }
+      }
+      
       if (updateData.date_of_birth) {
         userUpdateData.date_of_birth = parseDateString(updateData.date_of_birth);
       }

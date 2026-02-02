@@ -19,6 +19,7 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const customer_entity_1 = require("../entities/customer.entity");
 const date_util_1 = require("../../common/utils/date.util");
+const string_util_1 = require("../../common/utils/string.util");
 const kundli_service_1 = require("../../kundli/services/kundli.service");
 const common_2 = require("@nestjs/common");
 let CustomerService = CustomerService_1 = class CustomerService {
@@ -65,10 +66,15 @@ let CustomerService = CustomerService_1 = class CustomerService {
     }
     async updateProfile(id, updateData) {
         const customer = await this.findOne(id);
-        if (updateData.first_name !== undefined) {
+        if (updateData.full_name !== undefined && updateData.full_name !== null) {
+            const { first_name, last_name } = (0, string_util_1.splitFullName)(updateData.full_name);
+            customer.first_name = first_name || null;
+            customer.last_name = last_name || null;
+        }
+        if (updateData.first_name !== undefined && updateData.full_name === undefined) {
             customer.first_name = updateData.first_name;
         }
-        if (updateData.last_name !== undefined) {
+        if (updateData.last_name !== undefined && updateData.full_name === undefined) {
             customer.last_name = updateData.last_name;
         }
         if (updateData.email !== undefined) {
@@ -97,6 +103,23 @@ let CustomerService = CustomerService_1 = class CustomerService {
         }
         if (updateData.avatar_url !== undefined) {
             customer.avatar_url = updateData.avatar_url || null;
+        }
+        if (updateData.avatar_img !== undefined) {
+            customer.avatar_img = updateData.avatar_img || null;
+        }
+        if (updateData.life_role !== undefined) {
+            customer.life_role = updateData.life_role || null;
+        }
+        if (updateData.relationship_status !== undefined) {
+            customer.relationship_status = updateData.relationship_status || null;
+        }
+        if (updateData.interests !== undefined) {
+            if (updateData.interests && updateData.interests.length > 0) {
+                customer.interests = JSON.stringify(updateData.interests);
+            }
+            else {
+                customer.interests = null;
+            }
         }
         customer.modify_date = new Date();
         try {

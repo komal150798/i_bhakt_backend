@@ -151,3 +151,5 @@ The manifestation system now supports **9 main categories** with comprehensive k
 - **Dhandha vs Dhan**: "dhandha" = business, "dhan" = wealth (different words)
 
 
+
+

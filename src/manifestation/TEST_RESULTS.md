@@ -76,3 +76,5 @@ The manifestation category detection is now **96.55% accurate** with comprehensi
 The one borderline case ("Mixed career and love") is acceptable as it correctly identifies both categories, with relationship having slightly higher score due to keyword matching.
 
 
+
+

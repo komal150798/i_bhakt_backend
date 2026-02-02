@@ -30,6 +30,10 @@ __decorate([
     __metadata("design:type", String)
 ], Customer.prototype, "last_name", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 200, nullable: true, name: 'full_name' }),
+    __metadata("design:type", String)
+], Customer.prototype, "full_name", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: 'varchar', length: 100, unique: true, nullable: true }),
     __metadata("design:type", String)
 ], Customer.prototype, "email", void 0);
@@ -94,6 +98,22 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'text', nullable: true }),
     __metadata("design:type", String)
 ], Customer.prototype, "avatar_url", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true, name: 'avatar_img' }),
+    __metadata("design:type", String)
+], Customer.prototype, "avatar_img", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 100, nullable: true, name: 'life_role' }),
+    __metadata("design:type", String)
+], Customer.prototype, "life_role", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 50, nullable: true, name: 'relationship_status' }),
+    __metadata("design:type", String)
+], Customer.prototype, "relationship_status", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "interests", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'enum', enum: plan_type_enum_1.PlanType, default: plan_type_enum_1.PlanType.FREE, name: 'current_plan' }),
     __metadata("design:type", String)

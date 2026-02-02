@@ -24,6 +24,7 @@ const axios_1 = require("@nestjs/axios");
 const manifestation_llm_analyzer_service_1 = require("./services/manifestation-llm-analyzer.service");
 const manifestation_backend_config_service_1 = require("./services/manifestation-backend-config.service");
 const manifestation_db_config_service_1 = require("./services/manifestation-db-config.service");
+const manifestation_alignment_service_1 = require("./services/manifestation-alignment.service");
 const constants_module_1 = require("../common/constants/constants.module");
 const ai_prompt_module_1 = require("../common/ai/ai-prompt.module");
 const dasha_record_entity_1 = require("../database/entities/dasha-record.entity");
@@ -81,6 +82,7 @@ exports.ManifestationModule = ManifestationModule = __decorate([
             manifestation_llm_analyzer_service_1.ManifestationLLMAnalyzerService,
             manifestation_backend_config_service_1.ManifestationBackendConfigService,
             manifestation_db_config_service_1.ManifestationDbConfigService,
+            manifestation_alignment_service_1.ManifestationAlignmentService,
             seed_manifestation_master_data_service_1.SeedManifestationMasterDataService,
         ],
         exports: [manifestation_service_1.ManifestationService, manifestation_enhanced_service_1.ManifestationEnhancedService, manifestation_db_config_service_1.ManifestationDbConfigService],

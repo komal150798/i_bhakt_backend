@@ -198,3 +198,5 @@ ALTER TABLE notifications ADD CONSTRAINT fk_notification_customer
 - Foreign key column names (`user_id`) are kept for compatibility but now reference `cst_customer.id`
 
 
+
+

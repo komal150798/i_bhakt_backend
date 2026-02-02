@@ -8,6 +8,7 @@ import { CustomerToken } from '../../auth/entities/customer-token.entity';
 export declare class Customer extends BaseEntity {
     first_name: string | null;
     last_name: string | null;
+    full_name: string | null;
     email: string | null;
     phone_number: string;
     password: string | null;
@@ -24,6 +25,10 @@ export declare class Customer extends BaseEntity {
     dasha_at_birth: string | null;
     gender: string | null;
     avatar_url: string | null;
+    avatar_img: string | null;
+    life_role: string | null;
+    relationship_status: string | null;
+    interests: string | null;
     current_plan: PlanType;
     referral_code: string | null;
     referred_by: number | null;

@@ -29,6 +29,7 @@ import { HttpModule } from '@nestjs/axios';
 import { ManifestationLLMAnalyzerService } from './services/manifestation-llm-analyzer.service';
 import { ManifestationBackendConfigService } from './services/manifestation-backend-config.service';
 import { ManifestationDbConfigService } from './services/manifestation-db-config.service';
+import { ManifestationAlignmentService } from './services/manifestation-alignment.service';
 import { ConstantsModule } from '../common/constants/constants.module';
 import { AIPromptModule } from '../common/ai/ai-prompt.module';
 import { DashaRecord } from '../database/entities/dasha-record.entity';
@@ -84,6 +85,7 @@ import { SeedManifestationMasterDataService } from './seeds/seed-manifestation-m
     ManifestationLLMAnalyzerService,
     ManifestationBackendConfigService,
     ManifestationDbConfigService, // New database-driven config service
+    ManifestationAlignmentService, // Kundli alignment service
     SeedManifestationMasterDataService, // Seed service for master data
   ],
   exports: [ManifestationService, ManifestationEnhancedService, ManifestationDbConfigService],

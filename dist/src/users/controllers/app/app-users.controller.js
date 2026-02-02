@@ -85,11 +85,24 @@ let AppUsersController = class AppUsersController {
         }
         else {
             const userUpdateData = {};
+            if (updateData.full_name !== undefined && updateData.full_name !== null) {
+                const { first_name, last_name } = (0, string_util_1.splitFullName)(updateData.full_name);
+                userUpdateData.first_name = first_name || null;
+                userUpdateData.last_name = last_name || null;
+            }
             Object.keys(updateData).forEach(key => {
-                if (key !== 'date_of_birth') {
+                if (key !== 'date_of_birth' && key !== 'full_name') {
                     userUpdateData[key] = updateData[key];
                 }
             });
+            if (updateData.full_name === undefined) {
+                if (updateData.first_name !== undefined) {
+                    userUpdateData.first_name = updateData.first_name;
+                }
+                if (updateData.last_name !== undefined) {
+                    userUpdateData.last_name = updateData.last_name;
+                }
+            }
             if (updateData.date_of_birth) {
                 userUpdateData.date_of_birth = (0, date_util_1.parseDateString)(updateData.date_of_birth);
             }
@@ -177,6 +190,18 @@ __decorate([
                     email: 'john.doe@example.com',
                 },
             },
+            withFullName: {
+                summary: 'Update with full_name (will be split into first_name and last_name)',
+                value: {
+                    full_name: 'John Doe',
+                    email: 'john.doe@example.com',
+                    gender: 'male',
+                    life_role: 'Entrepreneur',
+                    relationship_status: 'single',
+                    interests: ['yoga', 'meditation', 'astrology'],
+                    avatar_img: 'https://example.com/avatar.jpg',
+                },
+            },
             withBirthData: {
                 summary: 'Update with birth data for kundli',
                 value: {
@@ -188,6 +213,23 @@ __decorate([
                     latitude: 19.0760,
                     longitude: 72.8777,
                     timezone: 'Asia/Kolkata',
+                },
+            },
+            complete: {
+                summary: 'Complete profile update with all new fields',
+                value: {
+                    full_name: 'Jane Smith',
+                    gender: 'female',
+                    life_role: 'Teacher',
+                    date_of_birth: '1995-05-20',
+                    time_of_birth: '14:45:00',
+                    place_name: 'Delhi',
+                    latitude: 28.6139,
+                    longitude: 77.2090,
+                    timezone: 'Asia/Kolkata',
+                    relationship_status: 'married',
+                    interests: ['reading', 'travel', 'cooking'],
+                    avatar_img: 'https://example.com/avatar.jpg',
                 },
             },
         },

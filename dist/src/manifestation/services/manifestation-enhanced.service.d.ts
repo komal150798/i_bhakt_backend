@@ -13,6 +13,7 @@ import { Kundli } from '../../kundli/entities/kundli.entity';
 import { KundliPlanet } from '../../kundli/entities/kundli-planet.entity';
 import { KundliHouse } from '../../kundli/entities/kundli-house.entity';
 import { KundliService } from '../../kundli/services/kundli.service';
+import { ManifestationAlignmentService } from './manifestation-alignment.service';
 export declare class ManifestationEnhancedService {
     private manifestationRepository;
     private userRepository;
@@ -27,9 +28,10 @@ export declare class ManifestationEnhancedService {
     private aiEvaluationService;
     private swissEphemerisService;
     private kundliService;
+    private alignmentService;
     private readonly logger;
     private readonly regexCache;
-    constructor(manifestationRepository: Repository<Manifestation>, userRepository: Repository<User>, customerRepository: Repository<Customer>, dashaRepository: Repository<DashaRecord>, antardashaRepository: Repository<AntardashaRecord>, pratyantarRepository: Repository<PratyantarDashaRecord>, sukshmaRepository: Repository<SukshmaDashaRecord>, kundliRepository: Repository<Kundli>, kundliPlanetRepository: Repository<KundliPlanet>, kundliHouseRepository: Repository<KundliHouse>, aiEvaluationService: ManifestationAIEvaluationService, swissEphemerisService: SwissEphemerisService, kundliService: KundliService);
+    constructor(manifestationRepository: Repository<Manifestation>, userRepository: Repository<User>, customerRepository: Repository<Customer>, dashaRepository: Repository<DashaRecord>, antardashaRepository: Repository<AntardashaRecord>, pratyantarRepository: Repository<PratyantarDashaRecord>, sukshmaRepository: Repository<SukshmaDashaRecord>, kundliRepository: Repository<Kundli>, kundliPlanetRepository: Repository<KundliPlanet>, kundliHouseRepository: Repository<KundliHouse>, aiEvaluationService: ManifestationAIEvaluationService, swissEphemerisService: SwissEphemerisService, kundliService: KundliService, alignmentService: ManifestationAlignmentService);
     createManifestation(userId: number, dto: CreateManifestationEnhancedDto): Promise<Manifestation>;
     private getQuickScores;
     private enhanceManifestationAsync;

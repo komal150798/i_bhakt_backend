@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const update_customer_profile_dto_1 = require("../../dtos/update-customer-profile.dto");
 const date_util_1 = require("../../../common/utils/date.util");
+const string_util_1 = require("../../../common/utils/string.util");
 const jwt_auth_guard_1 = require("../../../common/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../../common/decorators/current-user.decorator");
 const users_service_1 = require("../../services/users.service");
@@ -90,11 +91,24 @@ let WebUsersController = class WebUsersController {
         }
         else {
             const userUpdateData = {};
+            if (updateData.full_name !== undefined && updateData.full_name !== null) {
+                const { first_name, last_name } = (0, string_util_1.splitFullName)(updateData.full_name);
+                userUpdateData.first_name = first_name || null;
+                userUpdateData.last_name = last_name || null;
+            }
             Object.keys(updateData).forEach(key => {
-                if (key !== 'date_of_birth') {
+                if (key !== 'date_of_birth' && key !== 'full_name') {
                     userUpdateData[key] = updateData[key];
                 }
             });
+            if (updateData.full_name === undefined) {
+                if (updateData.first_name !== undefined) {
+                    userUpdateData.first_name = updateData.first_name;
+                }
+                if (updateData.last_name !== undefined) {
+                    userUpdateData.last_name = updateData.last_name;
+                }
+            }
             if (updateData.date_of_birth) {
                 userUpdateData.date_of_birth = (0, date_util_1.parseDateString)(updateData.date_of_birth);
             }
