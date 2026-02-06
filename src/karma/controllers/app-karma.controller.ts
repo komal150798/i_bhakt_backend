@@ -3,12 +3,12 @@ import {
   Get,
   Post,
   Body,
+  Param,
   Query,
   UseGuards,
-  Request,
   HttpCode,
   HttpStatus,
-  BadRequestException,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,12 +16,14 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
-import { KarmaService, AddKarmaActionDto } from '../services/karma.service';
+import { KarmaService } from '../services/karma.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CurrentUserPayload } from '../../common/types/jwt-payload.interface';
-import { AddKarmaInputDto } from '../dtos/add-karma-input.dto';
+import { RecordKarmaDto } from '../dtos/record-karma.dto';
 
 @ApiTags('Karma (App)')
 @Controller('app/karma')
@@ -31,183 +33,165 @@ export class AppKarmaController {
   constructor(private readonly karmaService: KarmaService) {}
 
   /**
-   * GET /api/v1/app/karma/today
-   * Get today's karma summary and input prompt
+   * Screen 02.1 - Karma Ledger (Main Dashboard)
+   * GET /api/v1/app/karma/ledger
    */
-  @Get('today')
+  @Get('ledger')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Get today's karma summary (Mobile App)" })
+  @ApiOperation({ summary: 'Get Karma Ledger dashboard (Screen 02.1)' })
   @ApiResponse({
     status: 200,
-    description: "Today's karma data retrieved successfully",
+    description: 'Karma ledger data with awareness level, distribution, and tips',
   })
-  async getTodayKarma(@CurrentUser() user: CurrentUserPayload) {
-    const userId = user.id;
-    
-    // Get today's karma entries and summary
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // Get dashboard summary which includes today's data
-    const dashboard = await this.karmaService.getDashboardSummary(userId);
-    
-    // Get today's entries from recent actions
-    const todayEntries = dashboard.recent_actions?.filter((entry: any) => {
-      const entryDate = new Date(entry.entry_date);
-      return entryDate >= today && entryDate < tomorrow;
-    }) || [];
-
-    return {
-      success: true,
-      data: {
-        karma_score: dashboard.overall?.score || 0,
-        today_input_submitted: todayEntries.length > 0,
-        today_input_prompt: todayEntries.length === 0 
-          ? "How did you align with your values today?" 
-          : null,
-        streak: 0, // TODO: Calculate streak from entries
-        weekly_heatmap: [], // TODO: Generate weekly heatmap
-        daily_alignment_tip: null, // TODO: Get from daily alignment tip service
-      },
-    };
+  async getKarmaLedger(@CurrentUser() user: CurrentUserPayload) {
+    const data = await this.karmaService.getKarmaLedger(user.id);
+    return { success: true, data };
   }
 
   /**
-   * POST /api/v1/app/karma/input
-   * Add a karma action/input
+   * Screen 02.2 & 02.3 - Record Karma
+   * POST /api/v1/app/karma/record
    */
-  @Post('input')
+  @Post('record')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Add karma input/action (Mobile App)' })
+  @ApiOperation({ summary: 'Record a karma action (Screen 02.2 & 02.3)' })
   @ApiBody({
-    type: AddKarmaInputDto,
-    description: 'Karma action details',
+    type: RecordKarmaDto,
+    description: 'Karma action with type and description',
     examples: {
-      example1: {
-        summary: 'Add karma action',
+      good: {
+        summary: 'Record a good karma action',
         value: {
-          action_text: 'Helped an elderly person cross the road',
-          timestamp: '2024-01-15T10:30:00Z',
+          karma_type: 'good',
+          description: 'Helped a colleague with a difficult project without being asked.',
+          intention: 'Genuine support',
+          emotional_context: 'Compassion and satisfaction',
+        },
+      },
+      neutral: {
+        summary: 'Record a neutral karma action',
+        value: {
+          karma_type: 'neutral',
+          description: 'Observed a conflict without taking sides.',
+        },
+      },
+      challenging: {
+        summary: 'Record a challenging karma action',
+        value: {
+          karma_type: 'challenging',
+          description: 'Lost patience during a meeting.',
         },
       },
     },
   })
   @ApiResponse({
     status: 201,
-    description: 'Karma input added successfully',
+    description: 'Karma action recorded successfully with confirmation',
   })
-  async addKarmaInput(
-    @Body() inputDto: AddKarmaInputDto,
+  async recordKarma(
+    @Body() dto: RecordKarmaDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    const dto: AddKarmaActionDto = {
+    const data = await this.karmaService.recordKarma({
       user_id: user.id,
-      action_text: inputDto.action_text,
-      timestamp: inputDto.timestamp ? new Date(inputDto.timestamp) : new Date(),
-    };
-
-    const entry = await this.karmaService.addKarmaAction(dto);
-
-    return {
-      success: true,
-      data: {
-        id: entry.id,
-        action_text: entry.text,
-        karma_type: entry.karma_type,
-        score: entry.score,
-        category: entry.category_name,
-        created_at: entry.added_date,
-      },
-    };
+      karma_type: dto.karma_type,
+      description: dto.description,
+      intention: dto.intention,
+      emotional_context: dto.emotional_context,
+    });
+    return { success: true, data };
   }
 
   /**
-   * GET /api/v1/app/karma/scores
-   * Get karma scores (current, weekly, monthly)
+   * Screen 02.5B - Karma List with Filters
+   * GET /api/v1/app/karma/list?filter=all|good|neutral|challenging
+   *
+   * NOTE: This must be defined BEFORE the /:id route
+   * to avoid 'list' being captured as an :id param.
    */
-  @Get('scores')
+  @Get('list')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get karma scores (Mobile App)' })
+  @ApiOperation({ summary: 'Get karma entries list with filters (Screen 02.5B)' })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    enum: ['all', 'good', 'neutral', 'challenging'],
+    description: 'Filter karma entries by type',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Karma scores retrieved successfully',
+    description: 'Filtered karma entries list with legend',
   })
-  async getKarmaScores(@CurrentUser() user: CurrentUserPayload) {
-    if (!user.id) {
-      throw new BadRequestException('User ID is missing');
-    }
-    const userId = user.id;
-    const summary = await this.karmaService.getUserKarmaSummary(userId);
-
-    // Get weekly and monthly insights for scores
-    const weeklyInsights = await this.karmaService.getWeeklyInsights(userId);
-    const monthlyInsights = await this.karmaService.getMonthlyInsights(userId);
-
-    return {
-      success: true,
-      data: {
-        current_score: summary.karma_score?.karma_score || 0,
-        weekly_score: weeklyInsights.karma_score || 0,
-        monthly_score: monthlyInsights.karma_score || 0,
-        trend: summary.karma_score?.trend || 'stable',
-        grade: this.getKarmaGrade(summary.karma_score?.karma_score || 0),
-      },
-    };
+  async getKarmaList(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('filter') filter?: string,
+  ) {
+    const data = await this.karmaService.getKarmaList(user.id, filter);
+    return { success: true, data };
   }
 
   /**
-   * GET /api/v1/app/karma/dashboard
-   * Get comprehensive karma dashboard
+   * Screen 02.7 - Karma Patterns (Awareness over time)
+   * GET /api/v1/app/karma/patterns?filter=week|month|year
    */
-  @Get('dashboard')
+  @Get('patterns')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get karma dashboard (Mobile App)' })
+  @ApiOperation({ summary: 'Get karma patterns chart data (Screen 02.7)' })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    enum: ['week', 'month', 'year'],
+    description: 'Time range filter for patterns',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Dashboard data retrieved successfully',
+    description: 'Karma patterns chart data with daily/monthly breakdown',
   })
-  async getDashboard(@CurrentUser() user: CurrentUserPayload) {
-    if (!user.id) {
-      throw new BadRequestException('User ID is missing');
-    }
-    const userId = user.id;
-    const dashboard = await this.karmaService.getDashboardSummary(userId);
-
-    return {
-      success: true,
-      data: {
-        karma_score: dashboard.overall?.score || 0,
-        karma_grade: dashboard.overall?.grade || 'Fair',
-        trend: dashboard.overall?.trend || 'flat',
-        total_actions: dashboard.overall?.total_actions || 0,
-        recent_actions: dashboard.recent_actions?.slice(0, 10) || [],
-        patterns: dashboard.patterns || [],
-        improvement_plan: dashboard.improvement_plan || {},
-        weekly_trend: dashboard.trends?.weekly || {},
-        monthly_trend: dashboard.trends?.monthly || {},
-        streak: dashboard.streak || {
-          current_days: 0,
-          longest_days: 0,
-          level: 'awaken',
-          level_name: 'Awaken',
-          next_level_threshold: 7,
-          progress_to_next_level: 0,
-        },
-      },
-    };
+  async getKarmaPatterns(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('filter') filter?: string,
+  ) {
+    const data = await this.karmaService.getKarmaPatterns(user.id, filter);
+    return { success: true, data };
   }
 
   /**
-   * Helper method to get karma grade
+   * Screen 02.4 - Karma Insight for a specific entry
+   * GET /api/v1/app/karma/:id/insight
    */
-  private getKarmaGrade(score: number): string {
-    if (score >= 80) return 'Excellent';
-    if (score >= 65) return 'Good';
-    if (score >= 50) return 'Fair';
-    if (score >= 35) return 'Needs Improvement';
-    return 'Poor';
+  @Get(':id/insight')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get karma insight for a specific entry (Screen 02.4)' })
+  @ApiParam({ name: 'id', type: Number, description: 'Karma entry ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Karma insight with alignment gauge and description',
+  })
+  async getKarmaInsight(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const data = await this.karmaService.getKarmaInsight(id, user.id);
+    return { success: true, data };
+  }
+
+  /**
+   * Screen 02.5A - Karma Entry Details
+   * GET /api/v1/app/karma/:id
+   */
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get karma entry details (Screen 02.5A)' })
+  @ApiParam({ name: 'id', type: Number, description: 'Karma entry ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Full karma entry details with teaching and phase impact',
+  })
+  async getKarmaEntry(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const data = await this.karmaService.getKarmaEntryById(id, user.id);
+    return { success: true, data };
   }
 }
-

@@ -28,6 +28,7 @@ const habit_recommendation_service_1 = require("./habit-recommendation.service")
 const karma_streak_service_1 = require("./karma-streak.service");
 const karma_type_enum_1 = require("../../common/enums/karma-type.enum");
 const prompt_service_1 = require("../../common/ai/prompt.service");
+const record_karma_dto_1 = require("../dtos/record-karma.dto");
 let KarmaService = KarmaService_1 = class KarmaService {
     constructor(karmaRepository, customerRepository, aiClassificationService, karmaScoreService, patternAnalysisService, habitRecommendationService, karmaStreakService, promptService, configService, httpService) {
         this.karmaRepository = karmaRepository;
@@ -585,6 +586,346 @@ let KarmaService = KarmaService_1 = class KarmaService {
             change: Math.round(change * 100) / 100,
             change_percentage: changePercentage,
         };
+    }
+    mapKarmaTypeInput(input) {
+        const map = {
+            [record_karma_dto_1.KarmaTypeInput.GOOD]: karma_type_enum_1.KarmaType.GOOD,
+            [record_karma_dto_1.KarmaTypeInput.NEUTRAL]: karma_type_enum_1.KarmaType.NEUTRAL,
+            [record_karma_dto_1.KarmaTypeInput.CHALLENGING]: karma_type_enum_1.KarmaType.BAD,
+        };
+        return map[input] || karma_type_enum_1.KarmaType.NEUTRAL;
+    }
+    getSelfAssessment(karmaType) {
+        if (karmaType === karma_type_enum_1.KarmaType.GOOD)
+            return 'good';
+        if (karmaType === karma_type_enum_1.KarmaType.BAD)
+            return 'bad';
+        return 'neutral';
+    }
+    mapKarmaTypeToDisplay(type) {
+        if (type === karma_type_enum_1.KarmaType.BAD || type === 'bad')
+            return 'challenging';
+        return type;
+    }
+    async getKarmaLedger(userId) {
+        const allEntries = await this.karmaRepository.findByUserId(userId);
+        const karmaScore = await this.karmaScoreService.calculateUserKarmaScore(userId);
+        const streak = await this.karmaStreakService.calculateStreak(userId);
+        let supportiveCount = 0;
+        let neutralCount = 0;
+        let learningCount = 0;
+        for (const entry of allEntries) {
+            if (entry.karma_type === karma_type_enum_1.KarmaType.GOOD) {
+                supportiveCount++;
+            }
+            else if (entry.karma_type === karma_type_enum_1.KarmaType.NEUTRAL) {
+                neutralCount++;
+            }
+            else {
+                learningCount++;
+            }
+        }
+        const alignmentTips = this.generateAlignmentTips(karmaScore.karma_score, karmaScore.trend);
+        return {
+            current_awareness_level: Math.round(karmaScore.karma_score),
+            score_message: 'This score reflects consistency, not morality.',
+            karma_distribution_snapshot: {
+                supportive: supportiveCount,
+                neutral: neutralCount,
+                learning: learningCount,
+            },
+            alignment_tips: alignmentTips,
+            karma_unfolds_message: 'Your karma unfolds over time, not instantly.',
+            streak: {
+                current_days: streak.current_streak_days,
+                longest_days: streak.longest_streak_days,
+                level: streak.level,
+                level_name: streak.level_name,
+            },
+        };
+    }
+    generateAlignmentTips(score, trend) {
+        if (score >= 70) {
+            return [
+                'This is a good phase for awareness over action.',
+                'Small conscious actions matters more now.',
+            ];
+        }
+        else if (score >= 50) {
+            return [
+                'Focus on building consistent positive habits.',
+                'Small conscious actions matters more now.',
+            ];
+        }
+        return [
+            'This is a learning phase - every action is an opportunity.',
+            'Focus on awareness and intention behind your actions.',
+        ];
+    }
+    async recordKarma(dto) {
+        if (!dto.description || dto.description.trim().length === 0) {
+            throw new common_1.BadRequestException('Description is required');
+        }
+        const customer = await this.customerRepository.findOne({
+            where: { id: dto.user_id, is_deleted: false },
+        });
+        if (!customer) {
+            throw new common_1.NotFoundException(`Customer with ID ${dto.user_id} not found.`);
+        }
+        const karmaType = this.mapKarmaTypeInput(dto.karma_type);
+        const classification = await this.aiClassificationService.classifyAction(dto.description, dto.user_id);
+        const entry = await this.karmaRepository.create({
+            user_id: dto.user_id,
+            text: dto.description,
+            karma_type: karmaType,
+            self_assessment: this.getSelfAssessment(karmaType),
+            score: classification.weight,
+            category_slug: classification.category,
+            category_name: classification.category,
+            entry_date: new Date(),
+            ai_analysis: {
+                type: classification.type,
+                confidence: classification.confidence,
+                emotion: classification.emotion,
+                category: classification.category,
+                weight: classification.weight,
+                pattern_key: classification.pattern_key,
+                reasoning: classification.reasoning,
+                habit_recommendation: classification.habit_recommendation,
+                user_selected_type: dto.karma_type,
+                intention: dto.intention || null,
+                emotional_context: dto.emotional_context || null,
+            },
+            metadata: {
+                intention: dto.intention || null,
+                emotional_context: dto.emotional_context || null,
+            },
+        });
+        this.logger.log(`Karma recorded for user ${dto.user_id}: ${dto.karma_type} (AI classified as: ${classification.type})`);
+        return {
+            id: entry.id,
+            unique_id: entry.unique_id,
+            karma_type: this.mapKarmaTypeToDisplay(karmaType),
+            message: 'Your action has been noted.',
+            sub_message: 'Every conscious action leaves an imprint.',
+            entry_date: entry.entry_date,
+        };
+    }
+    async getKarmaInsight(entryId, userId) {
+        const entry = await this.karmaRepository.findById(entryId);
+        if (!entry || entry.user_id !== userId) {
+            throw new common_1.NotFoundException('Karma entry not found');
+        }
+        const karmaScore = await this.karmaScoreService.calculateUserKarmaScore(userId);
+        const aiAnalysis = entry.ai_analysis || {};
+        const userType = this.mapKarmaTypeToDisplay(entry.karma_type);
+        const aiType = aiAnalysis.type || entry.karma_type;
+        const isAligned = (userType === 'good' && aiType === 'good') ||
+            (userType === 'neutral' && aiType === 'neutral') ||
+            (userType === 'challenging' && aiType === 'bad');
+        const alignmentLabel = isAligned ? 'Aligned' : 'Misaligned';
+        let insightDescription = '';
+        if (userType === 'good') {
+            insightDescription = 'This action aligns with a learning phase. It shows a moment of conscious choice that builds resilience.';
+        }
+        else if (userType === 'neutral') {
+            insightDescription = 'This action reflects a neutral observation. Awareness of such moments deepens your understanding.';
+        }
+        else {
+            insightDescription = 'This action represents a challenging moment. Recognizing it is the first step toward growth and transformation.';
+        }
+        if (this.useLLM) {
+            try {
+                const prompt = await this.promptService.getPrompt('karma.insight.entry.gpt5.1', {
+                    action_text: entry.text,
+                    karma_type: userType,
+                    score: entry.score?.toString() || '0',
+                    emotion: aiAnalysis.emotion || 'neutral',
+                    category: aiAnalysis.category || 'general',
+                    current_karma_score: karmaScore.karma_score.toString(),
+                    trend: karmaScore.trend,
+                });
+                const aiInsight = await this.callLLMForInsights(prompt.finalText);
+                if (aiInsight) {
+                    insightDescription = aiInsight;
+                }
+            }
+            catch {
+            }
+        }
+        return {
+            question: 'How this action reflects your current phase',
+            alignment: {
+                label: alignmentLabel,
+                is_aligned: isAligned,
+            },
+            description: insightDescription,
+            impact_message: 'Impact unfolds gradually.',
+        };
+    }
+    async getKarmaEntryById(entryId, userId) {
+        const entry = await this.karmaRepository.findById(entryId);
+        if (!entry || entry.user_id !== userId) {
+            throw new common_1.NotFoundException('Karma entry not found');
+        }
+        const aiAnalysis = entry.ai_analysis || {};
+        const metadata = entry.metadata || {};
+        const score = Number(entry.score) || 0;
+        let phaseImpact = 'Moderate';
+        if (Math.abs(score) >= 8) {
+            phaseImpact = 'Strong';
+        }
+        else if (Math.abs(score) <= 3) {
+            phaseImpact = 'Mild';
+        }
+        let teaching = aiAnalysis.reasoning || '';
+        if (!teaching) {
+            const type = this.mapKarmaTypeToDisplay(entry.karma_type);
+            if (type === 'good') {
+                teaching = 'This action reinforces the value of selfless service and strengthens your connection to community.';
+            }
+            else if (type === 'neutral') {
+                teaching = 'This action represents a moment of observation. Awareness without judgment is itself a form of growth.';
+            }
+            else {
+                teaching = 'This action offers an opportunity for reflection. Understanding our challenges leads to deeper awareness.';
+            }
+        }
+        return {
+            id: entry.id,
+            unique_id: entry.unique_id,
+            karma_type: this.mapKarmaTypeToDisplay(entry.karma_type),
+            date: entry.entry_date,
+            action_description: entry.text,
+            intention_emotional_context: {
+                intention: metadata.intention || aiAnalysis.intention || null,
+                emotional: metadata.emotional_context || aiAnalysis.emotional_context || aiAnalysis.emotion || null,
+            },
+            what_this_action_teaches: teaching,
+            current_karmic_phase_impact: phaseImpact,
+            score: Number(entry.score),
+            category: entry.category_name,
+        };
+    }
+    async getKarmaList(userId, filter = 'all') {
+        let entries;
+        if (filter === 'all' || !filter) {
+            entries = await this.karmaRepository.findByUserId(userId);
+        }
+        else {
+            const karmaTypeFilter = filter === 'challenging' ? 'bad' : filter;
+            entries = await this.karmaRepository.findByUserId(userId, { karma_type: karmaTypeFilter });
+        }
+        const items = entries.map((entry) => ({
+            id: entry.id,
+            unique_id: entry.unique_id,
+            karma_type: this.mapKarmaTypeToDisplay(entry.karma_type),
+            description: entry.text,
+            date: entry.entry_date,
+            score: Number(entry.score),
+            category: entry.category_name,
+            emotion: entry.ai_analysis?.emotion || null,
+        }));
+        const allEntries = await this.karmaRepository.findByUserId(userId);
+        let goodCount = 0;
+        let neutralCount = 0;
+        let challengingCount = 0;
+        for (const entry of allEntries) {
+            if (entry.karma_type === karma_type_enum_1.KarmaType.GOOD) {
+                goodCount++;
+            }
+            else if (entry.karma_type === karma_type_enum_1.KarmaType.NEUTRAL) {
+                neutralCount++;
+            }
+            else {
+                challengingCount++;
+            }
+        }
+        return {
+            filter: filter || 'all',
+            total: items.length,
+            items,
+            legend: {
+                good: { label: 'Supportive actions', count: goodCount },
+                neutral: { label: 'Observation actions', count: neutralCount },
+                challenging: { label: 'Learning action', count: challengingCount },
+            },
+        };
+    }
+    async getKarmaPatterns(userId, filter = 'week') {
+        const now = new Date();
+        let startDate;
+        let dateFormat;
+        switch (filter) {
+            case 'month':
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                dateFormat = 'day';
+                break;
+            case 'year':
+                startDate = new Date(now.getFullYear(), 0, 1);
+                dateFormat = 'month';
+                break;
+            case 'week':
+            default:
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 6);
+                startDate.setHours(0, 0, 0, 0);
+                dateFormat = 'day';
+                break;
+        }
+        const entries = await this.karmaRepository.findByUserIdAndDateRange(userId, startDate, now);
+        const dailyData = new Map();
+        const currentDate = new Date(startDate);
+        while (currentDate <= now) {
+            const dateKey = this.formatDateKey(currentDate, dateFormat);
+            if (!dailyData.has(dateKey)) {
+                dailyData.set(dateKey, { good: 0, neutral: 0, challenging: 0, total: 0 });
+            }
+            if (dateFormat === 'month') {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+            else {
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+        }
+        for (const entry of entries) {
+            const dateKey = this.formatDateKey(new Date(entry.entry_date), dateFormat);
+            const dayData = dailyData.get(dateKey);
+            if (dayData) {
+                dayData.total++;
+                if (entry.karma_type === karma_type_enum_1.KarmaType.GOOD) {
+                    dayData.good++;
+                }
+                else if (entry.karma_type === karma_type_enum_1.KarmaType.NEUTRAL) {
+                    dayData.neutral++;
+                }
+                else {
+                    dayData.challenging++;
+                }
+            }
+        }
+        const chartData = Array.from(dailyData.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([date, data]) => ({
+            date,
+            good: data.good,
+            neutral: data.neutral,
+            challenging: data.challenging,
+            total: data.total,
+        }));
+        return {
+            heading: 'Awareness over time',
+            filter,
+            chart_data: chartData,
+            footer_message: 'Patterns show direction, not destiny.',
+        };
+    }
+    formatDateKey(date, format) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        if (format === 'month') {
+            return `${months[date.getMonth()]} ${date.getFullYear()}`;
+        }
+        return `${months[date.getMonth()]} ${String(date.getDate()).padStart(2, '0')}`;
     }
 };
 exports.KarmaService = KarmaService;

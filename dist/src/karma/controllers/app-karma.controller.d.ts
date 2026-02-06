@@ -1,55 +1,31 @@
 import { KarmaService } from '../services/karma.service';
 import { CurrentUserPayload } from '../../common/types/jwt-payload.interface';
-import { AddKarmaInputDto } from '../dtos/add-karma-input.dto';
+import { RecordKarmaDto } from '../dtos/record-karma.dto';
 export declare class AppKarmaController {
     private readonly karmaService;
     constructor(karmaService: KarmaService);
-    getTodayKarma(user: CurrentUserPayload): Promise<{
+    getKarmaLedger(user: CurrentUserPayload): Promise<{
         success: boolean;
-        data: {
-            karma_score: any;
-            today_input_submitted: boolean;
-            today_input_prompt: string;
-            streak: number;
-            weekly_heatmap: any[];
-            daily_alignment_tip: any;
-        };
+        data: any;
     }>;
-    addKarmaInput(inputDto: AddKarmaInputDto, user: CurrentUserPayload): Promise<{
+    recordKarma(dto: RecordKarmaDto, user: CurrentUserPayload): Promise<{
         success: boolean;
-        data: {
-            id: number;
-            action_text: string;
-            karma_type: import("../../common/enums/karma-type.enum").KarmaType;
-            score: number;
-            category: string;
-            created_at: Date;
-        };
+        data: any;
     }>;
-    getKarmaScores(user: CurrentUserPayload): Promise<{
+    getKarmaList(user: CurrentUserPayload, filter?: string): Promise<{
         success: boolean;
-        data: {
-            current_score: number;
-            weekly_score: any;
-            monthly_score: any;
-            trend: "improving" | "declining" | "stable";
-            grade: string;
-        };
+        data: any;
     }>;
-    getDashboard(user: CurrentUserPayload): Promise<{
+    getKarmaPatterns(user: CurrentUserPayload, filter?: string): Promise<{
         success: boolean;
-        data: {
-            karma_score: any;
-            karma_grade: any;
-            trend: any;
-            total_actions: any;
-            recent_actions: any;
-            patterns: any;
-            improvement_plan: any;
-            weekly_trend: any;
-            monthly_trend: any;
-            streak: any;
-        };
+        data: any;
     }>;
-    private getKarmaGrade;
+    getKarmaInsight(id: number, user: CurrentUserPayload): Promise<{
+        success: boolean;
+        data: any;
+    }>;
+    getKarmaEntry(id: number, user: CurrentUserPayload): Promise<{
+        success: boolean;
+        data: any;
+    }>;
 }

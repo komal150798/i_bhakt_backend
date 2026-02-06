@@ -19,3 +19,7 @@ target/
 *.njsproj
 *.sln
 *.sw?
+# Markdown handling
+*.md
+*.MD
+!README.md

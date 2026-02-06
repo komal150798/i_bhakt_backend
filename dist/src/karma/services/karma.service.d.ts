@@ -10,10 +10,18 @@ import { PatternAnalysisService, PatternAnalysisResult } from './pattern-analysi
 import { HabitRecommendationService, HabitPlan } from './habit-recommendation.service';
 import { KarmaStreakService } from './karma-streak.service';
 import { PromptService } from '../../common/ai/prompt.service';
+import { KarmaTypeInput } from '../dtos/record-karma.dto';
 export interface AddKarmaActionDto {
     user_id: number;
     action_text: string;
     timestamp?: Date;
+}
+export interface RecordKarmaActionDto {
+    user_id: number;
+    karma_type: KarmaTypeInput;
+    description: string;
+    intention?: string;
+    emotional_context?: string;
 }
 export interface KarmaSummaryDto {
     karma_score: KarmaScoreResult;
@@ -77,4 +85,15 @@ export declare class KarmaService {
     private generateImprovementSummary;
     private getWeeklyTrend;
     private getMonthlyTrend;
+    private mapKarmaTypeInput;
+    private getSelfAssessment;
+    private mapKarmaTypeToDisplay;
+    getKarmaLedger(userId: number): Promise<any>;
+    private generateAlignmentTips;
+    recordKarma(dto: RecordKarmaActionDto): Promise<any>;
+    getKarmaInsight(entryId: number, userId: number): Promise<any>;
+    getKarmaEntryById(entryId: number, userId: number): Promise<any>;
+    getKarmaList(userId: number, filter?: string): Promise<any>;
+    getKarmaPatterns(userId: number, filter?: string): Promise<any>;
+    private formatDateKey;
 }
