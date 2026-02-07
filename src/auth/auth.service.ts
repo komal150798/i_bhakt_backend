@@ -9,6 +9,7 @@ import { RefreshToken } from './entities/refresh-token.entity';
 import { CustomerToken } from './entities/customer-token.entity';
 import { AdminToken } from './entities/admin-token.entity';
 import { OtpService } from './services/otp.service';
+
 import { AuthJwtService } from './services/jwt.service';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { UserRole } from '../common/enums/user-role.enum';
@@ -45,37 +46,37 @@ export class AuthService {
   }
 
   async sendOtp(phoneNumber: string): Promise<{ message: string; debug_code?: string }> {
-    // Normalize phone number before storing in OTP cache
+    // Normalize phone number before storing OTP
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
-    const code = this.otpService.issueOtp(normalizedPhone);
+    const otpResult = await this.otpService.issueOtp(normalizedPhone, 'login');
     const response: { message: string; debug_code?: string } = {
       message: 'OTP sent successfully',
     };
-    
+
     // In non-production, include debug code
     if (process.env.APP_ENV !== 'production') {
-      response.debug_code = code;
+      response.debug_code = otpResult.otp_code;
     }
-    
+
     // TODO: In production, send OTP via SMS service
-    // await this.smsService.sendOtp(phoneNumber, code);
-    
+    // await this.smsService.sendOtp(phoneNumber, otpResult.otp_code);
+
     return response;
   }
 
   async sendEmailOtp(email: string): Promise<{ message: string; debug_code?: string }> {
-    const code = this.otpService.issueOtp(email);
+    const otpResult = await this.otpService.issueOtp(email, 'verify_email');
     const response: { message: string; debug_code?: string } = {
       message: 'OTP sent successfully to email',
     };
-    
+
     // In non-production, include debug code
     if (process.env.APP_ENV !== 'production') {
-      response.debug_code = code;
+      response.debug_code = otpResult.otp_code;
     }
-    
+
     // TODO: In production, send OTP via email service
-    // await this.emailService.sendOtp(email, code);
+    // await this.emailService.sendOtp(email, otpResult.otp_code);
     
     return response;
   }
@@ -89,12 +90,12 @@ export class AuthService {
     // Normalize phone number before verification
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
     
-    if (!this.otpService.verifyOtp(normalizedPhone, otpCode)) {
+    if (!(await this.otpService.verifyOtp(normalizedPhone, otpCode))) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Check Customer table
-    const customer = await this.findCustomerByPhone(normalizedPhone);
+    // Check Customer table - pass original phoneNumber so all variations are tried
+    const customer = await this.findCustomerByPhone(phoneNumber);
 
     // If login attempt, customer must exist
     if (isLogin && !customer) {
@@ -117,7 +118,7 @@ export class AuthService {
 
     const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
       sub: userId || 0,
-      phone_number: normalizedPhone,
+      phone_number: customer?.phone_number || normalizedPhone,
       role: role,
       type: 'user',
     };
@@ -144,7 +145,7 @@ export class AuthService {
     refresh_token: string;
     user_id?: number;
   }> {
-    if (!this.otpService.verifyOtp(email, otpCode)) {
+    if (!(await this.otpService.verifyOtp(email, otpCode))) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
@@ -198,10 +199,9 @@ export class AuthService {
    * Used for forgot password flow to verify user exists before sending OTP
    */
   async checkUserExists(phoneNumber: string | null, email: string | null): Promise<boolean> {
-    // Check Customer table only
+    // Check Customer table only - pass original phone so all variations are tried
     if (phoneNumber) {
-      const normalizedPhone = normalizePhoneNumber(phoneNumber);
-      const customer = await this.findCustomerByPhone(normalizedPhone);
+      const customer = await this.findCustomerByPhone(phoneNumber);
       if (customer) return true;
     }
 
@@ -228,17 +228,16 @@ export class AuthService {
       throw new BadRequestException('Either phone_number or email is required');
     }
 
-    // Verify OTP
-    const otpIdentifier = phoneNumber || email!;
-    if (!this.otpService.verifyOtp(otpIdentifier, otpCode)) {
+    // Verify OTP - normalize phone number to match how it was stored in OTP cache
+    const otpIdentifier = phoneNumber ? normalizePhoneNumber(phoneNumber) : email;
+    if (!(await this.otpService.verifyOtp(otpIdentifier, otpCode))) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Find customer
+    // Find customer - pass original phone so all variations are tried
     let customer: Customer | null = null;
     if (phoneNumber) {
-      const normalizedPhone = normalizePhoneNumber(phoneNumber);
-      customer = await this.findCustomerByPhone(normalizedPhone);
+      customer = await this.findCustomerByPhone(phoneNumber);
     } else if (email) {
       customer = await this.findCustomerByEmail(email);
     }
@@ -291,6 +290,26 @@ export class AuthService {
     if (legacyToken) {
       legacyToken.is_revoked = true;
       await this.refreshTokenRepository.save(legacyToken);
+    }
+  }
+
+  /**
+   * Logout by revoking all active tokens for a user
+   * Uses the authenticated user's ID from Bearer token
+   */
+  async logoutByUserId(userId: number, userType: string = 'user'): Promise<void> {
+    if (userType === 'admin') {
+      // Revoke all active admin tokens
+      await this.adminTokenRepository.update(
+        { added_by: userId, is_revoked: false },
+        { is_revoked: true },
+      );
+    } else {
+      // Revoke all active customer tokens
+      await this.customerTokenRepository.update(
+        { customer_id: userId, is_revoked: false },
+        { is_revoked: true },
+      );
     }
   }
 
@@ -428,12 +447,12 @@ export class AuthService {
     // Normalize phone number before verification
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
     
-    if (!this.otpService.verifyOtp(normalizedPhone, otpCode)) {
+    if (!(await this.otpService.verifyOtp(normalizedPhone, otpCode))) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Find or create customer by phone number
-    let customer = await this.findCustomerByPhone(normalizedPhone);
+    // Find or create customer by phone number - pass original to try all variations
+    let customer = await this.findCustomerByPhone(phoneNumber);
 
     if (!customer) {
       // Create new customer
@@ -651,9 +670,7 @@ export class AuthService {
 
     // Check if phone number already exists in Customer table
     if (phone_number) {
-      const existingCustomerByPhone = await this.customerRepository.findOne({
-        where: { phone_number, is_deleted: false },
-      });
+      const existingCustomerByPhone = await this.findCustomerByPhone(phone_number);
       if (existingCustomerByPhone) {
         throw new ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
       }
@@ -1053,23 +1070,28 @@ export class AuthService {
 
   /**
    * Find customer by phone number (checks Customer table first)
+   * Tries multiple variations to handle different storage formats
+   * (some records may have "+", some may not)
    */
   private async findCustomerByPhone(phoneNumber: string): Promise<Customer | null> {
     // First normalize: remove "+" prefix if present
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
-    
+
     // Also try variations (remove all non-digits, last 10 digits)
     const digitsOnly = normalizedPhone.replace(/\D+/g, '');
-    
-    // Try multiple variations
-    const variations = [
-      normalizedPhone.trim(),
-      digitsOnly,
-      digitsOnly.slice(-10), // Last 10 digits
-      phoneNumber.trim(), // Original for backward compatibility
-    ];
 
-    for (const variation of variations) {
+    // Build unique set of variations to try
+    const variationsSet = new Set<string>();
+    variationsSet.add(normalizedPhone.trim());          // e.g. "1234567890"
+    variationsSet.add(`+${normalizedPhone.trim()}`);    // e.g. "+1234567890" (DB may store with +)
+    variationsSet.add(digitsOnly);                       // e.g. "1234567890"
+    if (digitsOnly.length > 10) {
+      variationsSet.add(digitsOnly.slice(-10));          // Last 10 digits
+    }
+    variationsSet.add(phoneNumber.trim());               // Original input as-is
+
+    for (const variation of variationsSet) {
+      if (!variation) continue;
       const customer = await this.customerRepository.findOne({
         where: { phone_number: variation, is_deleted: false },
       });

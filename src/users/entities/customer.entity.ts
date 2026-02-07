@@ -104,6 +104,25 @@ export class Customer extends BaseEntity {
   @Column({ type: 'varchar', length: 50, nullable: true, name: 'last_login_ip' })
   last_login_ip: string | null;
 
+  // OTP fields - stored directly on customer for verification
+  @Column({ type: 'varchar', length: 10, nullable: true, name: 'otp_code' })
+  otp_code: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'otp_expires_at' })
+  otp_expires_at: Date | null;
+
+  @Column({ type: 'int', default: 0, name: 'otp_attempts' })
+  otp_attempts: number;
+
+  @Column({ type: 'int', default: 5, name: 'otp_max_attempts' })
+  otp_max_attempts: number;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, name: 'otp_purpose' })
+  otp_purpose: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'otp_verified_at' })
+  otp_verified_at: Date | null;
+
   // Relations - Now using Customer as the main table for both app and web
   @OneToMany(() => Subscription, (subscription) => subscription.customer)
   subscriptions: Subscription[];

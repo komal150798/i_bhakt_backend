@@ -40,17 +40,34 @@ export class AppUsersController {
     // Get user from Customer table only
     const fullUser = await this.customerService.findByUniqueId(user.unique_id);
     
-    // Optimized response for mobile app (minimal data)
     return {
       success: true,
       data: {
         id: fullUser.unique_id,
-        name: formatFullName(fullUser.first_name, fullUser.last_name),
+        first_name: fullUser.first_name,
+        last_name: fullUser.last_name,
+        full_name: formatFullName(fullUser.first_name, fullUser.last_name),
         email: fullUser.email,
-        phone: fullUser.phone_number,
-        plan: (fullUser as any).current_plan || (fullUser as any).plan || 'free',
-        avatar: (fullUser as any).avatar_url || null,
-        verified: (fullUser as any).is_verified || false,
+        phone_number: fullUser.phone_number,
+        gender: fullUser.gender,
+        date_of_birth: fullUser.date_of_birth,
+        time_of_birth: fullUser.time_of_birth,
+        place_name: fullUser.place_name,
+        latitude: fullUser.latitude,
+        longitude: fullUser.longitude,
+        timezone: fullUser.timezone,
+        life_role: fullUser.life_role,
+        relationship_status: fullUser.relationship_status,
+        interests: fullUser.interests ? JSON.parse(fullUser.interests) : [],
+        avatar_url: fullUser.avatar_url,
+        avatar_img: fullUser.avatar_img,
+        nakshatra: fullUser.nakshatra,
+        pada: fullUser.pada,
+        current_plan: fullUser.current_plan,
+        referral_code: fullUser.referral_code,
+        is_verified: fullUser.is_verified,
+        created_at: fullUser.added_date,
+        updated_at: fullUser.modify_date,
       },
     };
   }
@@ -137,18 +154,38 @@ export class AppUsersController {
       throw new BadRequestException('User unique_id is missing');
     }
     
-    // Get user from Customer table only
-    const fullUser = await this.customerService.findByUniqueId(user.unique_id);
-    
     // Update Customer
     const updated = await this.customerService.updateProfile(user.id, updateData);
-    
+
     return {
       success: true,
+      message: 'Profile updated successfully',
       data: {
         id: updated.unique_id,
-        name: formatFullName(updated.first_name, updated.last_name),
-        message: 'Profile updated',
+        first_name: updated.first_name,
+        last_name: updated.last_name,
+        full_name: formatFullName(updated.first_name, updated.last_name),
+        email: updated.email,
+        phone_number: updated.phone_number,
+        gender: updated.gender,
+        date_of_birth: updated.date_of_birth,
+        time_of_birth: updated.time_of_birth,
+        place_name: updated.place_name,
+        latitude: updated.latitude,
+        longitude: updated.longitude,
+        timezone: updated.timezone,
+        life_role: updated.life_role,
+        relationship_status: updated.relationship_status,
+        interests: updated.interests ? JSON.parse(updated.interests) : [],
+        avatar_url: updated.avatar_url,
+        avatar_img: updated.avatar_img,
+        nakshatra: updated.nakshatra,
+        pada: updated.pada,
+        current_plan: updated.current_plan,
+        referral_code: updated.referral_code,
+        is_verified: updated.is_verified,
+        created_at: updated.added_date,
+        updated_at: updated.modify_date,
       },
     };
   }

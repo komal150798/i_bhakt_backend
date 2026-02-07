@@ -1376,18 +1376,20 @@ export class ManifestationEnhancedService {
       }
 
       // Check if user has required birth data
-      const birthDate = (user as any).date_of_birth || (user as any).birth_date;
-      const birthTime = (user as any).time_of_birth || (user as any).birth_time;
-      const latitude = (user as any).latitude;
-      const longitude = (user as any).longitude;
-      const placeName = (user as any).place_name || (user as any).birth_place;
+      const birthDate = user.date_of_birth;
+      const birthTime = user.time_of_birth;
+      const latitude = user.latitude;
+      const longitude = user.longitude;
+      const placeName = user.place_name;
 
-      // Check what's missing
+      // Check what's missing - only require date, time, and either place or coordinates
       const missingFields: string[] = [];
       if (!birthDate) missingFields.push('Date of Birth');
       if (!birthTime) missingFields.push('Time of Birth');
-      if (!placeName) missingFields.push('Place of Birth');
-      if (!latitude || !longitude) missingFields.push('Birth Location (Latitude/Longitude)');
+      // Need either place_name (for geocoding) or lat/lng
+      if (!placeName && (!latitude || !longitude)) {
+        missingFields.push('Place of Birth');
+      }
 
       if (missingFields.length > 0) {
         const missingFieldsText = missingFields.join(', ');
@@ -1397,30 +1399,31 @@ export class ManifestationEnhancedService {
         };
       }
 
-      // All data available, try to create kundli
+      // Birth data available, auto-generate kundli
+      // KundliService.generateKundli can geocode from place_name if lat/lng are missing
       try {
-        this.logger.log(`Creating kundli for user ${user.id} before manifestation`);
-        const firstName = (user as any).first_name || 'User';
-        const lastName = (user as any).last_name || '';
+        this.logger.log(`Auto-generating kundli for user ${user.id} before manifestation`);
+        const firstName = user.first_name || 'User';
+        const lastName = user.last_name || '';
         const fullName = `${firstName} ${lastName}`.trim();
-        
+
         await this.kundliService.generateKundli(
           {
             name: fullName,
-            birth_date: formatDateToISO(birthDate) || birthDate,
+            birth_date: formatDateToISO(birthDate) || String(birthDate),
             birth_time: birthTime,
             birth_place: placeName || 'Unknown',
-            latitude,
-            longitude,
-            timezone: (user as any).timezone || 'Asia/Kolkata',
+            latitude: latitude || 0,
+            longitude: longitude || 0,
+            timezone: user.timezone || 'Asia/Kolkata',
           },
           user.id,
         );
 
-        this.logger.log(`Kundli created successfully for user ${user.id}`);
+        this.logger.log(`Kundli auto-generated successfully for user ${user.id}`);
         return { isValid: true };
       } catch (kundliError) {
-        this.logger.error(`Failed to create kundli for user ${user.id}:`, kundliError);
+        this.logger.error(`Failed to auto-generate kundli for user ${user.id}:`, kundliError);
         return {
           isValid: false,
           message: 'Failed to generate your kundli. Please ensure your birth details are correct and try again. If the problem persists, please contact support.',

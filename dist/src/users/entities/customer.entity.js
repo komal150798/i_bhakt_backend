@@ -139,6 +139,30 @@ __decorate([
     __metadata("design:type", String)
 ], Customer.prototype, "last_login_ip", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 10, nullable: true, name: 'otp_code' }),
+    __metadata("design:type", String)
+], Customer.prototype, "otp_code", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true, name: 'otp_expires_at' }),
+    __metadata("design:type", Date)
+], Customer.prototype, "otp_expires_at", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'int', default: 0, name: 'otp_attempts' }),
+    __metadata("design:type", Number)
+], Customer.prototype, "otp_attempts", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'int', default: 5, name: 'otp_max_attempts' }),
+    __metadata("design:type", Number)
+], Customer.prototype, "otp_max_attempts", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 50, nullable: true, name: 'otp_purpose' }),
+    __metadata("design:type", String)
+], Customer.prototype, "otp_purpose", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true, name: 'otp_verified_at' }),
+    __metadata("design:type", Date)
+], Customer.prototype, "otp_verified_at", void 0);
+__decorate([
     (0, typeorm_1.OneToMany)(() => subscription_entity_1.Subscription, (subscription) => subscription.customer),
     __metadata("design:type", Array)
 ], Customer.prototype, "subscriptions", void 0);

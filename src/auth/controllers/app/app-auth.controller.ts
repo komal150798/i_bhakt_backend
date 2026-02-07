@@ -18,6 +18,7 @@ import { SendForgotPasswordOtpDto, ResetPasswordDto } from '../../dto/forgot-pas
 import { LoginPasswordDto } from '../../dto/login-password.dto';
 import { RegisterDto } from '../../dto/register.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Public } from '../../../common/decorators/public.decorator';
 import { IsEmail, IsString } from 'class-validator';
 
@@ -246,9 +247,11 @@ export class AppAuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Logout and invalidate refresh token (Mobile App)' })
-  async logout(@Body() dto: RefreshTokenDto) {
-    await this.authService.logout(dto.refresh_token);
+  @ApiOperation({ summary: 'Logout and revoke all active tokens (Mobile App)' })
+  @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Bearer token required' })
+  async logout(@CurrentUser() user: any) {
+    await this.authService.logoutByUserId(user.id, user.type);
     return {
       success: true,
       message: 'Logged out successfully',

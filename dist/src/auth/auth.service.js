@@ -46,31 +46,31 @@ let AuthService = class AuthService {
     }
     async sendOtp(phoneNumber) {
         const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
-        const code = this.otpService.issueOtp(normalizedPhone);
+        const otpResult = await this.otpService.issueOtp(normalizedPhone, 'login');
         const response = {
             message: 'OTP sent successfully',
         };
         if (process.env.APP_ENV !== 'production') {
-            response.debug_code = code;
+            response.debug_code = otpResult.otp_code;
         }
         return response;
     }
     async sendEmailOtp(email) {
-        const code = this.otpService.issueOtp(email);
+        const otpResult = await this.otpService.issueOtp(email, 'verify_email');
         const response = {
             message: 'OTP sent successfully to email',
         };
         if (process.env.APP_ENV !== 'production') {
-            response.debug_code = code;
+            response.debug_code = otpResult.otp_code;
         }
         return response;
     }
     async verifyOtp(phoneNumber, otpCode, isLogin = false) {
         const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
-        if (!this.otpService.verifyOtp(normalizedPhone, otpCode)) {
+        if (!(await this.otpService.verifyOtp(normalizedPhone, otpCode))) {
             throw new common_1.UnauthorizedException('Invalid or expired OTP');
         }
-        const customer = await this.findCustomerByPhone(normalizedPhone);
+        const customer = await this.findCustomerByPhone(phoneNumber);
         if (isLogin && !customer) {
             throw new common_1.NotFoundException('User not found. Please register first or check your phone number.');
         }
@@ -84,7 +84,7 @@ let AuthService = class AuthService {
         }
         const payload = {
             sub: userId || 0,
-            phone_number: normalizedPhone,
+            phone_number: customer?.phone_number || normalizedPhone,
             role: role,
             type: 'user',
         };
@@ -101,7 +101,7 @@ let AuthService = class AuthService {
         };
     }
     async verifyEmailOtp(email, otpCode, isLogin = false) {
-        if (!this.otpService.verifyOtp(email, otpCode)) {
+        if (!(await this.otpService.verifyOtp(email, otpCode))) {
             throw new common_1.UnauthorizedException('Invalid or expired OTP');
         }
         const customer = await this.findCustomerByEmail(email);
@@ -136,8 +136,7 @@ let AuthService = class AuthService {
     }
     async checkUserExists(phoneNumber, email) {
         if (phoneNumber) {
-            const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
-            const customer = await this.findCustomerByPhone(normalizedPhone);
+            const customer = await this.findCustomerByPhone(phoneNumber);
             if (customer)
                 return true;
         }
@@ -152,14 +151,13 @@ let AuthService = class AuthService {
         if (!phoneNumber && !email) {
             throw new common_1.BadRequestException('Either phone_number or email is required');
         }
-        const otpIdentifier = phoneNumber || email;
-        if (!this.otpService.verifyOtp(otpIdentifier, otpCode)) {
+        const otpIdentifier = phoneNumber ? (0, string_util_1.normalizePhoneNumber)(phoneNumber) : email;
+        if (!(await this.otpService.verifyOtp(otpIdentifier, otpCode))) {
             throw new common_1.UnauthorizedException('Invalid or expired OTP');
         }
         let customer = null;
         if (phoneNumber) {
-            const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
-            customer = await this.findCustomerByPhone(normalizedPhone);
+            customer = await this.findCustomerByPhone(phoneNumber);
         }
         else if (email) {
             customer = await this.findCustomerByEmail(email);
@@ -198,6 +196,14 @@ let AuthService = class AuthService {
         if (legacyToken) {
             legacyToken.is_revoked = true;
             await this.refreshTokenRepository.save(legacyToken);
+        }
+    }
+    async logoutByUserId(userId, userType = 'user') {
+        if (userType === 'admin') {
+            await this.adminTokenRepository.update({ added_by: userId, is_revoked: false }, { is_revoked: true });
+        }
+        else {
+            await this.customerTokenRepository.update({ customer_id: userId, is_revoked: false }, { is_revoked: true });
         }
     }
     async storeRefreshToken(token, userId, adminId, expiresIn) {
@@ -272,10 +278,10 @@ let AuthService = class AuthService {
     }
     async verifyOtpForLogin(phoneNumber, otpCode) {
         const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
-        if (!this.otpService.verifyOtp(normalizedPhone, otpCode)) {
+        if (!(await this.otpService.verifyOtp(normalizedPhone, otpCode))) {
             throw new common_1.UnauthorizedException('Invalid or expired OTP');
         }
-        let customer = await this.findCustomerByPhone(normalizedPhone);
+        let customer = await this.findCustomerByPhone(phoneNumber);
         if (!customer) {
             customer = this.customerRepository.create({
                 phone_number: normalizedPhone,
@@ -396,9 +402,7 @@ let AuthService = class AuthService {
             }
         }
         if (phone_number) {
-            const existingCustomerByPhone = await this.customerRepository.findOne({
-                where: { phone_number, is_deleted: false },
-            });
+            const existingCustomerByPhone = await this.findCustomerByPhone(phone_number);
             if (existingCustomerByPhone) {
                 throw new common_1.ConflictException('This phone number is already registered. Please use a different phone number or try logging in.');
             }
@@ -654,13 +658,17 @@ let AuthService = class AuthService {
     async findCustomerByPhone(phoneNumber) {
         const normalizedPhone = (0, string_util_1.normalizePhoneNumber)(phoneNumber);
         const digitsOnly = normalizedPhone.replace(/\D+/g, '');
-        const variations = [
-            normalizedPhone.trim(),
-            digitsOnly,
-            digitsOnly.slice(-10),
-            phoneNumber.trim(),
-        ];
-        for (const variation of variations) {
+        const variationsSet = new Set();
+        variationsSet.add(normalizedPhone.trim());
+        variationsSet.add(`+${normalizedPhone.trim()}`);
+        variationsSet.add(digitsOnly);
+        if (digitsOnly.length > 10) {
+            variationsSet.add(digitsOnly.slice(-10));
+        }
+        variationsSet.add(phoneNumber.trim());
+        for (const variation of variationsSet) {
+            if (!variation)
+                continue;
             const customer = await this.customerRepository.findOne({
                 where: { phone_number: variation, is_deleted: false },
             });

@@ -21,7 +21,6 @@ const customer_entity_1 = require("../entities/customer.entity");
 const date_util_1 = require("../../common/utils/date.util");
 const string_util_1 = require("../../common/utils/string.util");
 const kundli_service_1 = require("../../kundli/services/kundli.service");
-const common_2 = require("@nestjs/common");
 let CustomerService = CustomerService_1 = class CustomerService {
     constructor(customerRepository, kundliService, kundliRepository) {
         this.customerRepository = customerRepository;
@@ -78,7 +77,16 @@ let CustomerService = CustomerService_1 = class CustomerService {
             customer.last_name = updateData.last_name;
         }
         if (updateData.email !== undefined) {
-            customer.email = updateData.email;
+            const newEmail = updateData.email?.trim().toLowerCase() || null;
+            if (newEmail && newEmail !== customer.email) {
+                const existing = await this.customerRepository.findOne({
+                    where: { email: newEmail, is_deleted: false, id: (0, typeorm_2.Not)(id) },
+                });
+                if (existing) {
+                    throw new common_1.ConflictException('This email is already registered by another user.');
+                }
+            }
+            customer.email = newEmail;
         }
         if (updateData.date_of_birth !== undefined) {
             customer.date_of_birth = (0, date_util_1.parseDateString)(updateData.date_of_birth) || null;
@@ -243,7 +251,7 @@ exports.CustomerService = CustomerService;
 exports.CustomerService = CustomerService = CustomerService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
-    __param(2, (0, common_2.Inject)('IKundliRepository')),
+    __param(2, (0, common_1.Inject)('IKundliRepository')),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         kundli_service_1.KundliService, Object])
 ], CustomerService);

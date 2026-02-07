@@ -24,6 +24,7 @@ const forgot_password_dto_1 = require("../../dto/forgot-password.dto");
 const login_password_dto_1 = require("../../dto/login-password.dto");
 const register_dto_1 = require("../../dto/register.dto");
 const jwt_auth_guard_1 = require("../../../common/guards/jwt-auth.guard");
+const current_user_decorator_1 = require("../../../common/decorators/current-user.decorator");
 const public_decorator_1 = require("../../../common/decorators/public.decorator");
 const class_validator_1 = require("class-validator");
 class SendEmailOtpDto {
@@ -143,8 +144,8 @@ let AppAuthController = class AppAuthController {
             },
         };
     }
-    async logout(dto) {
-        await this.authService.logout(dto.refresh_token);
+    async logout(user) {
+        await this.authService.logoutByUserId(user.id, user.type);
         return {
             success: true,
             message: 'Logged out successfully',
@@ -331,10 +332,12 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    (0, swagger_1.ApiOperation)({ summary: 'Logout and invalidate refresh token (Mobile App)' }),
-    __param(0, (0, common_1.Body)()),
+    (0, swagger_1.ApiOperation)({ summary: 'Logout and revoke all active tokens (Mobile App)' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Logged out successfully' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'Unauthorized - Bearer token required' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [refresh_token_dto_1.RefreshTokenDto]),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AppAuthController.prototype, "logout", null);
 __decorate([

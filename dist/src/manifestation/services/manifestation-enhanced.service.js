@@ -955,20 +955,19 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
                 this.logger.debug(`Kundli exists for user ${user.id}`);
                 return { isValid: true };
             }
-            const birthDate = user.date_of_birth || user.birth_date;
-            const birthTime = user.time_of_birth || user.birth_time;
+            const birthDate = user.date_of_birth;
+            const birthTime = user.time_of_birth;
             const latitude = user.latitude;
             const longitude = user.longitude;
-            const placeName = user.place_name || user.birth_place;
+            const placeName = user.place_name;
             const missingFields = [];
             if (!birthDate)
                 missingFields.push('Date of Birth');
             if (!birthTime)
                 missingFields.push('Time of Birth');
-            if (!placeName)
+            if (!placeName && (!latitude || !longitude)) {
                 missingFields.push('Place of Birth');
-            if (!latitude || !longitude)
-                missingFields.push('Birth Location (Latitude/Longitude)');
+            }
             if (missingFields.length > 0) {
                 const missingFieldsText = missingFields.join(', ');
                 return {
@@ -977,24 +976,24 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
                 };
             }
             try {
-                this.logger.log(`Creating kundli for user ${user.id} before manifestation`);
+                this.logger.log(`Auto-generating kundli for user ${user.id} before manifestation`);
                 const firstName = user.first_name || 'User';
                 const lastName = user.last_name || '';
                 const fullName = `${firstName} ${lastName}`.trim();
                 await this.kundliService.generateKundli({
                     name: fullName,
-                    birth_date: (0, date_util_1.formatDateToISO)(birthDate) || birthDate,
+                    birth_date: (0, date_util_1.formatDateToISO)(birthDate) || String(birthDate),
                     birth_time: birthTime,
                     birth_place: placeName || 'Unknown',
-                    latitude,
-                    longitude,
+                    latitude: latitude || 0,
+                    longitude: longitude || 0,
                     timezone: user.timezone || 'Asia/Kolkata',
                 }, user.id);
-                this.logger.log(`Kundli created successfully for user ${user.id}`);
+                this.logger.log(`Kundli auto-generated successfully for user ${user.id}`);
                 return { isValid: true };
             }
             catch (kundliError) {
-                this.logger.error(`Failed to create kundli for user ${user.id}:`, kundliError);
+                this.logger.error(`Failed to auto-generate kundli for user ${user.id}:`, kundliError);
                 return {
                     isValid: false,
                     message: 'Failed to generate your kundli. Please ensure your birth details are correct and try again. If the problem persists, please contact support.',

@@ -46,6 +46,7 @@ export declare class AuthService {
         message: string;
     }>;
     logout(refreshTokenString: string): Promise<void>;
+    logoutByUserId(userId: number, userType?: string): Promise<void>;
     private storeRefreshToken;
     private parseExpiresIn;
     validateCustomerByPassword(username: string, password: string): Promise<Customer | null>;

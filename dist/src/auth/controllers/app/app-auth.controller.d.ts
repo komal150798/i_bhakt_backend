@@ -84,7 +84,7 @@ export declare class AppAuthController {
             refresh_token: string;
         };
     }>;
-    logout(dto: RefreshTokenDto): Promise<{
+    logout(user: any): Promise<{
         success: boolean;
         message: string;
     }>;

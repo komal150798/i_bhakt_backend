@@ -35,6 +35,12 @@ export declare class Customer extends BaseEntity {
     is_verified: boolean;
     last_login: Date | null;
     last_login_ip: string | null;
+    otp_code: string | null;
+    otp_expires_at: Date | null;
+    otp_attempts: number;
+    otp_max_attempts: number;
+    otp_purpose: string | null;
+    otp_verified_at: Date | null;
     subscriptions: Subscription[];
     orders: Order[];
     kundlis: Kundli[];

@@ -1,6 +1,6 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import { Customer } from '../entities/customer.entity';
 import { UpdateCustomerProfileDto } from '../dtos/update-customer-profile.dto';
 import { parseDateString, formatDateToISO } from '../../common/utils/date.util';
@@ -9,7 +9,6 @@ import { ListUsersDto } from '../dtos/list-users.dto';
 import { PlanType } from '../../common/enums/plan-type.enum';
 import { KundliService } from '../../kundli/services/kundli.service';
 import { IKundliRepository } from '../../core/interfaces/repositories/kundli-repository.interface';
-import { Inject } from '@nestjs/common';
 
 @Injectable()
 export class CustomerService {
@@ -90,7 +89,16 @@ export class CustomerService {
       customer.last_name = updateData.last_name;
     }
     if (updateData.email !== undefined) {
-      customer.email = updateData.email;
+      const newEmail = updateData.email?.trim().toLowerCase() || null;
+      if (newEmail && newEmail !== customer.email) {
+        const existing = await this.customerRepository.findOne({
+          where: { email: newEmail, is_deleted: false, id: Not(id) },
+        });
+        if (existing) {
+          throw new ConflictException('This email is already registered by another user.');
+        }
+      }
+      customer.email = newEmail;
     }
     if (updateData.date_of_birth !== undefined) {
       customer.date_of_birth = parseDateString(updateData.date_of_birth) || null;
