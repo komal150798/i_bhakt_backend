@@ -20,8 +20,11 @@ export declare class KundliService {
     private readonly configService;
     private readonly logger;
     private readonly useAICalculation;
+    private readonly pythonApiUrl;
     constructor(httpService: HttpService, kundliRepository: IKundliRepository, kundliPlanetRepository: Repository<KundliPlanet>, kundliHouseRepository: Repository<KundliHouse>, customerRepository: Repository<Customer>, swissEphemerisService: SwissEphemerisService, aiKundliService: AIKundliService, configService: ConfigService);
     generateKundli(dto: GenerateKundliDto, userId?: number): Promise<KundliResponseDto>;
+    private calculateWithPythonAPI;
+    private getSignLord;
     private calculateWithSwissEphemeris;
     private transformSwissEphemerisResponse;
     private transformAIKundliResponse;

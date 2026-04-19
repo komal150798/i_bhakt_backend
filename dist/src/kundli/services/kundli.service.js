@@ -93,7 +93,9 @@ let KundliService = KundliService_1 = class KundliService {
         this.configService = configService;
         this.logger = new common_1.Logger(KundliService_1.name);
         this.useAICalculation = this.configService.get('USE_AI_KUNDLI') === 'true';
+        this.pythonApiUrl = this.configService.get('PYTHON_KUNDLI_URL') || 'http://localhost:8000';
         this.logger.log(`Kundli calculation mode: ${this.useAICalculation ? 'AI-based' : 'Swiss Ephemeris'}`);
+        this.logger.log(`Python Kundli API URL: ${this.pythonApiUrl}`);
     }
     async generateKundli(dto, userId) {
         try {
@@ -106,6 +108,16 @@ let KundliService = KundliService_1 = class KundliService {
                 timezone = coords.timezone || 'Asia/Kolkata';
             }
             let transformedData;
+            if (userId) {
+                try {
+                    transformedData = await this.calculateWithPythonAPI(dto, userId, latitude, longitude, timezone || 'Asia/Kolkata');
+                    this.logger.log('Kundli generated via Python Swiss Ephemeris API');
+                    return transformedData;
+                }
+                catch (pythonError) {
+                    this.logger.warn(`Python API unavailable, falling back to local calculation: ${pythonError?.message || pythonError}`);
+                }
+            }
             if (this.useAICalculation && this.aiKundliService) {
                 this.logger.log('Using AI for kundli calculation');
                 try {
@@ -144,8 +156,84 @@ let KundliService = KundliService_1 = class KundliService {
         }
         catch (error) {
             this.logger.error('Error generating kundli:', error);
-            throw new common_1.BadRequestException(error.response?.data?.message || error.message || 'Failed to generate kundli');
+            const message = error?.response?.data?.message || error?.message || 'Failed to generate kundli';
+            throw new common_1.BadRequestException(message);
         }
+    }
+    async calculateWithPythonAPI(dto, userId, latitude, longitude, timezone) {
+        this.logger.log(`Calling Python Kundli API at ${this.pythonApiUrl}/v1/kundli/generate`);
+        const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.pythonApiUrl}/v1/kundli/generate`, {
+            user_id: userId,
+            name: dto.name,
+            birth_date: dto.birth_date,
+            birth_time: dto.birth_time,
+            birth_place: dto.birth_place,
+            latitude,
+            longitude,
+            timezone,
+            ayanamsa: dto.ayanamsa || 1,
+        }, {
+            timeout: 30000,
+        }));
+        const data = response.data;
+        if (!data.success) {
+            throw new common_1.BadRequestException('Python API returned error');
+        }
+        return {
+            name: dto.name,
+            birth_date: dto.birth_date,
+            birth_time: dto.birth_time,
+            birth_place: dto.birth_place,
+            latitude,
+            longitude,
+            timezone,
+            lagna: {
+                sign: data.lagna.name,
+                degrees: data.lagna.degrees,
+                lord: this.getSignLord(data.lagna.name),
+            },
+            nakshatra: {
+                name: data.nakshatra.name,
+                pada: data.nakshatra.pada,
+                lord: data.nakshatra.lord,
+            },
+            planets: data.planets.map((p) => ({
+                name: p.name,
+                longitude: p.longitude,
+                latitude: 0,
+                sign: p.sign,
+                sign_lord: p.sign_lord,
+                nakshatra: p.nakshatra,
+                nakshatra_lord: p.nakshatra_lord,
+                nakshatra_pada: p.nakshatra_pada,
+                house: p.house,
+                is_retrograde: p.is_retrograde,
+            })),
+            houses: data.houses.map((h) => ({
+                house_number: h.house_number,
+                sign: h.sign,
+                sign_lord: h.sign_lord,
+                start_degree: h.cusp_degrees,
+                end_degree: 0,
+            })),
+            ayanamsa: data.ayanamsa,
+            tithi: data.panchanga?.tithi || '',
+            yoga: data.panchanga?.yoga || '',
+            karana: data.panchanga?.karana || '',
+            dasha_timeline: data.dasha_timeline,
+            full_data: data,
+        };
+    }
+    getSignLord(signName) {
+        const signLords = {
+            Aries: 'Mars', Taurus: 'Venus', Gemini: 'Mercury', Cancer: 'Moon',
+            Leo: 'Sun', Virgo: 'Mercury', Libra: 'Venus', Scorpio: 'Mars',
+            Sagittarius: 'Jupiter', Capricorn: 'Saturn', Aquarius: 'Saturn', Pisces: 'Jupiter',
+            Mesha: 'Mars', Vrishabha: 'Venus', Mithuna: 'Mercury', Karka: 'Moon',
+            Simha: 'Sun', Kanya: 'Mercury', Tula: 'Venus', Vrishchika: 'Mars',
+            Dhanu: 'Jupiter', Makara: 'Saturn', Kumbha: 'Saturn', Meena: 'Jupiter',
+        };
+        return signLords[signName] || '';
     }
     async calculateWithSwissEphemeris(dto, birthDateTime, latitude, longitude, timezone) {
         this.logger.log('Using Swiss Ephemeris for kundli calculation');

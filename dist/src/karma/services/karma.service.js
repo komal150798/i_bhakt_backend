@@ -266,13 +266,13 @@ let KarmaService = KarmaService_1 = class KarmaService {
     }
     generateWeeklySummary(summary, patternAnalysis) {
         const totalActions = summary.total_actions ?? 0;
-        const karmaScore = summary.karma_score ?? 0;
+        const karmaScore = Number(summary.karma_score ?? 0);
         const insights = patternAnalysis.behavioral_insights ?? '';
         return `This week, you recorded ${totalActions} actions. Your karma score is ${karmaScore.toFixed(1)}. ${insights}`;
     }
     generateMonthlySummary(summary, patternAnalysis) {
         const totalActions = summary.total_actions ?? 0;
-        const karmaScore = summary.karma_score ?? 0;
+        const karmaScore = Number(summary.karma_score ?? 0);
         const insights = patternAnalysis.behavioral_insights ?? '';
         return `This month, you recorded ${totalActions} actions. Your karma score is ${karmaScore.toFixed(1)}. ${insights}`;
     }
