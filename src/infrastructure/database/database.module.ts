@@ -64,6 +64,7 @@ import { SmsTemplate } from '../../common/messaging/entities/sms-template.entity
 import { EmailTemplate } from '../../common/messaging/entities/email-template.entity';
 import { SmsCredential } from '../../common/messaging/entities/sms-credential.entity';
 import { EmailCredential } from '../../common/messaging/entities/email-credential.entity';
+import { ContactInquiry } from '../../contact/entities/contact-inquiry.entity';
 import { SeedService } from './seeds/seed-admin.service';
 
 // All entities array
@@ -137,6 +138,8 @@ const entities = [
   EmailTemplate,
   SmsCredential,
   EmailCredential,
+  // Contact
+  ContactInquiry,
 ];
 
 @Module({
