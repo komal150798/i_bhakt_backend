@@ -157,11 +157,11 @@ export class AppSubscriptionController {
     paymentId: string,
     provider: 'stripe' | 'razorpay',
   ): Promise<boolean> {
-    // TODO: Implement actual payment verification
-    // - For Stripe: Use Stripe API to verify payment intent
-    // - For Razorpay: Use Razorpay API to verify payment
-    
-    // Stub implementation
+    if (provider === 'razorpay') {
+      // Use POST /api/v1/app/payments/razorpay/order then .../verify (signature + server fetch)
+      return false;
+    }
+    // TODO: Stripe payment intent verification
     return paymentId && paymentId.length > 0;
   }
 }

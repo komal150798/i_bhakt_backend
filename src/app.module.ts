@@ -27,6 +27,7 @@ import { AdminRbacModule } from './admin-rbac/admin-rbac.module';
 import { AIPromptModule } from './common/ai/ai-prompt.module';
 import { ConstantsModule } from './common/constants/constants.module';
 import { ContactModule } from './contact/contact.module';
+import { TestimonialModule } from './testimonial/testimonial.module';
 import { AdminController } from './controllers/admin/admin.controller';
 import { HomeController } from './controllers/home/home.controller';
 import { HomeKarmaController } from './controllers/home/karma.controller';
@@ -70,6 +71,7 @@ import redisConfig from './config/redis.config';
     AIPromptModule, // AI Prompt Management System
     ConstantsModule, // Central Constants Service
     ContactModule,
+    TestimonialModule,
   ],
   controllers: [
     AdminController,

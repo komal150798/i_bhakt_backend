@@ -83,6 +83,9 @@ let AppSubscriptionController = class AppSubscriptionController {
         };
     }
     async verifyPayment(paymentId, provider) {
+        if (provider === 'razorpay') {
+            return false;
+        }
         return paymentId && paymentId.length > 0;
     }
 };

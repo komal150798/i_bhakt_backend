@@ -35,6 +35,10 @@ export class Order extends BaseEntity {
   @Column({ type: 'jsonb', nullable: true })
   items: Record<string, any>[] | null;
 
+  /** Razorpay order id (e.g. order_xxx) for payment matching */
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'razorpay_order_id' })
+  razorpay_order_id: string | null;
+
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 

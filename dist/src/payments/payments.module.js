@@ -10,14 +10,26 @@ exports.PaymentsModule = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const payment_entity_1 = require("./entities/payment.entity");
+const order_entity_1 = require("../orders/entities/order.entity");
+const plan_entity_1 = require("../plans/entities/plan.entity");
+const razorpay_service_1 = require("./services/razorpay.service");
+const razorpay_checkout_service_1 = require("./services/razorpay-checkout.service");
+const razorpay_app_controller_1 = require("./controllers/razorpay-app.controller");
+const plans_module_1 = require("../plans/plans.module");
+const subscriptions_module_1 = require("../subscriptions/subscriptions.module");
 let PaymentsModule = class PaymentsModule {
 };
 exports.PaymentsModule = PaymentsModule;
 exports.PaymentsModule = PaymentsModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([payment_entity_1.Payment])],
-        providers: [],
-        exports: [],
+        imports: [
+            typeorm_1.TypeOrmModule.forFeature([payment_entity_1.Payment, order_entity_1.Order, plan_entity_1.Plan]),
+            plans_module_1.PlansModule,
+            subscriptions_module_1.SubscriptionsModule,
+        ],
+        controllers: [razorpay_app_controller_1.RazorpayAppController],
+        providers: [razorpay_service_1.RazorpayService, razorpay_checkout_service_1.RazorpayCheckoutService],
+        exports: [razorpay_service_1.RazorpayService, razorpay_checkout_service_1.RazorpayCheckoutService],
     })
 ], PaymentsModule);
 //# sourceMappingURL=payments.module.js.map

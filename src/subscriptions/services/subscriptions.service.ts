@@ -80,6 +80,15 @@ export class SubscriptionsService {
     startDate?: Date,
     orderId?: number,
   ): Promise<Subscription> {
+    if (orderId) {
+      const existingForOrder = await this.subscriptionRepository.findOne({
+        where: { user_id: userId, order_id: orderId, is_deleted: false },
+      });
+      if (existingForOrder) {
+        return existingForOrder;
+      }
+    }
+
     const customer = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
     if (!customer) {
       throw new NotFoundException('Customer not found');

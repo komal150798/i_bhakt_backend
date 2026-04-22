@@ -56,6 +56,10 @@ __decorate([
     __metadata("design:type", Array)
 ], Order.prototype, "items", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 255, nullable: true, name: 'razorpay_order_id' }),
+    __metadata("design:type", String)
+], Order.prototype, "razorpay_order_id", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: 'text', nullable: true }),
     __metadata("design:type", String)
 ], Order.prototype, "notes", void 0);

@@ -62,6 +62,14 @@ let SubscriptionsService = class SubscriptionsService {
         return plan.modules?.map((m) => m.slug) || [];
     }
     async createSubscription(userId, planId, startDate, orderId) {
+        if (orderId) {
+            const existingForOrder = await this.subscriptionRepository.findOne({
+                where: { user_id: userId, order_id: orderId, is_deleted: false },
+            });
+            if (existingForOrder) {
+                return existingForOrder;
+            }
+        }
         const customer = await this.customerRepository.findOne({ where: { id: userId, is_deleted: false } });
         if (!customer) {
             throw new common_1.NotFoundException('Customer not found');

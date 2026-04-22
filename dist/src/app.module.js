@@ -36,6 +36,7 @@ const admin_rbac_module_1 = require("./admin-rbac/admin-rbac.module");
 const ai_prompt_module_1 = require("./common/ai/ai-prompt.module");
 const constants_module_1 = require("./common/constants/constants.module");
 const contact_module_1 = require("./contact/contact.module");
+const testimonial_module_1 = require("./testimonial/testimonial.module");
 const admin_controller_1 = require("./controllers/admin/admin.controller");
 const home_controller_1 = require("./controllers/home/home.controller");
 const karma_controller_1 = require("./controllers/home/karma.controller");
@@ -82,6 +83,7 @@ exports.AppModule = AppModule = __decorate([
             ai_prompt_module_1.AIPromptModule,
             constants_module_1.ConstantsModule,
             contact_module_1.ContactModule,
+            testimonial_module_1.TestimonialModule,
         ],
         controllers: [
             admin_controller_1.AdminController,

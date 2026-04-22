@@ -13,6 +13,7 @@ export declare class Order extends BaseEntity {
     total_amount: number;
     currency: string;
     items: Record<string, any>[] | null;
+    razorpay_order_id: string | null;
     notes: string | null;
     completed_at: Date | null;
     customer: Customer;

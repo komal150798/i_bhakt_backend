@@ -62,6 +62,7 @@ const email_template_entity_1 = require("../../common/messaging/entities/email-t
 const sms_credential_entity_1 = require("../../common/messaging/entities/sms-credential.entity");
 const email_credential_entity_1 = require("../../common/messaging/entities/email-credential.entity");
 const contact_inquiry_entity_1 = require("../../contact/entities/contact-inquiry.entity");
+const testimonial_entity_1 = require("../../testimonial/entities/testimonial.entity");
 const seed_admin_service_1 = require("./seeds/seed-admin.service");
 const entities = [
     admin_user_entity_1.AdminUser,
@@ -122,6 +123,7 @@ const entities = [
     sms_credential_entity_1.SmsCredential,
     email_credential_entity_1.EmailCredential,
     contact_inquiry_entity_1.ContactInquiry,
+    testimonial_entity_1.Testimonial,
 ];
 let DatabaseModule = DatabaseModule_1 = class DatabaseModule {
     constructor(seedService) {
