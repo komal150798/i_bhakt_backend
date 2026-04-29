@@ -18,6 +18,7 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const manifestation_entity_1 = require("../entities/manifestation.entity");
+const manifestation_progress_entry_entity_1 = require("../entities/manifestation-progress-entry.entity");
 const manifestation_ai_evaluation_service_1 = require("./manifestation-ai-evaluation.service");
 const customer_entity_1 = require("../../users/entities/customer.entity");
 const swiss_ephemeris_service_1 = require("../../astrology/services/swiss-ephemeris.service");
@@ -35,10 +36,13 @@ const ngram_matching_util_1 = require("../algorithms/ngram-matching.util");
 const date_util_1 = require("../../common/utils/date.util");
 const number_util_1 = require("../../common/utils/number.util");
 const manifestation_alignment_service_1 = require("./manifestation-alignment.service");
+const entitlements_service_1 = require("../../subscriptions/services/entitlements.service");
+const plan_type_enum_1 = require("../../common/enums/plan-type.enum");
 let ManifestationEnhancedService = ManifestationEnhancedService_1 = class ManifestationEnhancedService {
-    constructor(manifestationRepository, customerRepository, dashaRepository, antardashaRepository, pratyantarRepository, sukshmaRepository, kundliRepository, kundliPlanetRepository, kundliHouseRepository, aiEvaluationService, swissEphemerisService, kundliService, alignmentService) {
+    constructor(manifestationRepository, customerRepository, manifestationProgressEntryRepository, dashaRepository, antardashaRepository, pratyantarRepository, sukshmaRepository, kundliRepository, kundliPlanetRepository, kundliHouseRepository, aiEvaluationService, swissEphemerisService, kundliService, alignmentService, entitlementsService) {
         this.manifestationRepository = manifestationRepository;
         this.customerRepository = customerRepository;
+        this.manifestationProgressEntryRepository = manifestationProgressEntryRepository;
         this.dashaRepository = dashaRepository;
         this.antardashaRepository = antardashaRepository;
         this.pratyantarRepository = pratyantarRepository;
@@ -50,10 +54,12 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         this.swissEphemerisService = swissEphemerisService;
         this.kundliService = kundliService;
         this.alignmentService = alignmentService;
+        this.entitlementsService = entitlementsService;
         this.logger = new common_1.Logger(ManifestationEnhancedService_1.name);
         this.regexCache = new Map();
     }
     async createManifestation(userId, dto) {
+        await this.enforceManifestationPlanLimit(userId);
         if (dto.description.trim().length < 15) {
             throw new common_1.BadRequestException('Description must be at least 15 characters long. Please provide more details about your manifestation intent.');
         }
@@ -117,6 +123,45 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             this.logger.error(`Async enhancement failed for manifestation ${savedManifestation.id}:`, error);
         });
         return savedManifestation;
+    }
+    async enforceManifestationPlanLimit(userId) {
+        const entitlements = await this.entitlementsService.getUserEntitlements(userId);
+        const manifestationFeature = entitlements.features.find((feature) => feature.feature === 'manifestation_journal');
+        if (!manifestationFeature?.allowed) {
+            throw new common_1.BadRequestException('Manifestation feature is not available in your current plan.');
+        }
+        const monthlyLimit = manifestationFeature.limit !== undefined
+            ? manifestationFeature.limit
+            : this.getMonthlyManifestationLimit(entitlements.plan_type);
+        if (monthlyLimit === null) {
+            return;
+        }
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const nextMonthStart = new Date(monthStart);
+        nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
+        const usage = await this.manifestationRepository
+            .createQueryBuilder('manifestation')
+            .where('manifestation.user_id = :userId', { userId })
+            .andWhere('manifestation.is_deleted = false')
+            .andWhere('manifestation.added_date >= :monthStart', { monthStart })
+            .andWhere('manifestation.added_date < :nextMonthStart', { nextMonthStart })
+            .getCount();
+        if (usage >= monthlyLimit) {
+            throw new common_1.BadRequestException(`Monthly manifestation limit reached for your plan (${monthlyLimit}/${monthlyLimit}). Please upgrade to continue.`);
+        }
+    }
+    getMonthlyManifestationLimit(planType) {
+        if (planType === plan_type_enum_1.PlanType.FREE)
+            return 3;
+        if (planType === plan_type_enum_1.PlanType.PAID)
+            return 12;
+        if (planType === plan_type_enum_1.PlanType.PREMIUM)
+            return null;
+        if (planType === plan_type_enum_1.PlanType.REFERRAL)
+            return 12;
+        return 3;
     }
     async getQuickScores(title, description) {
         const rawText = `${title} ${description}`;
@@ -467,6 +512,26 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
         }
     }
     async getDashboard(userId) {
+        const entitlements = await this.entitlementsService.getUserEntitlements(userId);
+        const manifestationFeature = entitlements.features.find((feature) => feature.feature === 'manifestation_journal');
+        const monthlyLimit = manifestationFeature?.limit !== undefined
+            ? manifestationFeature.limit
+            : this.getMonthlyManifestationLimit(entitlements.plan_type);
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const nextMonthStart = new Date(monthStart);
+        nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
+        const monthlyUsed = await this.manifestationRepository
+            .createQueryBuilder('manifestation')
+            .where('manifestation.user_id = :userId', { userId })
+            .andWhere('manifestation.is_deleted = false')
+            .andWhere('manifestation.added_date >= :monthStart', { monthStart })
+            .andWhere('manifestation.added_date < :nextMonthStart', { nextMonthStart })
+            .getCount();
+        const monthlyRemaining = monthlyLimit === null ? null : Math.max(0, monthlyLimit - monthlyUsed);
+        const canCreateManifestation = manifestationFeature?.allowed !== false &&
+            (monthlyLimit === null || monthlyUsed < monthlyLimit);
         const activeManifestations = await this.manifestationRepository.find({
             where: {
                 user_id: userId,
@@ -556,6 +621,13 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
                 action_windows: m.action_windows,
                 progress_tracking: m.progress_tracking,
             })),
+            plan: {
+                plan_type: entitlements.plan_type,
+                monthly_limit: monthlyLimit,
+                monthly_used: monthlyUsed,
+                monthly_remaining: monthlyRemaining,
+                can_create_manifestation: canCreateManifestation,
+            },
         };
     }
     async getManifestationById(id, userId) {
@@ -729,6 +801,86 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             next_optimal_date: topOptimalDates.length > 0 ? topOptimalDates[0] : null,
             planetary_influences: planetaryInfluences.slice(0, 5),
         };
+    }
+    async addDailyProgressEntry(manifestationId, userId, entryDate, actionText) {
+        await this.ensureManifestationAccess(manifestationId, userId);
+        const parsedDate = new Date(entryDate);
+        if (Number.isNaN(parsedDate.getTime())) {
+            throw new common_1.BadRequestException('Invalid entry date format. Use YYYY-MM-DD.');
+        }
+        const trimmedAction = actionText.trim();
+        if (!trimmedAction) {
+            throw new common_1.BadRequestException('Action text is required.');
+        }
+        const existingEntry = await this.manifestationProgressEntryRepository.findOne({
+            where: {
+                manifestation_id: manifestationId,
+                user_id: userId,
+                entry_date: parsedDate,
+                is_deleted: false,
+            },
+        });
+        if (existingEntry) {
+            throw new common_1.BadRequestException('Daily progress for this date already exists. You can edit the existing entry.');
+        }
+        const entry = this.manifestationProgressEntryRepository.create({
+            manifestation_id: manifestationId,
+            user_id: userId,
+            entry_date: parsedDate,
+            action_text: trimmedAction,
+        });
+        return this.manifestationProgressEntryRepository.save(entry);
+    }
+    async getDailyProgressEntries(manifestationId, userId) {
+        await this.ensureManifestationAccess(manifestationId, userId);
+        return this.manifestationProgressEntryRepository.find({
+            where: {
+                manifestation_id: manifestationId,
+                user_id: userId,
+                is_deleted: false,
+            },
+            order: {
+                entry_date: 'DESC',
+                added_date: 'DESC',
+            },
+        });
+    }
+    async updateDailyProgressEntry(entryId, userId, actionText) {
+        const entry = await this.manifestationProgressEntryRepository.findOne({
+            where: { id: entryId, user_id: userId, is_deleted: false },
+        });
+        if (!entry) {
+            throw new common_1.NotFoundException('Daily progress entry not found.');
+        }
+        const trimmedAction = actionText.trim();
+        if (!trimmedAction) {
+            throw new common_1.BadRequestException('Action text is required.');
+        }
+        entry.action_text = trimmedAction;
+        return this.manifestationProgressEntryRepository.save(entry);
+    }
+    async deleteDailyProgressEntry(entryId, userId) {
+        const entry = await this.manifestationProgressEntryRepository.findOne({
+            where: { id: entryId, user_id: userId, is_deleted: false },
+        });
+        if (!entry) {
+            throw new common_1.NotFoundException('Daily progress entry not found.');
+        }
+        entry.is_deleted = true;
+        await this.manifestationProgressEntryRepository.save(entry);
+    }
+    async ensureManifestationAccess(manifestationId, userId) {
+        const manifestation = await this.manifestationRepository.findOne({
+            where: {
+                id: manifestationId,
+                user_id: userId,
+                is_deleted: false,
+            },
+            select: ['id'],
+        });
+        if (!manifestation) {
+            throw new common_1.NotFoundException('Manifestation not found');
+        }
     }
     async getAllManifestations(userId, includeArchived = false) {
         const where = {
@@ -2523,14 +2675,16 @@ exports.ManifestationEnhancedService = ManifestationEnhancedService = Manifestat
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(manifestation_entity_1.Manifestation)),
     __param(1, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
-    __param(2, (0, typeorm_1.InjectRepository)(dasha_record_entity_1.DashaRecord)),
-    __param(3, (0, typeorm_1.InjectRepository)(antardasha_record_entity_1.AntardashaRecord)),
-    __param(4, (0, typeorm_1.InjectRepository)(pratyantar_dasha_record_entity_1.PratyantarDashaRecord)),
-    __param(5, (0, typeorm_1.InjectRepository)(sukshma_dasha_record_entity_1.SukshmaDashaRecord)),
-    __param(6, (0, typeorm_1.InjectRepository)(kundli_entity_1.Kundli)),
-    __param(7, (0, typeorm_1.InjectRepository)(kundli_planet_entity_1.KundliPlanet)),
-    __param(8, (0, typeorm_1.InjectRepository)(kundli_house_entity_1.KundliHouse)),
+    __param(2, (0, typeorm_1.InjectRepository)(manifestation_progress_entry_entity_1.ManifestationProgressEntry)),
+    __param(3, (0, typeorm_1.InjectRepository)(dasha_record_entity_1.DashaRecord)),
+    __param(4, (0, typeorm_1.InjectRepository)(antardasha_record_entity_1.AntardashaRecord)),
+    __param(5, (0, typeorm_1.InjectRepository)(pratyantar_dasha_record_entity_1.PratyantarDashaRecord)),
+    __param(6, (0, typeorm_1.InjectRepository)(sukshma_dasha_record_entity_1.SukshmaDashaRecord)),
+    __param(7, (0, typeorm_1.InjectRepository)(kundli_entity_1.Kundli)),
+    __param(8, (0, typeorm_1.InjectRepository)(kundli_planet_entity_1.KundliPlanet)),
+    __param(9, (0, typeorm_1.InjectRepository)(kundli_house_entity_1.KundliHouse)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
@@ -2542,6 +2696,7 @@ exports.ManifestationEnhancedService = ManifestationEnhancedService = Manifestat
         manifestation_ai_evaluation_service_1.ManifestationAIEvaluationService,
         swiss_ephemeris_service_1.SwissEphemerisService,
         kundli_service_1.KundliService,
-        manifestation_alignment_service_1.ManifestationAlignmentService])
+        manifestation_alignment_service_1.ManifestationAlignmentService,
+        entitlements_service_1.EntitlementsService])
 ], ManifestationEnhancedService);
 //# sourceMappingURL=manifestation-enhanced.service.js.map

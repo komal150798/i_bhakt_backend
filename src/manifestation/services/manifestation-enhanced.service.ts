@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Manifestation } from '../entities/manifestation.entity';
+import { ManifestationProgressEntry } from '../entities/manifestation-progress-entry.entity';
 import { CreateManifestationEnhancedDto } from '../dtos/create-manifestation-enhanced.dto';
 import { ManifestationAIEvaluationService } from './manifestation-ai-evaluation.service';
 import { Customer } from '../../users/entities/customer.entity';
@@ -20,6 +21,8 @@ import { NGramMatching } from '../algorithms/ngram-matching.util';
 import { formatDateToISO } from '../../common/utils/date.util';
 import { toNumber } from '../../common/utils/number.util';
 import { ManifestationAlignmentService } from './manifestation-alignment.service';
+import { EntitlementsService } from '../../subscriptions/services/entitlements.service';
+import { PlanType } from '../../common/enums/plan-type.enum';
 
 @Injectable()
 export class ManifestationEnhancedService {
@@ -33,6 +36,8 @@ export class ManifestationEnhancedService {
     private manifestationRepository: Repository<Manifestation>,
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
+    @InjectRepository(ManifestationProgressEntry)
+    private manifestationProgressEntryRepository: Repository<ManifestationProgressEntry>,
     @InjectRepository(DashaRecord)
     private dashaRepository: Repository<DashaRecord>,
     @InjectRepository(AntardashaRecord)
@@ -51,6 +56,7 @@ export class ManifestationEnhancedService {
     private swissEphemerisService: SwissEphemerisService,
     private kundliService: KundliService,
     private alignmentService: ManifestationAlignmentService,
+    private entitlementsService: EntitlementsService,
   ) {}
 
   /**
@@ -60,6 +66,8 @@ export class ManifestationEnhancedService {
     userId: number,
     dto: CreateManifestationEnhancedDto,
   ): Promise<Manifestation> {
+    await this.enforceManifestationPlanLimit(userId);
+
     // Validate description length (15 characters min)
     if (dto.description.trim().length < 15) {
       throw new BadRequestException(
@@ -144,6 +152,57 @@ export class ManifestationEnhancedService {
     });
 
     return savedManifestation;
+  }
+
+  private async enforceManifestationPlanLimit(userId: number): Promise<void> {
+    const entitlements = await this.entitlementsService.getUserEntitlements(userId);
+    const manifestationFeature = entitlements.features.find(
+      (feature) => feature.feature === 'manifestation_journal',
+    );
+
+    if (!manifestationFeature?.allowed) {
+      throw new BadRequestException(
+        'Manifestation feature is not available in your current plan.',
+      );
+    }
+
+    const monthlyLimit =
+      manifestationFeature.limit !== undefined
+        ? manifestationFeature.limit
+        : this.getMonthlyManifestationLimit(entitlements.plan_type);
+
+    // Unlimited plan
+    if (monthlyLimit === null) {
+      return;
+    }
+
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const nextMonthStart = new Date(monthStart);
+    nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
+
+    const usage = await this.manifestationRepository
+      .createQueryBuilder('manifestation')
+      .where('manifestation.user_id = :userId', { userId })
+      .andWhere('manifestation.is_deleted = false')
+      .andWhere('manifestation.added_date >= :monthStart', { monthStart })
+      .andWhere('manifestation.added_date < :nextMonthStart', { nextMonthStart })
+      .getCount();
+    if (usage >= monthlyLimit) {
+      throw new BadRequestException(
+        `Monthly manifestation limit reached for your plan (${monthlyLimit}/${monthlyLimit}). Please upgrade to continue.`,
+      );
+    }
+  }
+
+  private getMonthlyManifestationLimit(planType: PlanType): number | null {
+    if (planType === PlanType.FREE) return 3;
+    if (planType === PlanType.PAID) return 12;
+    if (planType === PlanType.PREMIUM) return null; // Unlimited
+    if (planType === PlanType.REFERRAL) return 12;
+    return 3;
   }
 
   /**
@@ -679,7 +738,44 @@ export class ManifestationEnhancedService {
       action_windows: any;
       progress_tracking: any;
     }>;
+    plan: {
+      plan_type: PlanType;
+      monthly_limit: number | null;
+      monthly_used: number;
+      monthly_remaining: number | null;
+      can_create_manifestation: boolean;
+    };
   }> {
+    const entitlements = await this.entitlementsService.getUserEntitlements(userId);
+    const manifestationFeature = entitlements.features.find(
+      (feature) => feature.feature === 'manifestation_journal',
+    );
+    const monthlyLimit =
+      manifestationFeature?.limit !== undefined
+        ? manifestationFeature.limit
+        : this.getMonthlyManifestationLimit(entitlements.plan_type);
+
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const nextMonthStart = new Date(monthStart);
+    nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
+
+    const monthlyUsed = await this.manifestationRepository
+      .createQueryBuilder('manifestation')
+      .where('manifestation.user_id = :userId', { userId })
+      .andWhere('manifestation.is_deleted = false')
+      .andWhere('manifestation.added_date >= :monthStart', { monthStart })
+      .andWhere('manifestation.added_date < :nextMonthStart', { nextMonthStart })
+      .getCount();
+
+    const monthlyRemaining =
+      monthlyLimit === null ? null : Math.max(0, monthlyLimit - monthlyUsed);
+    const canCreateManifestation =
+      manifestationFeature?.allowed !== false &&
+      (monthlyLimit === null || monthlyUsed < monthlyLimit);
+
     // Get active manifestations - sorted by creation date (oldest first)
     const activeManifestations = await this.manifestationRepository.find({
       where: {
@@ -793,6 +889,13 @@ export class ManifestationEnhancedService {
         action_windows: m.action_windows,
         progress_tracking: m.progress_tracking,
       })),
+      plan: {
+        plan_type: entitlements.plan_type,
+        monthly_limit: monthlyLimit,
+        monthly_used: monthlyUsed,
+        monthly_remaining: monthlyRemaining,
+        can_create_manifestation: canCreateManifestation,
+      },
     };
   }
 
@@ -1069,6 +1172,125 @@ export class ManifestationEnhancedService {
       next_optimal_date: topOptimalDates.length > 0 ? topOptimalDates[0] : null,
       planetary_influences: planetaryInfluences.slice(0, 5),
     };
+  }
+
+  /**
+   * Add one daily progress entry for a manifestation.
+   * Business rule: single entry per manifestation per day.
+   */
+  async addDailyProgressEntry(
+    manifestationId: number,
+    userId: number,
+    entryDate: string,
+    actionText: string,
+  ): Promise<ManifestationProgressEntry> {
+    await this.ensureManifestationAccess(manifestationId, userId);
+
+    const parsedDate = new Date(entryDate);
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException('Invalid entry date format. Use YYYY-MM-DD.');
+    }
+
+    const trimmedAction = actionText.trim();
+    if (!trimmedAction) {
+      throw new BadRequestException('Action text is required.');
+    }
+
+    const existingEntry = await this.manifestationProgressEntryRepository.findOne({
+      where: {
+        manifestation_id: manifestationId,
+        user_id: userId,
+        entry_date: parsedDate,
+        is_deleted: false,
+      },
+    });
+
+    if (existingEntry) {
+      throw new BadRequestException(
+        'Daily progress for this date already exists. You can edit the existing entry.',
+      );
+    }
+
+    const entry = this.manifestationProgressEntryRepository.create({
+      manifestation_id: manifestationId,
+      user_id: userId,
+      entry_date: parsedDate,
+      action_text: trimmedAction,
+    });
+
+    return this.manifestationProgressEntryRepository.save(entry);
+  }
+
+  async getDailyProgressEntries(
+    manifestationId: number,
+    userId: number,
+  ): Promise<ManifestationProgressEntry[]> {
+    await this.ensureManifestationAccess(manifestationId, userId);
+
+    return this.manifestationProgressEntryRepository.find({
+      where: {
+        manifestation_id: manifestationId,
+        user_id: userId,
+        is_deleted: false,
+      },
+      order: {
+        entry_date: 'DESC',
+        added_date: 'DESC',
+      },
+    });
+  }
+
+  async updateDailyProgressEntry(
+    entryId: number,
+    userId: number,
+    actionText: string,
+  ): Promise<ManifestationProgressEntry> {
+    const entry = await this.manifestationProgressEntryRepository.findOne({
+      where: { id: entryId, user_id: userId, is_deleted: false },
+    });
+
+    if (!entry) {
+      throw new NotFoundException('Daily progress entry not found.');
+    }
+
+    const trimmedAction = actionText.trim();
+    if (!trimmedAction) {
+      throw new BadRequestException('Action text is required.');
+    }
+
+    entry.action_text = trimmedAction;
+    return this.manifestationProgressEntryRepository.save(entry);
+  }
+
+  async deleteDailyProgressEntry(entryId: number, userId: number): Promise<void> {
+    const entry = await this.manifestationProgressEntryRepository.findOne({
+      where: { id: entryId, user_id: userId, is_deleted: false },
+    });
+
+    if (!entry) {
+      throw new NotFoundException('Daily progress entry not found.');
+    }
+
+    entry.is_deleted = true;
+    await this.manifestationProgressEntryRepository.save(entry);
+  }
+
+  private async ensureManifestationAccess(
+    manifestationId: number,
+    userId: number,
+  ): Promise<void> {
+    const manifestation = await this.manifestationRepository.findOne({
+      where: {
+        id: manifestationId,
+        user_id: userId,
+        is_deleted: false,
+      },
+      select: ['id'],
+    });
+
+    if (!manifestation) {
+      throw new NotFoundException('Manifestation not found');
+    }
   }
 
   /**

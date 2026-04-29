@@ -22,6 +22,7 @@ import { KarmaEntry } from '../karma/entities/karma-entry.entity';
 import { KarmaMasterGood } from '../karma/entities/karma-master-good.entity';
 import { KarmaMasterBad } from '../karma/entities/karma-master-bad.entity';
 import { ManifestationLog } from '../manifestation/entities/manifestation-log.entity';
+import { ManifestationProgressEntry } from '../manifestation/entities/manifestation-progress-entry.entity';
 import { CMSPage } from '../cms/entities/cms-page.entity';
 import { Notification } from '../notifications/entities/notification.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
@@ -48,6 +49,7 @@ const entities = [
   KarmaMasterGood,
   KarmaMasterBad,
   ManifestationLog,
+  ManifestationProgressEntry,
   CMSPage,
   Notification,
   AuditLog,

@@ -7,6 +7,8 @@ import { Subscription } from './entities/subscription.entity';
 import { UsageTracking } from './entities/usage-tracking.entity';
 import { Customer } from '../users/entities/customer.entity';
 import { Plan } from '../plans/entities/plan.entity';
+import { Order } from '../orders/entities/order.entity';
+import { Payment } from '../payments/entities/payment.entity';
 import { AppSubscriptionController } from './controllers/app-subscription.controller';
 import { AppEntitlementsController } from './controllers/app-entitlements.controller';
 import { AdminSubscriptionsController } from './controllers/admin/admin-subscriptions.controller';
@@ -14,7 +16,7 @@ import { PlansModule } from '../plans/plans.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Subscription, UsageTracking, Customer, Plan]),
+    TypeOrmModule.forFeature([Subscription, UsageTracking, Customer, Plan, Order, Payment]),
     PlansModule,
   ],
   controllers: [

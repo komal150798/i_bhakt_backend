@@ -30,7 +30,7 @@ let AuthController = class AuthController {
         this.authService = authService;
     }
     async register(dto) {
-        return this.authService.register(dto.name, dto.email, dto.phone_number, dto.password);
+        return this.authService.register(dto.name, dto.email, dto.phone_number, dto.password, dto.referral_code);
     }
     async login(dto) {
         return this.authService.loginWithPassword(dto.username, dto.password);

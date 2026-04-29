@@ -8,6 +8,7 @@ import { AdminToken } from './entities/admin-token.entity';
 import { OtpService } from './services/otp.service';
 import { AuthJwtService } from './services/jwt.service';
 import { HoroscopeService } from '../horoscope/services/horoscope.service';
+import { SubscriptionsService } from '../subscriptions/services/subscriptions.service';
 export declare class AuthService {
     private customerRepository;
     private adminUserRepository;
@@ -18,7 +19,8 @@ export declare class AuthService {
     private jwtService;
     private configService;
     private horoscopeService;
-    constructor(customerRepository: Repository<Customer>, adminUserRepository: Repository<AdminUser>, refreshTokenRepository: Repository<RefreshToken>, customerTokenRepository: Repository<CustomerToken>, adminTokenRepository: Repository<AdminToken>, otpService: OtpService, jwtService: AuthJwtService, configService: ConfigService, horoscopeService: HoroscopeService);
+    private subscriptionsService;
+    constructor(customerRepository: Repository<Customer>, adminUserRepository: Repository<AdminUser>, refreshTokenRepository: Repository<RefreshToken>, customerTokenRepository: Repository<CustomerToken>, adminTokenRepository: Repository<AdminToken>, otpService: OtpService, jwtService: AuthJwtService, configService: ConfigService, horoscopeService: HoroscopeService, subscriptionsService: SubscriptionsService);
     private getAppSessionExpiration;
     sendOtp(phoneNumber: string): Promise<{
         message: string;
@@ -72,7 +74,7 @@ export declare class AuthService {
         googleId: string;
     }): Promise<Customer>;
     private verifyGoogleToken;
-    register(name: string | undefined, email: string | undefined, phone_number: string | undefined, password: string): Promise<{
+    register(name: string | undefined, email: string | undefined, phone_number: string | undefined, password: string, referralCode?: string): Promise<{
         access_token: string;
         refresh_token: string;
         user: any;
@@ -82,6 +84,10 @@ export declare class AuthService {
     private storeCustomerToken;
     private storeCustomerRefreshToken;
     private formatCustomerResponse;
+    private generateUniqueReferralCode;
+    private ensureCustomerReferralCode;
+    private applyReferralPlanUpgradeIfEligible;
+    private getPlanRank;
     getCurrentUser(userPayload: any): Promise<any>;
     refreshAccessToken(refreshTokenString: string): Promise<{
         access_token: string;

@@ -41,6 +41,19 @@ export class SubscriptionsService {
     return subscription?.plan_type || PlanType.FREE;
   }
 
+  async getActivePlanByType(planType: PlanType): Promise<Plan | null> {
+    return this.planRepository.findOne({
+      where: {
+        plan_type: planType,
+        is_deleted: false,
+        is_enabled: true,
+      },
+      order: {
+        id: 'ASC',
+      },
+    });
+  }
+
   /**
    * Check if user has access to a module
    */

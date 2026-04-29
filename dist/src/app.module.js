@@ -40,6 +40,7 @@ const testimonial_module_1 = require("./testimonial/testimonial.module");
 const admin_controller_1 = require("./controllers/admin/admin.controller");
 const home_controller_1 = require("./controllers/home/home.controller");
 const karma_controller_1 = require("./controllers/home/karma.controller");
+const refer_controller_1 = require("./controllers/home/refer.controller");
 const customer_controller_1 = require("./controllers/customer/customer.controller");
 const karma_controller_2 = require("./controllers/customer/karma.controller");
 const app_controller_1 = require("./controllers/app/app.controller");
@@ -89,6 +90,7 @@ exports.AppModule = AppModule = __decorate([
             admin_controller_1.AdminController,
             home_controller_1.HomeController,
             karma_controller_1.HomeKarmaController,
+            refer_controller_1.ReferController,
             customer_controller_1.CustomerController,
             karma_controller_2.KarmaController,
             app_controller_1.AppController,

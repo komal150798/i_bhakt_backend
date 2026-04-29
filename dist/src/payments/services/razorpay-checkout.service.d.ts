@@ -20,6 +20,12 @@ export interface VerifyResult {
     plan_id: number;
     payment_id: number;
 }
+export interface OfflineSuccessResult {
+    local_order_id: number;
+    payment_id: number;
+    plan_id: number;
+    order_number: string;
+}
 export declare class RazorpayCheckoutService {
     private readonly razorpay;
     private readonly config;
@@ -29,5 +35,7 @@ export declare class RazorpayCheckoutService {
     private readonly dataSource;
     constructor(razorpay: RazorpayService, config: ConfigService, orderRepo: Repository<Order>, paymentRepo: Repository<Payment>, planRepo: Repository<Plan>, dataSource: DataSource);
     createOrderForPlan(userId: number, planUniqueId: string, billing: 'yearly' | 'monthly'): Promise<CreateOrderResult>;
+    isDevBypassMode(): boolean;
+    createOfflineSuccessForPlan(userId: number, planUniqueId: string, billing: 'yearly' | 'monthly', source?: 'dev-offline' | 'admin-offline'): Promise<OfflineSuccessResult>;
     verifySignatureAndCapture(userId: number, razorpayOrderId: string, razorpayPaymentId: string, razorpaySignature: string): Promise<VerifyResult>;
 }

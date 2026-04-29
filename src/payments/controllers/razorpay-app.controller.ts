@@ -27,6 +27,39 @@ export class RazorpayAppController {
   async createOrder(@CurrentUser() user: any, @Body() dto: CreateRazorpayOrderDto) {
     this.assertCustomer(user);
     const billing = dto.billing ?? 'yearly';
+
+    if (this.checkout.isDevBypassMode()) {
+      const offline = await this.checkout.createOfflineSuccessForPlan(
+        user.id,
+        dto.plan_unique_id,
+        billing,
+        'dev-offline',
+      );
+
+      const subscription = await this.subscriptions.createSubscription(
+        user.id,
+        offline.plan_id,
+        new Date(),
+        offline.local_order_id,
+      );
+
+      return {
+        success: true,
+        data: {
+          mode: 'offline-dev',
+          requires_verification: false,
+          local_order_id: offline.local_order_id,
+          order_number: offline.order_number,
+          payment_id: offline.payment_id,
+          subscription_id: subscription.id,
+          plan_id: subscription.plan_id,
+          start_date: subscription.start_date,
+          end_date: subscription.end_date,
+          is_active: subscription.is_active,
+        },
+      };
+    }
+
     const data = await this.checkout.createOrderForPlan(user.id, dto.plan_unique_id, billing);
     return {
       success: true,

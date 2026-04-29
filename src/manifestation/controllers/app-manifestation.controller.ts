@@ -29,6 +29,10 @@ import {
   CommitIntentionDto,
 } from '../dtos/alignment-action.dto';
 import { CalculateResonanceDto } from '../dtos/calculate-resonance.dto';
+import {
+  AddDailyProgressEntryDto,
+  UpdateDailyProgressEntryDto,
+} from '../dtos/daily-progress-entry.dto';
 import { toNumber } from '../../common/utils/number.util';
 
 @ApiTags('Manifestation (App)')
@@ -346,6 +350,115 @@ export class AppManifestationController {
     };
   }
 
+  /**
+   * POST /api/v1/app/manifestation/daily-progress/add
+   * Add daily progress entry for a manifestation
+   */
+  @Post('daily-progress/add')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Add daily progress entry for a manifestation' })
+  async addDailyProgressEntry(
+    @Body() dto: AddDailyProgressEntryDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const entry = await this.manifestationService.addDailyProgressEntry(
+      dto.manifestation_id,
+      user.id,
+      dto.entry_date,
+      dto.action_text,
+    );
+
+    return {
+      success: true,
+      code: 201,
+      message: 'Daily progress entry added.',
+      data: {
+        id: entry.id,
+        manifestation_id: entry.manifestation_id,
+        entry_date: entry.entry_date,
+        action_text: entry.action_text,
+      },
+    };
+  }
+
+  /**
+   * GET /api/v1/app/manifestation/:id/daily-progress
+   * Get daily progress entries for a manifestation
+   */
+  @Get(':id/daily-progress')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get daily progress entries for a manifestation' })
+  async getDailyProgressEntries(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const entries = await this.manifestationService.getDailyProgressEntries(id, user.id);
+
+    return {
+      success: true,
+      code: 200,
+      message: 'Daily progress entries retrieved.',
+      data: entries.map((entry) => ({
+        id: entry.id,
+        manifestation_id: entry.manifestation_id,
+        entry_date: entry.entry_date,
+        action_text: entry.action_text,
+        added_date: entry.added_date,
+      })),
+    };
+  }
+
+  /**
+   * PUT /api/v1/app/manifestation/daily-progress/:entryId
+   * Update daily progress entry
+   */
+  @Put('daily-progress/:entryId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update daily progress entry' })
+  async updateDailyProgressEntry(
+    @Param('entryId', ParseIntPipe) entryId: number,
+    @Body() dto: UpdateDailyProgressEntryDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const entry = await this.manifestationService.updateDailyProgressEntry(
+      entryId,
+      user.id,
+      dto.action_text || '',
+    );
+
+    return {
+      success: true,
+      code: 200,
+      message: 'Daily progress entry updated.',
+      data: {
+        id: entry.id,
+        manifestation_id: entry.manifestation_id,
+        entry_date: entry.entry_date,
+        action_text: entry.action_text,
+      },
+    };
+  }
+
+  /**
+   * DELETE /api/v1/app/manifestation/daily-progress/:entryId
+   * Delete daily progress entry
+   */
+  @Delete('daily-progress/:entryId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete daily progress entry' })
+  async deleteDailyProgressEntry(
+    @Param('entryId', ParseIntPipe) entryId: number,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.manifestationService.deleteDailyProgressEntry(entryId, user.id);
+
+    return {
+      success: true,
+      code: 200,
+      message: 'Daily progress entry deleted.',
+    };
+  }
+
   // ============================================
   // PARAMETERIZED ROUTES (must come after static routes)
   // ============================================
@@ -373,6 +486,8 @@ export class AppManifestationController {
       id,
       user.id,
     );
+    const dailyProgressEntries =
+      await this.manifestationService.getDailyProgressEntries(id, user.id);
 
     // Use common utility function for number conversion
 
@@ -399,6 +514,13 @@ export class AppManifestationController {
         tips: manifestation.tips,
         insights: manifestation.insights,
         summary_for_ui: manifestation.insights?.summary_for_ui || null,
+        daily_progress_entries: dailyProgressEntries.map((entry) => ({
+          id: entry.id,
+          manifestation_id: entry.manifestation_id,
+          entry_date: entry.entry_date,
+          action_text: entry.action_text,
+          added_date: entry.added_date,
+        })),
         is_archived: manifestation.is_archived,
         is_locked: manifestation.is_locked,
         added_date: manifestation.added_date,

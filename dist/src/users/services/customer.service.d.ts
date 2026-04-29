@@ -12,9 +12,17 @@ export declare class CustomerService {
     constructor(customerRepository: Repository<Customer>, kundliService: KundliService, kundliRepository: IKundliRepository);
     findOne(id: number): Promise<Customer>;
     getProfile(id: number): Promise<Partial<Customer>>;
+    getReferralCode(userId: number): Promise<string>;
+    getReferralStats(userId: number): Promise<{
+        referral_code: string;
+        total_referrals: number;
+        successful_referrals: number;
+        total_earnings: number;
+    }>;
     updateProfile(id: number, updateData: UpdateCustomerProfileDto): Promise<Customer>;
     private updateKundliOnProfileChange;
     findByUniqueId(uniqueId: string): Promise<Customer>;
+    private ensureReferralCode;
     findAll(dto: ListUsersDto): Promise<{
         data: Customer[];
         meta: any;

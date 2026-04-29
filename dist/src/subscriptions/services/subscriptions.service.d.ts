@@ -10,6 +10,7 @@ export declare class SubscriptionsService {
     constructor(subscriptionRepository: Repository<Subscription>, customerRepository: Repository<Customer>, planRepository: Repository<Plan>);
     getCurrentSubscription(userId: number): Promise<Subscription | null>;
     getCurrentPlanType(userId: number): Promise<PlanType>;
+    getActivePlanByType(planType: PlanType): Promise<Plan | null>;
     hasModuleAccess(userId: number, moduleSlug: string): Promise<boolean>;
     getUserModules(userId: number): Promise<string[]>;
     createSubscription(userId: number, planId: number, startDate?: Date, orderId?: number): Promise<Subscription>;

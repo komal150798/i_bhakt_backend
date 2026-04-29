@@ -17,6 +17,7 @@ export declare class CreatePlanDto {
     referral_count_required?: number;
     is_popular?: boolean;
     is_featured?: boolean;
+    is_enabled?: boolean;
     sort_order?: number;
     badge_color?: string;
     badge_icon?: string;

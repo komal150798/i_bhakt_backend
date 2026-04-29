@@ -49,6 +49,7 @@ export class AuthController {
       dto.email,
       dto.phone_number,
       dto.password,
+      dto.referral_code,
     );
   }
 

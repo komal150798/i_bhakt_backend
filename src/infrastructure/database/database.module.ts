@@ -30,6 +30,7 @@ import { KarmaPattern } from '../../karma/entities/karma-pattern.entity';
 import { KarmaScoreSummary } from '../../karma/entities/karma-score-summary.entity';
 import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
 import { Manifestation } from '../../manifestation/entities/manifestation.entity';
+import { ManifestationProgressEntry } from '../../manifestation/entities/manifestation-progress-entry.entity';
 // New database-driven AI system entities
 import {
   ManifestCategory,
@@ -109,6 +110,7 @@ const entities = [
   KarmaScoreSummary,
   ManifestationLog,
   Manifestation,
+  ManifestationProgressEntry,
   // New database-driven AI system entities
   ManifestCategory,
   ManifestSubcategory,

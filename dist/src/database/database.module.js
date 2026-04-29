@@ -29,6 +29,7 @@ const karma_entry_entity_1 = require("../karma/entities/karma-entry.entity");
 const karma_master_good_entity_1 = require("../karma/entities/karma-master-good.entity");
 const karma_master_bad_entity_1 = require("../karma/entities/karma-master-bad.entity");
 const manifestation_log_entity_1 = require("../manifestation/entities/manifestation-log.entity");
+const manifestation_progress_entry_entity_1 = require("../manifestation/entities/manifestation-progress-entry.entity");
 const cms_page_entity_1 = require("../cms/entities/cms-page.entity");
 const notification_entity_1 = require("../notifications/entities/notification.entity");
 const audit_log_entity_1 = require("../audit/entities/audit-log.entity");
@@ -53,6 +54,7 @@ const entities = [
     karma_master_good_entity_1.KarmaMasterGood,
     karma_master_bad_entity_1.KarmaMasterBad,
     manifestation_log_entity_1.ManifestationLog,
+    manifestation_progress_entry_entity_1.ManifestationProgressEntry,
     cms_page_entity_1.CMSPage,
     notification_entity_1.Notification,
     audit_log_entity_1.AuditLog,

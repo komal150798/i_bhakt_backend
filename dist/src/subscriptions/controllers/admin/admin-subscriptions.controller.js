@@ -22,12 +22,19 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const subscription_entity_1 = require("../../entities/subscription.entity");
 const plan_entity_1 = require("../../../plans/entities/plan.entity");
+const order_entity_1 = require("../../../orders/entities/order.entity");
+const payment_entity_1 = require("../../../payments/entities/payment.entity");
+const order_status_enum_1 = require("../../../common/enums/order-status.enum");
+const payment_status_enum_1 = require("../../../common/enums/payment-status.enum");
+const crypto = require("crypto");
 let AdminSubscriptionsController = class AdminSubscriptionsController {
-    constructor(subscriptionsService, plansService, subscriptionRepository, planRepository) {
+    constructor(subscriptionsService, plansService, subscriptionRepository, planRepository, orderRepository, paymentRepository) {
         this.subscriptionsService = subscriptionsService;
         this.plansService = plansService;
         this.subscriptionRepository = subscriptionRepository;
         this.planRepository = planRepository;
+        this.orderRepository = orderRepository;
+        this.paymentRepository = paymentRepository;
     }
     async findAll(body) {
         const page = body.page || 1;
@@ -136,7 +143,60 @@ let AdminSubscriptionsController = class AdminSubscriptionsController {
         };
     }
     async create(body) {
-        const subscription = await this.subscriptionsService.createSubscription(body.user_id, body.plan_id, body.start_date ? new Date(body.start_date) : undefined, body.order_id);
+        let orderId = body.order_id;
+        if (!orderId && body.create_offline_payment) {
+            const plan = await this.planRepository.findOne({
+                where: { id: body.plan_id, is_deleted: false },
+            });
+            if (!plan) {
+                throw new Error('Plan not found');
+            }
+            const amountInr = Number(plan.yearly_price ?? plan.monthly_price ?? 0);
+            const orderNumber = `IB-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+            const source = body.offline_source || 'admin-offline';
+            const order = this.orderRepository.create({
+                order_number: orderNumber,
+                user_id: body.user_id,
+                order_status: order_status_enum_1.OrderStatus.COMPLETED,
+                subtotal: amountInr,
+                discount: 0,
+                tax: 0,
+                total_amount: amountInr,
+                currency: plan.currency || 'INR',
+                items: [
+                    {
+                        type: 'subscription',
+                        plan_id: plan.id,
+                        plan_unique_id: plan.unique_id,
+                        plan_type: plan.plan_type,
+                        billing: plan.billing_cycle_days === 365 ? 'yearly' : 'monthly',
+                    },
+                ],
+                notes: `offline:${source}:subscription:${plan.plan_type}`,
+                completed_at: new Date(),
+            });
+            const savedOrder = await this.orderRepository.save(order);
+            const payment = this.paymentRepository.create({
+                transaction_id: `OFFLINE-ADMIN-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+                user_id: body.user_id,
+                order_id: savedOrder.id,
+                payment_status: payment_status_enum_1.PaymentStatus.COMPLETED,
+                amount: amountInr,
+                currency: savedOrder.currency,
+                payment_method: source,
+                gateway: source,
+                gateway_response: JSON.stringify({
+                    mode: 'offline',
+                    source,
+                    created_by: 'admin-subscriptions',
+                    recorded_at: new Date().toISOString(),
+                }),
+                paid_at: new Date(),
+            });
+            await this.paymentRepository.save(payment);
+            orderId = savedOrder.id;
+        }
+        const subscription = await this.subscriptionsService.createSubscription(body.user_id, body.plan_id, body.start_date ? new Date(body.start_date) : undefined, orderId);
         if (body.end_date) {
             subscription.end_date = new Date(body.end_date);
             await this.subscriptionsService['subscriptionRepository'].save(subscription);
@@ -151,6 +211,7 @@ let AdminSubscriptionsController = class AdminSubscriptionsController {
                 start_date: subscription.start_date,
                 end_date: subscription.end_date,
                 is_active: subscription.is_active,
+                order_id: subscription.order_id,
             },
         };
     }
@@ -294,8 +355,12 @@ exports.AdminSubscriptionsController = AdminSubscriptionsController = __decorate
     (0, swagger_1.ApiBearerAuth)(),
     __param(2, (0, typeorm_1.InjectRepository)(subscription_entity_1.Subscription)),
     __param(3, (0, typeorm_1.InjectRepository)(plan_entity_1.Plan)),
+    __param(4, (0, typeorm_1.InjectRepository)(order_entity_1.Order)),
+    __param(5, (0, typeorm_1.InjectRepository)(payment_entity_1.Payment)),
     __metadata("design:paramtypes", [subscriptions_service_1.SubscriptionsService,
         plans_service_1.PlansService,
+        typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository])
 ], AdminSubscriptionsController);

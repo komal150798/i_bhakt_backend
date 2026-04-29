@@ -1,6 +1,7 @@
 // Manifestation entities index
 export { Manifestation } from './manifestation.entity';
 export { ManifestationLog } from './manifestation-log.entity';
+export { ManifestationProgressEntry } from './manifestation-progress-entry.entity';
 
 // New database-driven AI system entities
 export { ManifestCategory } from './manifest-category.entity';

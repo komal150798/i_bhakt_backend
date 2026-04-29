@@ -21,6 +21,7 @@ import { AdminToken } from './entities/admin-token.entity';
 import { AdminRbacModule } from '../admin-rbac/admin-rbac.module';
 import { AdmRole } from '../admin-rbac/entities/adm-role.entity';
 import { HoroscopeModule } from '../horoscope/horoscope.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { HoroscopeModule } from '../horoscope/horoscope.module';
     TypeOrmModule.forFeature([Customer, AdminUser, RefreshToken, CustomerToken, AdminToken, AdmRole]),
     AdminRbacModule,
     HoroscopeModule,
+    SubscriptionsModule,
   ],
   controllers: [
     AdminAuthController,

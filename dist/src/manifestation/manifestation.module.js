@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const manifestation_log_entity_1 = require("./entities/manifestation-log.entity");
 const manifestation_entity_1 = require("./entities/manifestation.entity");
+const manifestation_progress_entry_entity_1 = require("./entities/manifestation-progress-entry.entity");
 const entities_1 = require("./entities");
 const manifestation_service_1 = require("./manifestation.service");
 const manifestation_enhanced_service_1 = require("./services/manifestation-enhanced.service");
@@ -35,6 +36,7 @@ const kundli_entity_1 = require("../kundli/entities/kundli.entity");
 const kundli_planet_entity_1 = require("../kundli/entities/kundli-planet.entity");
 const kundli_house_entity_1 = require("../kundli/entities/kundli-house.entity");
 const seed_manifestation_master_data_service_1 = require("./seeds/seed-manifestation-master-data.service");
+const subscriptions_module_1 = require("../subscriptions/subscriptions.module");
 let ManifestationModule = class ManifestationModule {
 };
 exports.ManifestationModule = ManifestationModule;
@@ -44,6 +46,7 @@ exports.ManifestationModule = ManifestationModule = __decorate([
             typeorm_1.TypeOrmModule.forFeature([
                 manifestation_log_entity_1.ManifestationLog,
                 manifestation_entity_1.Manifestation,
+                manifestation_progress_entry_entity_1.ManifestationProgressEntry,
                 customer_entity_1.Customer,
                 dasha_record_entity_1.DashaRecord,
                 antardasha_record_entity_1.AntardashaRecord,
@@ -71,6 +74,7 @@ exports.ManifestationModule = ManifestationModule = __decorate([
             kundli_module_1.KundliModule,
             constants_module_1.ConstantsModule,
             ai_prompt_module_1.AIPromptModule,
+            subscriptions_module_1.SubscriptionsModule,
         ],
         controllers: [app_manifestation_controller_1.AppManifestationController],
         providers: [

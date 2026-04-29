@@ -41,6 +41,16 @@ export class RegisterDto {
   @MinLength(6)
   @MaxLength(255)
   password: string;
+
+  @ApiProperty({
+    example: 'AB12CD',
+    description: 'Optional referral code used during registration',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
+  referral_code?: string;
 }
 
 

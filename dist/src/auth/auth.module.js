@@ -29,6 +29,7 @@ const admin_token_entity_1 = require("./entities/admin-token.entity");
 const admin_rbac_module_1 = require("../admin-rbac/admin-rbac.module");
 const adm_role_entity_1 = require("../admin-rbac/entities/adm-role.entity");
 const horoscope_module_1 = require("../horoscope/horoscope.module");
+const subscriptions_module_1 = require("../subscriptions/subscriptions.module");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
@@ -49,6 +50,7 @@ exports.AuthModule = AuthModule = __decorate([
             typeorm_1.TypeOrmModule.forFeature([customer_entity_1.Customer, admin_user_entity_1.AdminUser, refresh_token_entity_1.RefreshToken, customer_token_entity_1.CustomerToken, admin_token_entity_1.AdminToken, adm_role_entity_1.AdmRole]),
             admin_rbac_module_1.AdminRbacModule,
             horoscope_module_1.HoroscopeModule,
+            subscriptions_module_1.SubscriptionsModule,
         ],
         controllers: [
             admin_auth_controller_1.AdminAuthController,

@@ -42,6 +42,7 @@ export class CustomerService {
    */
   async getProfile(id: number): Promise<Partial<Customer>> {
     const customer = await this.findOne(id);
+    const ensuredReferralCode = await this.ensureReferralCode(customer);
 
     return {
       id: customer.id,
@@ -62,9 +63,40 @@ export class CustomerService {
       pada: customer.pada,
       current_plan: customer.current_plan,
       is_verified: customer.is_verified,
-      referral_code: customer.referral_code,
+      referral_code: ensuredReferralCode,
       added_date: customer.added_date,
       modify_date: customer.modify_date,
+    };
+  }
+
+  async getReferralCode(userId: number): Promise<string> {
+    const customer = await this.findOne(userId);
+    return this.ensureReferralCode(customer);
+  }
+
+  async getReferralStats(userId: number): Promise<{
+    referral_code: string;
+    total_referrals: number;
+    successful_referrals: number;
+    total_earnings: number;
+  }> {
+    const customer = await this.findOne(userId);
+    const referralCode = await this.ensureReferralCode(customer);
+
+    const [totalReferrals, successfulReferrals] = await Promise.all([
+      this.customerRepository.count({
+        where: { referred_by: userId, is_deleted: false },
+      }),
+      this.customerRepository.count({
+        where: { referred_by: userId, is_deleted: false, is_verified: true },
+      }),
+    ]);
+
+    return {
+      referral_code: referralCode,
+      total_referrals: totalReferrals,
+      successful_referrals: successfulReferrals,
+      total_earnings: 0,
     };
   }
 
@@ -267,6 +299,30 @@ export class CustomerService {
     }
 
     return customer;
+  }
+
+  private async ensureReferralCode(customer: Customer): Promise<string> {
+    if (customer.referral_code) {
+      return customer.referral_code;
+    }
+
+    let attempts = 0;
+    while (attempts < 10) {
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const existing = await this.customerRepository.findOne({
+        where: { referral_code: code, is_deleted: false },
+      });
+      if (!existing) {
+        customer.referral_code = code;
+        await this.customerRepository.save(customer);
+        return code;
+      }
+      attempts++;
+    }
+
+    customer.referral_code = `RF${Date.now().toString().slice(-6)}`;
+    await this.customerRepository.save(customer);
+    return customer.referral_code;
   }
 
   /**

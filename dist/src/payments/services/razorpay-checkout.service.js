@@ -101,6 +101,81 @@ let RazorpayCheckoutService = class RazorpayCheckoutService {
             plan_type: plan.plan_type,
         };
     }
+    isDevBypassMode() {
+        const env = (this.config.get('NODE_ENV') || '').toLowerCase();
+        const bypass = this.config.get('PAYMENT_BYPASS_IN_DEV');
+        const bypassEnabled = bypass === undefined ? true : bypass === 'true';
+        return (env === 'dev' || env === 'development') && bypassEnabled;
+    }
+    async createOfflineSuccessForPlan(userId, planUniqueId, billing, source = 'dev-offline') {
+        const plan = await this.planRepo.findOne({
+            where: { unique_id: planUniqueId, is_deleted: false, is_enabled: true },
+        });
+        if (!plan) {
+            throw new common_1.NotFoundException('Plan not found or not available');
+        }
+        if (plan.plan_type === plan_type_enum_1.PlanType.FREE) {
+            throw new common_1.BadRequestException('Free plan does not require payment');
+        }
+        const amountInr = billing === 'yearly' && plan.yearly_price != null
+            ? Number(plan.yearly_price)
+            : Number(plan.monthly_price);
+        if (!Number.isFinite(amountInr) || amountInr <= 0) {
+            throw new common_1.BadRequestException('Invalid plan amount for selected billing');
+        }
+        return this.dataSource.transaction(async (manager) => {
+            const orderRepo = manager.getRepository(order_entity_1.Order);
+            const paymentRepo = manager.getRepository(payment_entity_1.Payment);
+            const orderNumber = `IB-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+            const localOrder = orderRepo.create({
+                order_number: orderNumber,
+                user_id: userId,
+                order_status: order_status_enum_1.OrderStatus.COMPLETED,
+                subtotal: amountInr,
+                discount: 0,
+                tax: 0,
+                total_amount: amountInr,
+                currency: plan.currency || 'INR',
+                items: [
+                    {
+                        type: 'subscription',
+                        plan_id: plan.id,
+                        plan_unique_id: plan.unique_id,
+                        plan_type: plan.plan_type,
+                        billing,
+                    },
+                ],
+                notes: `offline:${source}:subscription:${plan.plan_type}`,
+                completed_at: new Date(),
+            });
+            const savedOrder = await orderRepo.save(localOrder);
+            const transactionId = `OFFLINE-${source.toUpperCase()}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+            const payment = paymentRepo.create({
+                transaction_id: transactionId,
+                user_id: userId,
+                order_id: savedOrder.id,
+                payment_status: payment_status_enum_1.PaymentStatus.COMPLETED,
+                amount: amountInr,
+                currency: savedOrder.currency,
+                payment_method: source,
+                gateway: source,
+                gateway_response: JSON.stringify({
+                    mode: 'offline',
+                    source,
+                    auto_marked_paid: true,
+                    recorded_at: new Date().toISOString(),
+                }),
+                paid_at: new Date(),
+            });
+            const savedPayment = await paymentRepo.save(payment);
+            return {
+                local_order_id: savedOrder.id,
+                payment_id: savedPayment.id,
+                plan_id: plan.id,
+                order_number: savedOrder.order_number,
+            };
+        });
+    }
     async verifySignatureAndCapture(userId, razorpayOrderId, razorpayPaymentId, razorpaySignature) {
         if (!this.razorpay.isConfigured()) {
             throw new common_1.ServiceUnavailableException('Razorpay is not configured');

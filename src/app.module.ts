@@ -31,6 +31,7 @@ import { TestimonialModule } from './testimonial/testimonial.module';
 import { AdminController } from './controllers/admin/admin.controller';
 import { HomeController } from './controllers/home/home.controller';
 import { HomeKarmaController } from './controllers/home/karma.controller';
+import { ReferController } from './controllers/home/refer.controller';
 import { CustomerController } from './controllers/customer/customer.controller';
 import { KarmaController } from './controllers/customer/karma.controller';
 import { AppController } from './controllers/app/app.controller';
@@ -77,6 +78,7 @@ import redisConfig from './config/redis.config';
     AdminController,
     HomeController,
     HomeKarmaController,
+    ReferController,
     CustomerController,
     KarmaController,
     AppController,

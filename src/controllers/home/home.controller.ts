@@ -1,13 +1,20 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { PlansService } from '../../plans/services/plans.service';
 import { PlanResponseDto } from '../../plans/dtos/plan-response.dto';
 import { Public } from '../../common/decorators/public.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUserPayload } from '../../common/types/jwt-payload.interface';
+import { CustomerService } from '../../users/services/customer.service';
 
 @ApiTags('Home')
 @Controller('home')
 export class HomeController {
-  constructor(private readonly plansService: PlansService) {}
+  constructor(
+    private readonly plansService: PlansService,
+    private readonly customerService: CustomerService,
+  ) {}
 
   // ========== PUBLIC PLANS ==========
 
@@ -27,6 +34,42 @@ export class HomeController {
   @ApiResponse({ status: 404, description: 'Plan not found' })
   async getPlan(@Param('uniqueId') uniqueId: string): Promise<PlanResponseDto> {
     return this.plansService.findOneByUniqueId(uniqueId);
+  }
+
+  @Get('refer/code')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user referral code and share link' })
+  @ApiResponse({ status: 200, description: 'Referral code fetched successfully' })
+  async getReferralCode(@CurrentUser() user: CurrentUserPayload) {
+    const code = await this.customerService.getReferralCode(user.id);
+    const baseUrl = (process.env.APP_PUBLIC_URL || process.env.FRONTEND_URL || '').trim();
+    const referral_link = `${baseUrl || 'https://app.ibhakt.com'}/signup?ref=${code}`;
+
+    return {
+      success: true,
+      data: {
+        code,
+        referral_link,
+      },
+    };
+  }
+
+  @Get('refer/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user referral stats' })
+  @ApiResponse({ status: 200, description: 'Referral stats fetched successfully' })
+  async getReferralStats(@CurrentUser() user: CurrentUserPayload) {
+    const stats = await this.customerService.getReferralStats(user.id);
+    return {
+      success: true,
+      data: {
+        totalReferrals: stats.total_referrals,
+        successfulReferrals: stats.successful_referrals,
+        earnings: `${stats.total_earnings}`,
+      },
+    };
   }
 
   // TODO: Add more public endpoints for:

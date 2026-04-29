@@ -4,12 +4,16 @@ import { PlanType } from '../../../common/enums/plan-type.enum';
 import { Repository } from 'typeorm';
 import { Subscription } from '../../entities/subscription.entity';
 import { Plan } from '../../../plans/entities/plan.entity';
+import { Order } from '../../../orders/entities/order.entity';
+import { Payment } from '../../../payments/entities/payment.entity';
 export declare class AdminSubscriptionsController {
     private readonly subscriptionsService;
     private readonly plansService;
     private readonly subscriptionRepository;
     private readonly planRepository;
-    constructor(subscriptionsService: SubscriptionsService, plansService: PlansService, subscriptionRepository: Repository<Subscription>, planRepository: Repository<Plan>);
+    private readonly orderRepository;
+    private readonly paymentRepository;
+    constructor(subscriptionsService: SubscriptionsService, plansService: PlansService, subscriptionRepository: Repository<Subscription>, planRepository: Repository<Plan>, orderRepository: Repository<Order>, paymentRepository: Repository<Payment>);
     findAll(body: {
         page?: number;
         limit?: number;
@@ -80,6 +84,8 @@ export declare class AdminSubscriptionsController {
         start_date?: string;
         end_date?: string;
         order_id?: number;
+        create_offline_payment?: boolean;
+        offline_source?: 'dev-offline' | 'admin-offline';
     }): Promise<{
         success: boolean;
         data: {
@@ -90,6 +96,7 @@ export declare class AdminSubscriptionsController {
             start_date: Date;
             end_date: Date;
             is_active: boolean;
+            order_id: number;
         };
     }>;
     update(id: number, body: {

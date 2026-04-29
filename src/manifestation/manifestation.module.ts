@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ManifestationLog } from './entities/manifestation-log.entity';
 import { Manifestation } from './entities/manifestation.entity';
+import { ManifestationProgressEntry } from './entities/manifestation-progress-entry.entity';
 import {
   ManifestCategory,
   ManifestSubcategory,
@@ -40,12 +41,14 @@ import { Kundli } from '../kundli/entities/kundli.entity';
 import { KundliPlanet } from '../kundli/entities/kundli-planet.entity';
 import { KundliHouse } from '../kundli/entities/kundli-house.entity';
 import { SeedManifestationMasterDataService } from './seeds/seed-manifestation-master-data.service';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       ManifestationLog,
       Manifestation,
+      ManifestationProgressEntry,
       Customer,
       DashaRecord, // For Dasha period analysis
       AntardashaRecord,
@@ -74,6 +77,7 @@ import { SeedManifestationMasterDataService } from './seeds/seed-manifestation-m
     KundliModule, // For kundli calculation
     ConstantsModule, // Central Constants Service
     AIPromptModule, // AI Prompt Service
+    SubscriptionsModule,
   ],
   controllers: [AppManifestationController],
   providers: [

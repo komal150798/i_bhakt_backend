@@ -59,6 +59,7 @@ export class AppAuthController {
       dto.email,
       dto.phone_number,
       dto.password,
+      dto.referral_code,
     );
     
     return {

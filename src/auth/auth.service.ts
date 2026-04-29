@@ -16,6 +16,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { PlanType } from '../common/enums/plan-type.enum';
 import { HoroscopeService } from '../horoscope/services/horoscope.service';
 import { normalizePhoneNumber } from '../common/utils/string.util';
+import { SubscriptionsService } from '../subscriptions/services/subscriptions.service';
 
 @Injectable()
 export class AuthService {
@@ -34,6 +35,7 @@ export class AuthService {
     private jwtService: AuthJwtService,
     private configService: ConfigService,
     private horoscopeService: HoroscopeService,
+    private subscriptionsService: SubscriptionsService,
   ) {}
 
   /**
@@ -640,6 +642,7 @@ export class AuthService {
     email: string | undefined,
     phone_number: string | undefined,
     password: string,
+    referralCode?: string,
   ): Promise<{
     access_token: string;
     refresh_token: string;
@@ -708,6 +711,19 @@ export class AuthService {
       finalPhoneNumber = normalizePhoneNumber(finalPhoneNumber);
     }
 
+    // Resolve referral code if provided
+    let referredBy: number | null = null;
+    const normalizedReferralCode = referralCode?.trim().toUpperCase() || null;
+    if (normalizedReferralCode) {
+      const referrer = await this.customerRepository.findOne({
+        where: { referral_code: normalizedReferralCode, is_deleted: false },
+      });
+      if (!referrer) {
+        throw new BadRequestException('Invalid referral code');
+      }
+      referredBy = referrer.id;
+    }
+
     // Create new customer
     const customer = this.customerRepository.create({
       first_name,
@@ -717,9 +733,16 @@ export class AuthService {
       password: hashedPassword,
       is_verified: email ? true : false, // Email registration is considered verified
       last_login: new Date(),
+      referral_code: await this.generateUniqueReferralCode(),
+      referred_by: referredBy,
     });
 
     const savedCustomer = await this.customerRepository.save(customer);
+
+    // Auto-upgrade referrer plan based on env-managed referral thresholds
+    if (referredBy) {
+      await this.applyReferralPlanUpgradeIfEligible(referredBy);
+    }
 
     // Issue tokens
     return this.issueCustomerTokens(savedCustomer);
@@ -746,6 +769,8 @@ export class AuthService {
 
     // Store refresh token in CustomerToken table
     await this.storeCustomerToken(refreshToken, customer.id);
+
+    customer = await this.ensureCustomerReferralCode(customer);
 
     // Format customer response
     const userResponse = this.formatCustomerResponse(customer);
@@ -793,6 +818,8 @@ export class AuthService {
 
     // Store refresh token in CustomerToken table with app session expiration
     await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'google');
+
+    customer = await this.ensureCustomerReferralCode(customer);
 
     // Format customer response
     const userResponse = this.formatCustomerResponse(customer);
@@ -887,8 +914,98 @@ export class AuthService {
       avatar_url: customer.avatar_url,
       role: 'user',
       is_verified: customer.is_verified,
+      referral_code: customer.referral_code,
       created_at: customer.added_date,
     };
+  }
+
+  private async generateUniqueReferralCode(): Promise<string> {
+    let attempts = 0;
+    while (attempts < 10) {
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const existing = await this.customerRepository.findOne({
+        where: { referral_code: code, is_deleted: false },
+      });
+      if (!existing) {
+        return code;
+      }
+      attempts++;
+    }
+    return `RF${Date.now().toString().slice(-6)}`;
+  }
+
+  private async ensureCustomerReferralCode(customer: Customer): Promise<Customer> {
+    if (customer.referral_code) {
+      return customer;
+    }
+
+    const candidate = `IBHAKT${customer.id}`;
+    const existing = await this.customerRepository.findOne({
+      where: { referral_code: candidate, is_deleted: false },
+    });
+
+    customer.referral_code = existing && existing.id !== customer.id
+      ? await this.generateUniqueReferralCode()
+      : candidate;
+
+    return this.customerRepository.save(customer);
+  }
+
+  private async applyReferralPlanUpgradeIfEligible(referrerUserId: number): Promise<void> {
+    const proCountRaw =
+      process.env.REFERAL_PRO_COUNT || process.env.REFERRAL_PRO_COUNT || '5';
+    const masterCountRaw =
+      process.env.REFERAL_MASTER_COUNT || process.env.REFERRAL_MASTER_COUNT || '10';
+
+    const proCount = Number(proCountRaw);
+    const masterCount = Number(masterCountRaw);
+
+    const totalReferrals = await this.customerRepository.count({
+      where: { referred_by: referrerUserId, is_deleted: false },
+    });
+
+    let targetPlanType: PlanType | null = null;
+    if (Number.isFinite(masterCount) && masterCount > 0 && totalReferrals >= masterCount) {
+      targetPlanType = PlanType.PREMIUM;
+    } else if (Number.isFinite(proCount) && proCount > 0 && totalReferrals >= proCount) {
+      targetPlanType = PlanType.PAID;
+    }
+
+    if (!targetPlanType) {
+      return;
+    }
+
+    const referrer = await this.customerRepository.findOne({
+      where: { id: referrerUserId, is_deleted: false },
+    });
+    if (!referrer) {
+      return;
+    }
+
+    const current = referrer.current_plan;
+    const currentRank = this.getPlanRank(current);
+    const targetRank = this.getPlanRank(targetPlanType);
+    if (currentRank >= targetRank) {
+      return;
+    }
+
+    const targetPlan = await this.subscriptionsService.getActivePlanByType(targetPlanType);
+    if (!targetPlan) {
+      return;
+    }
+
+    await this.subscriptionsService.createSubscription(
+      referrerUserId,
+      targetPlan.id,
+      new Date(),
+    );
+  }
+
+  private getPlanRank(planType: PlanType | null | undefined): number {
+    if (planType === PlanType.PREMIUM) return 4;
+    if (planType === PlanType.PAID) return 3;
+    if (planType === PlanType.REFERRAL) return 2;
+    return 1;
   }
 
 
@@ -932,7 +1049,8 @@ export class AuthService {
         throw new UnauthorizedException('User not found');
       }
 
-      return this.formatCustomerResponse(customer);
+      const safeCustomer = await this.ensureCustomerReferralCode(customer);
+      return this.formatCustomerResponse(safeCustomer);
     }
   }
 
@@ -1006,7 +1124,7 @@ export class AuthService {
       return {
         access_token: newAccessToken,
         refresh_token: newRefreshToken,
-        user: this.formatCustomerResponse(customer),
+        user: this.formatCustomerResponse(await this.ensureCustomerReferralCode(customer)),
       };
     }
 
@@ -1064,7 +1182,7 @@ export class AuthService {
     return {
       access_token: newAccessToken,
       refresh_token: newRefreshToken,
-      user: this.formatCustomerResponse(customer),
+      user: this.formatCustomerResponse(await this.ensureCustomerReferralCode(customer)),
     };
   }
 

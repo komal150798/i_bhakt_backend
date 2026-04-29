@@ -74,6 +74,11 @@ export class CreatePlanDto {
   @IsOptional()
   is_featured?: boolean;
 
+  @ApiPropertyOptional({ example: true, default: true })
+  @IsBoolean()
+  @IsOptional()
+  is_enabled?: boolean;
+
   @ApiPropertyOptional({ example: 0, default: 0 })
   @IsNumber()
   @IsOptional()

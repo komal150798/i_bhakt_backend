@@ -3,6 +3,7 @@ import { ManifestationEnhancedService } from '../services/manifestation-enhanced
 import { CreateManifestationEnhancedDto } from '../dtos/create-manifestation-enhanced.dto';
 import { AddAlignmentActionsDto, CommitIntentionDto } from '../dtos/alignment-action.dto';
 import { CalculateResonanceDto } from '../dtos/calculate-resonance.dto';
+import { AddDailyProgressEntryDto, UpdateDailyProgressEntryDto } from '../dtos/daily-progress-entry.dto';
 export declare class AppManifestationController {
     private readonly manifestationService;
     constructor(manifestationService: ManifestationEnhancedService);
@@ -53,6 +54,13 @@ export declare class AppManifestationController {
                 action_windows: any;
                 progress_tracking: any;
             }>;
+            plan: {
+                plan_type: import("../../common/enums/plan-type.enum").PlanType;
+                monthly_limit: number | null;
+                monthly_used: number;
+                monthly_remaining: number | null;
+                can_create_manifestation: boolean;
+            };
         };
     }>;
     getAllManifestations(user: CurrentUserPayload): Promise<{
@@ -157,6 +165,45 @@ export declare class AppManifestationController {
             target_date: string | null;
         };
     }>;
+    addDailyProgressEntry(dto: AddDailyProgressEntryDto, user: CurrentUserPayload): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            id: number;
+            manifestation_id: number;
+            entry_date: Date;
+            action_text: string;
+        };
+    }>;
+    getDailyProgressEntries(id: number, user: CurrentUserPayload): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            id: number;
+            manifestation_id: number;
+            entry_date: Date;
+            action_text: string;
+            added_date: Date;
+        }[];
+    }>;
+    updateDailyProgressEntry(entryId: number, dto: UpdateDailyProgressEntryDto, user: CurrentUserPayload): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+        data: {
+            id: number;
+            manifestation_id: number;
+            entry_date: Date;
+            action_text: string;
+        };
+    }>;
+    deleteDailyProgressEntry(entryId: number, user: CurrentUserPayload): Promise<{
+        success: boolean;
+        code: number;
+        message: string;
+    }>;
     getManifestation(id: number, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
@@ -195,6 +242,13 @@ export declare class AppManifestationController {
                 energy_reason?: string;
             };
             summary_for_ui: string;
+            daily_progress_entries: {
+                id: number;
+                manifestation_id: number;
+                entry_date: Date;
+                action_text: string;
+                added_date: Date;
+            }[];
             is_archived: boolean;
             is_locked: boolean;
             added_date: Date;

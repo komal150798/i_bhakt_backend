@@ -1,10 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ManifestUserLog = exports.ManifestBackendCache = exports.ManifestSummaryTemplate = exports.ManifestInsightTemplate = exports.ManifestAlignmentTemplate = exports.ManifestNotToManifestTemplate = exports.ManifestToManifestTemplate = exports.ManifestRitualTemplate = exports.ManifestEnergyRule = exports.ManifestKeyword = exports.ManifestSubcategory = exports.ManifestCategory = exports.ManifestationLog = exports.Manifestation = void 0;
+exports.ManifestUserLog = exports.ManifestBackendCache = exports.ManifestSummaryTemplate = exports.ManifestInsightTemplate = exports.ManifestAlignmentTemplate = exports.ManifestNotToManifestTemplate = exports.ManifestToManifestTemplate = exports.ManifestRitualTemplate = exports.ManifestEnergyRule = exports.ManifestKeyword = exports.ManifestSubcategory = exports.ManifestCategory = exports.ManifestationProgressEntry = exports.ManifestationLog = exports.Manifestation = void 0;
 var manifestation_entity_1 = require("./manifestation.entity");
 Object.defineProperty(exports, "Manifestation", { enumerable: true, get: function () { return manifestation_entity_1.Manifestation; } });
 var manifestation_log_entity_1 = require("./manifestation-log.entity");
 Object.defineProperty(exports, "ManifestationLog", { enumerable: true, get: function () { return manifestation_log_entity_1.ManifestationLog; } });
+var manifestation_progress_entry_entity_1 = require("./manifestation-progress-entry.entity");
+Object.defineProperty(exports, "ManifestationProgressEntry", { enumerable: true, get: function () { return manifestation_progress_entry_entity_1.ManifestationProgressEntry; } });
 var manifest_category_entity_1 = require("./manifest-category.entity");
 Object.defineProperty(exports, "ManifestCategory", { enumerable: true, get: function () { return manifest_category_entity_1.ManifestCategory; } });
 var manifest_subcategory_entity_1 = require("./manifest-subcategory.entity");

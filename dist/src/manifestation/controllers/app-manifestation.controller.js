@@ -21,6 +21,7 @@ const manifestation_enhanced_service_1 = require("../services/manifestation-enha
 const create_manifestation_enhanced_dto_1 = require("../dtos/create-manifestation-enhanced.dto");
 const alignment_action_dto_1 = require("../dtos/alignment-action.dto");
 const calculate_resonance_dto_1 = require("../dtos/calculate-resonance.dto");
+const daily_progress_entry_dto_1 = require("../dtos/daily-progress-entry.dto");
 const number_util_1 = require("../../common/utils/number.util");
 let AppManifestationController = class AppManifestationController {
     constructor(manifestationService) {
@@ -118,8 +119,60 @@ let AppManifestationController = class AppManifestationController {
             data: result,
         };
     }
+    async addDailyProgressEntry(dto, user) {
+        const entry = await this.manifestationService.addDailyProgressEntry(dto.manifestation_id, user.id, dto.entry_date, dto.action_text);
+        return {
+            success: true,
+            code: 201,
+            message: 'Daily progress entry added.',
+            data: {
+                id: entry.id,
+                manifestation_id: entry.manifestation_id,
+                entry_date: entry.entry_date,
+                action_text: entry.action_text,
+            },
+        };
+    }
+    async getDailyProgressEntries(id, user) {
+        const entries = await this.manifestationService.getDailyProgressEntries(id, user.id);
+        return {
+            success: true,
+            code: 200,
+            message: 'Daily progress entries retrieved.',
+            data: entries.map((entry) => ({
+                id: entry.id,
+                manifestation_id: entry.manifestation_id,
+                entry_date: entry.entry_date,
+                action_text: entry.action_text,
+                added_date: entry.added_date,
+            })),
+        };
+    }
+    async updateDailyProgressEntry(entryId, dto, user) {
+        const entry = await this.manifestationService.updateDailyProgressEntry(entryId, user.id, dto.action_text || '');
+        return {
+            success: true,
+            code: 200,
+            message: 'Daily progress entry updated.',
+            data: {
+                id: entry.id,
+                manifestation_id: entry.manifestation_id,
+                entry_date: entry.entry_date,
+                action_text: entry.action_text,
+            },
+        };
+    }
+    async deleteDailyProgressEntry(entryId, user) {
+        await this.manifestationService.deleteDailyProgressEntry(entryId, user.id);
+        return {
+            success: true,
+            code: 200,
+            message: 'Daily progress entry deleted.',
+        };
+    }
     async getManifestation(id, user) {
         const manifestation = await this.manifestationService.getManifestationById(id, user.id);
+        const dailyProgressEntries = await this.manifestationService.getDailyProgressEntries(id, user.id);
         return {
             success: true,
             code: 200,
@@ -143,6 +196,13 @@ let AppManifestationController = class AppManifestationController {
                 tips: manifestation.tips,
                 insights: manifestation.insights,
                 summary_for_ui: manifestation.insights?.summary_for_ui || null,
+                daily_progress_entries: dailyProgressEntries.map((entry) => ({
+                    id: entry.id,
+                    manifestation_id: entry.manifestation_id,
+                    entry_date: entry.entry_date,
+                    action_text: entry.action_text,
+                    added_date: entry.added_date,
+                })),
                 is_archived: manifestation.is_archived,
                 is_locked: manifestation.is_locked,
                 added_date: manifestation.added_date,
@@ -415,6 +475,47 @@ __decorate([
     __metadata("design:paramtypes", [alignment_action_dto_1.CommitIntentionDto, Object]),
     __metadata("design:returntype", Promise)
 ], AppManifestationController.prototype, "commitIntention", null);
+__decorate([
+    (0, common_1.Post)('daily-progress/add'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    (0, swagger_1.ApiOperation)({ summary: 'Add daily progress entry for a manifestation' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [daily_progress_entry_dto_1.AddDailyProgressEntryDto, Object]),
+    __metadata("design:returntype", Promise)
+], AppManifestationController.prototype, "addDailyProgressEntry", null);
+__decorate([
+    (0, common_1.Get)(':id/daily-progress'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Get daily progress entries for a manifestation' }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
+], AppManifestationController.prototype, "getDailyProgressEntries", null);
+__decorate([
+    (0, common_1.Put)('daily-progress/:entryId'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Update daily progress entry' }),
+    __param(0, (0, common_1.Param)('entryId', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, daily_progress_entry_dto_1.UpdateDailyProgressEntryDto, Object]),
+    __metadata("design:returntype", Promise)
+], AppManifestationController.prototype, "updateDailyProgressEntry", null);
+__decorate([
+    (0, common_1.Delete)('daily-progress/:entryId'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Delete daily progress entry' }),
+    __param(0, (0, common_1.Param)('entryId', common_1.ParseIntPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
+], AppManifestationController.prototype, "deleteDailyProgressEntry", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

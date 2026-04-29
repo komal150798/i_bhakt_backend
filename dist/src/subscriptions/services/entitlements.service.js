@@ -101,7 +101,13 @@ let EntitlementsService = EntitlementsService_1 = class EntitlementsService {
             {
                 feature: 'manifestation_journal',
                 allowed: true,
-                limit: planType === plan_type_enum_1.PlanType.FREE ? 3 : (planType === plan_type_enum_1.PlanType.REFERRAL ? 10 : undefined),
+                limit: planType === plan_type_enum_1.PlanType.FREE
+                    ? 3
+                    : planType === plan_type_enum_1.PlanType.PAID
+                        ? 12
+                        : planType === plan_type_enum_1.PlanType.REFERRAL
+                            ? 12
+                            : undefined,
             },
             {
                 feature: 'mfp_score',
@@ -160,7 +166,7 @@ let EntitlementsService = EntitlementsService_1 = class EntitlementsService {
                 allowed: planType === plan_type_enum_1.PlanType.PREMIUM,
             },
         ];
-        if (plan.features && Array.isArray(plan.features)) {
+        if (plan?.features && Array.isArray(plan.features)) {
             plan.features.forEach((planFeature) => {
                 const existing = baseFeatures.find(f => f.feature === planFeature.slug || f.feature === planFeature.name?.toLowerCase().replace(/\s+/g, '_'));
                 if (existing) {

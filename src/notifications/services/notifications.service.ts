@@ -16,7 +16,7 @@ export class NotificationsService {
   async getAdminNotifications(limit: number = 10, userId?: number) {
     const queryBuilder = this.notificationRepository
       .createQueryBuilder('notification')
-      .leftJoinAndSelect('notification.user', 'user')
+      .leftJoinAndSelect('notification.customer', 'customer')
       .where('notification.is_deleted = :isDeleted', { isDeleted: false })
       .orderBy('notification.added_date', 'DESC')
       .limit(limit);

@@ -27,6 +27,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Subscription } from '../../entities/subscription.entity';
 import { Plan } from '../../../plans/entities/plan.entity';
+import { Order } from '../../../orders/entities/order.entity';
+import { Payment } from '../../../payments/entities/payment.entity';
+import { OrderStatus } from '../../../common/enums/order-status.enum';
+import { PaymentStatus } from '../../../common/enums/payment-status.enum';
+import * as crypto from 'crypto';
 
 @ApiTags('Admin - Subscriptions')
 @Controller('admin/subscriptions')
@@ -40,6 +45,10 @@ export class AdminSubscriptionsController {
     private readonly subscriptionRepository: Repository<Subscription>,
     @InjectRepository(Plan)
     private readonly planRepository: Repository<Plan>,
+    @InjectRepository(Order)
+    private readonly orderRepository: Repository<Order>,
+    @InjectRepository(Payment)
+    private readonly paymentRepository: Repository<Payment>,
   ) {}
 
   /**
@@ -208,13 +217,73 @@ export class AdminSubscriptionsController {
       start_date?: string;
       end_date?: string;
       order_id?: number;
+      create_offline_payment?: boolean;
+      offline_source?: 'dev-offline' | 'admin-offline';
     },
   ) {
+    let orderId = body.order_id;
+
+    if (!orderId && body.create_offline_payment) {
+      const plan = await this.planRepository.findOne({
+        where: { id: body.plan_id, is_deleted: false },
+      });
+      if (!plan) {
+        throw new Error('Plan not found');
+      }
+
+      const amountInr = Number(plan.yearly_price ?? plan.monthly_price ?? 0);
+      const orderNumber = `IB-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+      const source = body.offline_source || 'admin-offline';
+
+      const order = this.orderRepository.create({
+        order_number: orderNumber,
+        user_id: body.user_id,
+        order_status: OrderStatus.COMPLETED,
+        subtotal: amountInr,
+        discount: 0,
+        tax: 0,
+        total_amount: amountInr,
+        currency: plan.currency || 'INR',
+        items: [
+          {
+            type: 'subscription',
+            plan_id: plan.id,
+            plan_unique_id: plan.unique_id,
+            plan_type: plan.plan_type,
+            billing: plan.billing_cycle_days === 365 ? 'yearly' : 'monthly',
+          },
+        ],
+        notes: `offline:${source}:subscription:${plan.plan_type}`,
+        completed_at: new Date(),
+      });
+      const savedOrder = await this.orderRepository.save(order);
+
+      const payment = this.paymentRepository.create({
+        transaction_id: `OFFLINE-ADMIN-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        user_id: body.user_id,
+        order_id: savedOrder.id,
+        payment_status: PaymentStatus.COMPLETED,
+        amount: amountInr,
+        currency: savedOrder.currency,
+        payment_method: source,
+        gateway: source,
+        gateway_response: JSON.stringify({
+          mode: 'offline',
+          source,
+          created_by: 'admin-subscriptions',
+          recorded_at: new Date().toISOString(),
+        }),
+        paid_at: new Date(),
+      });
+      await this.paymentRepository.save(payment);
+      orderId = savedOrder.id;
+    }
+
     const subscription = await this.subscriptionsService.createSubscription(
       body.user_id,
       body.plan_id,
       body.start_date ? new Date(body.start_date) : undefined,
-      body.order_id,
+      orderId,
     );
 
     // Override end_date if provided
@@ -233,6 +302,7 @@ export class AdminSubscriptionsController {
         start_date: subscription.start_date,
         end_date: subscription.end_date,
         is_active: subscription.is_active,
+        order_id: subscription.order_id,
       },
     };
   }

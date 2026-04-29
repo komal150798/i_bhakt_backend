@@ -48,7 +48,7 @@ let AppAuthController = class AppAuthController {
         this.authService = authService;
     }
     async register(dto) {
-        const result = await this.authService.register(dto.name, dto.email, dto.phone_number, dto.password);
+        const result = await this.authService.register(dto.name, dto.email, dto.phone_number, dto.password, dto.referral_code);
         return {
             success: true,
             data: {

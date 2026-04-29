@@ -112,7 +112,10 @@ export class EntitlementsService {
   /**
    * Build feature entitlements based on plan type
    */
-  private buildFeatureEntitlements(planType: PlanType, plan: Plan): FeatureEntitlement[] {
+  private buildFeatureEntitlements(
+    planType: PlanType,
+    plan: Plan | null,
+  ): FeatureEntitlement[] {
     const baseFeatures: FeatureEntitlement[] = [
       {
         feature: 'karma_journal',
@@ -138,7 +141,14 @@ export class EntitlementsService {
       {
         feature: 'manifestation_journal',
         allowed: true,
-        limit: planType === PlanType.FREE ? 3 : (planType === PlanType.REFERRAL ? 10 : undefined),
+        limit:
+          planType === PlanType.FREE
+            ? 3
+            : planType === PlanType.PAID
+              ? 12
+              : planType === PlanType.REFERRAL
+                ? 12
+                : undefined,
       },
       {
         feature: 'mfp_score',
@@ -199,7 +209,7 @@ export class EntitlementsService {
     ];
 
     // Override with plan-specific features if defined
-    if (plan.features && Array.isArray(plan.features)) {
+    if (plan?.features && Array.isArray(plan.features)) {
       plan.features.forEach((planFeature: any) => {
         const existing = baseFeatures.find(f => f.feature === planFeature.slug || f.feature === planFeature.name?.toLowerCase().replace(/\s+/g, '_'));
         if (existing) {

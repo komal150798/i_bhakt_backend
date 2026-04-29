@@ -1,5 +1,6 @@
 export { Manifestation } from './manifestation.entity';
 export { ManifestationLog } from './manifestation-log.entity';
+export { ManifestationProgressEntry } from './manifestation-progress-entry.entity';
 export { ManifestCategory } from './manifest-category.entity';
 export { ManifestSubcategory } from './manifest-subcategory.entity';
 export { ManifestKeyword } from './manifest-keyword.entity';

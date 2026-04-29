@@ -1,5 +1,6 @@
 import { Repository } from 'typeorm';
 import { Manifestation } from '../entities/manifestation.entity';
+import { ManifestationProgressEntry } from '../entities/manifestation-progress-entry.entity';
 import { CreateManifestationEnhancedDto } from '../dtos/create-manifestation-enhanced.dto';
 import { ManifestationAIEvaluationService } from './manifestation-ai-evaluation.service';
 import { Customer } from '../../users/entities/customer.entity';
@@ -13,9 +14,12 @@ import { KundliPlanet } from '../../kundli/entities/kundli-planet.entity';
 import { KundliHouse } from '../../kundli/entities/kundli-house.entity';
 import { KundliService } from '../../kundli/services/kundli.service';
 import { ManifestationAlignmentService } from './manifestation-alignment.service';
+import { EntitlementsService } from '../../subscriptions/services/entitlements.service';
+import { PlanType } from '../../common/enums/plan-type.enum';
 export declare class ManifestationEnhancedService {
     private manifestationRepository;
     private customerRepository;
+    private manifestationProgressEntryRepository;
     private dashaRepository;
     private antardashaRepository;
     private pratyantarRepository;
@@ -27,10 +31,13 @@ export declare class ManifestationEnhancedService {
     private swissEphemerisService;
     private kundliService;
     private alignmentService;
+    private entitlementsService;
     private readonly logger;
     private readonly regexCache;
-    constructor(manifestationRepository: Repository<Manifestation>, customerRepository: Repository<Customer>, dashaRepository: Repository<DashaRecord>, antardashaRepository: Repository<AntardashaRecord>, pratyantarRepository: Repository<PratyantarDashaRecord>, sukshmaRepository: Repository<SukshmaDashaRecord>, kundliRepository: Repository<Kundli>, kundliPlanetRepository: Repository<KundliPlanet>, kundliHouseRepository: Repository<KundliHouse>, aiEvaluationService: ManifestationAIEvaluationService, swissEphemerisService: SwissEphemerisService, kundliService: KundliService, alignmentService: ManifestationAlignmentService);
+    constructor(manifestationRepository: Repository<Manifestation>, customerRepository: Repository<Customer>, manifestationProgressEntryRepository: Repository<ManifestationProgressEntry>, dashaRepository: Repository<DashaRecord>, antardashaRepository: Repository<AntardashaRecord>, pratyantarRepository: Repository<PratyantarDashaRecord>, sukshmaRepository: Repository<SukshmaDashaRecord>, kundliRepository: Repository<Kundli>, kundliPlanetRepository: Repository<KundliPlanet>, kundliHouseRepository: Repository<KundliHouse>, aiEvaluationService: ManifestationAIEvaluationService, swissEphemerisService: SwissEphemerisService, kundliService: KundliService, alignmentService: ManifestationAlignmentService, entitlementsService: EntitlementsService);
     createManifestation(userId: number, dto: CreateManifestationEnhancedDto): Promise<Manifestation>;
+    private enforceManifestationPlanLimit;
+    private getMonthlyManifestationLimit;
     private getQuickScores;
     private enhanceManifestationAsync;
     getDashboard(userId: number): Promise<{
@@ -57,6 +64,13 @@ export declare class ManifestationEnhancedService {
             action_windows: any;
             progress_tracking: any;
         }>;
+        plan: {
+            plan_type: PlanType;
+            monthly_limit: number | null;
+            monthly_used: number;
+            monthly_remaining: number | null;
+            can_create_manifestation: boolean;
+        };
     }>;
     getManifestationById(id: number, userId: number): Promise<Manifestation>;
     archiveManifestation(id: number, userId: number): Promise<Manifestation>;
@@ -71,6 +85,11 @@ export declare class ManifestationEnhancedService {
         };
     }>;
     private calculateActionWindows;
+    addDailyProgressEntry(manifestationId: number, userId: number, entryDate: string, actionText: string): Promise<ManifestationProgressEntry>;
+    getDailyProgressEntries(manifestationId: number, userId: number): Promise<ManifestationProgressEntry[]>;
+    updateDailyProgressEntry(entryId: number, userId: number, actionText: string): Promise<ManifestationProgressEntry>;
+    deleteDailyProgressEntry(entryId: number, userId: number): Promise<void>;
+    private ensureManifestationAccess;
     getAllManifestations(userId: number, includeArchived?: boolean): Promise<Manifestation[]>;
     private calculateKundliBasedScores;
     private computeMFPScore;

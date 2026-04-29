@@ -42,6 +42,18 @@ let SubscriptionsService = class SubscriptionsService {
         const subscription = await this.getCurrentSubscription(userId);
         return subscription?.plan_type || plan_type_enum_1.PlanType.FREE;
     }
+    async getActivePlanByType(planType) {
+        return this.planRepository.findOne({
+            where: {
+                plan_type: planType,
+                is_deleted: false,
+                is_enabled: true,
+            },
+            order: {
+                id: 'ASC',
+            },
+        });
+    }
     async hasModuleAccess(userId, moduleSlug) {
         const subscription = await this.getCurrentSubscription(userId);
         if (!subscription) {

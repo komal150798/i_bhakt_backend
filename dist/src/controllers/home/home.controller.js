@@ -18,9 +18,13 @@ const swagger_1 = require("@nestjs/swagger");
 const plans_service_1 = require("../../plans/services/plans.service");
 const plan_response_dto_1 = require("../../plans/dtos/plan-response.dto");
 const public_decorator_1 = require("../../common/decorators/public.decorator");
+const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
+const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
+const customer_service_1 = require("../../users/services/customer.service");
 let HomeController = class HomeController {
-    constructor(plansService) {
+    constructor(plansService, customerService) {
         this.plansService = plansService;
+        this.customerService = customerService;
     }
     async getPlans(enabled) {
         const isEnabled = enabled === 'true' || enabled === undefined;
@@ -28,6 +32,29 @@ let HomeController = class HomeController {
     }
     async getPlan(uniqueId) {
         return this.plansService.findOneByUniqueId(uniqueId);
+    }
+    async getReferralCode(user) {
+        const code = await this.customerService.getReferralCode(user.id);
+        const baseUrl = (process.env.APP_PUBLIC_URL || process.env.FRONTEND_URL || '').trim();
+        const referral_link = `${baseUrl || 'https://app.ibhakt.com'}/signup?ref=${code}`;
+        return {
+            success: true,
+            data: {
+                code,
+                referral_link,
+            },
+        };
+    }
+    async getReferralStats(user) {
+        const stats = await this.customerService.getReferralStats(user.id);
+        return {
+            success: true,
+            data: {
+                totalReferrals: stats.total_referrals,
+                successfulReferrals: stats.successful_referrals,
+                earnings: `${stats.total_earnings}`,
+            },
+        };
     }
 };
 exports.HomeController = HomeController;
@@ -52,9 +79,32 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], HomeController.prototype, "getPlan", null);
+__decorate([
+    (0, common_1.Get)('refer/code'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Get current user referral code and share link' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Referral code fetched successfully' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], HomeController.prototype, "getReferralCode", null);
+__decorate([
+    (0, common_1.Get)('refer/stats'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Get current user referral stats' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Referral stats fetched successfully' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], HomeController.prototype, "getReferralStats", null);
 exports.HomeController = HomeController = __decorate([
     (0, swagger_1.ApiTags)('Home'),
     (0, common_1.Controller)('home'),
-    __metadata("design:paramtypes", [plans_service_1.PlansService])
+    __metadata("design:paramtypes", [plans_service_1.PlansService,
+        customer_service_1.CustomerService])
 ], HomeController);
 //# sourceMappingURL=home.controller.js.map
