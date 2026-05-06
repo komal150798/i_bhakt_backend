@@ -28,6 +28,7 @@ import { AIPromptModule } from './common/ai/ai-prompt.module';
 import { ConstantsModule } from './common/constants/constants.module';
 import { ContactModule } from './contact/contact.module';
 import { TestimonialModule } from './testimonial/testimonial.module';
+import { SpaWebModule } from './spa/spa-web.module';
 import { AdminController } from './controllers/admin/admin.controller';
 import { HomeController } from './controllers/home/home.controller';
 import { HomeKarmaController } from './controllers/home/karma.controller';
@@ -53,6 +54,7 @@ import redisConfig from './config/redis.config';
     ProductsModule,
     PlansModule,
     SubscriptionsModule,
+    SpaWebModule,
     OrdersModule,
     PaymentsModule,
     AstrologyModule,

@@ -598,7 +598,9 @@ let ManifestationEnhancedService = ManifestationEnhancedService_1 = class Manife
             astro_support: astro_support !== null && astro_support !== undefined && !isNaN(astro_support) ? Number(astro_support) : 0,
             energy_state: energy_state || 'aligned',
         };
-        if (process.env.LOG_LEVEL === 'debug' || process.env.NODE_ENV === 'development') {
+        if (process.env.LOG_LEVEL === 'debug' ||
+            process.env.NODE_ENV === 'development' ||
+            process.env.NODE_ENV === 'dev') {
             this.logger.debug(`Dashboard summary calculated:`, JSON.stringify(summary));
             this.logger.debug(`Locked manifestations count: ${lockedManifestations.length}`);
         }

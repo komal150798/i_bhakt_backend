@@ -3,6 +3,9 @@ import { PlanType } from '../../common/enums/plan-type.enum';
 
 export class PlanResponseDto {
   @ApiProperty()
+  id: number;
+
+  @ApiProperty()
   unique_id: string;
 
   @ApiProperty({ enum: PlanType })

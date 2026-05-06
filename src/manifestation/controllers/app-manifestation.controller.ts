@@ -34,6 +34,7 @@ import {
   UpdateDailyProgressEntryDto,
 } from '../dtos/daily-progress-entry.dto';
 import { toNumber } from '../../common/utils/number.util';
+import { EntitlementsService } from '../../subscriptions/services/entitlements.service';
 
 @ApiTags('Manifestation (App)')
 @Controller('app/manifestation')
@@ -42,6 +43,7 @@ import { toNumber } from '../../common/utils/number.util';
 export class AppManifestationController {
   constructor(
     private readonly manifestationService: ManifestationEnhancedService,
+    private readonly entitlementsService: EntitlementsService,
   ) {}
 
   // ============================================
@@ -488,6 +490,7 @@ export class AppManifestationController {
     );
     const dailyProgressEntries =
       await this.manifestationService.getDailyProgressEntries(id, user.id);
+    const entitlements = await this.entitlementsService.getUserEntitlements(user.id);
 
     // Use common utility function for number conversion
 
@@ -514,6 +517,10 @@ export class AppManifestationController {
         tips: manifestation.tips,
         insights: manifestation.insights,
         summary_for_ui: manifestation.insights?.summary_for_ui || null,
+        action_windows: manifestation.action_windows ?? null,
+        progress_tracking: manifestation.progress_tracking ?? null,
+        /** Same enum string as dashboard (e.g. karma_pro) so the client can gate UI without relying on parent state */
+        plan_type: entitlements.plan_type,
         daily_progress_entries: dailyProgressEntries.map((entry) => ({
           id: entry.id,
           manifestation_id: entry.manifestation_id,

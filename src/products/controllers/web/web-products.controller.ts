@@ -9,7 +9,7 @@ import { ProductsService } from '../../services/products.service';
 import { Cache } from '../../../cache/decorators/cache.decorator';
 
 @ApiTags('web-products')
-@Controller('web/products')
+@Controller('products')
 export class WebProductsController {
   constructor(private readonly productsService: ProductsService) {}
 

@@ -19,6 +19,18 @@ export declare class CustomerService {
         successful_referrals: number;
         total_earnings: number;
     }>;
+    getReferralListForDashboard(userId: number): Promise<{
+        pending: Array<{
+            id: number;
+            referral_type: string;
+            referral_value: string;
+        }>;
+        completed: Array<{
+            id: number;
+            referral_type: string;
+            referral_value: string;
+        }>;
+    }>;
     updateProfile(id: number, updateData: UpdateCustomerProfileDto): Promise<Customer>;
     private updateKundliOnProfileChange;
     findByUniqueId(uniqueId: string): Promise<Customer>;

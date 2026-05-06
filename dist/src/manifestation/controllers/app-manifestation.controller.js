@@ -23,9 +23,11 @@ const alignment_action_dto_1 = require("../dtos/alignment-action.dto");
 const calculate_resonance_dto_1 = require("../dtos/calculate-resonance.dto");
 const daily_progress_entry_dto_1 = require("../dtos/daily-progress-entry.dto");
 const number_util_1 = require("../../common/utils/number.util");
+const entitlements_service_1 = require("../../subscriptions/services/entitlements.service");
 let AppManifestationController = class AppManifestationController {
-    constructor(manifestationService) {
+    constructor(manifestationService, entitlementsService) {
         this.manifestationService = manifestationService;
+        this.entitlementsService = entitlementsService;
     }
     async createManifestation(dto, user) {
         const manifestation = await this.manifestationService.createManifestation(user.id, dto);
@@ -173,6 +175,7 @@ let AppManifestationController = class AppManifestationController {
     async getManifestation(id, user) {
         const manifestation = await this.manifestationService.getManifestationById(id, user.id);
         const dailyProgressEntries = await this.manifestationService.getDailyProgressEntries(id, user.id);
+        const entitlements = await this.entitlementsService.getUserEntitlements(user.id);
         return {
             success: true,
             code: 200,
@@ -196,6 +199,9 @@ let AppManifestationController = class AppManifestationController {
                 tips: manifestation.tips,
                 insights: manifestation.insights,
                 summary_for_ui: manifestation.insights?.summary_for_ui || null,
+                action_windows: manifestation.action_windows ?? null,
+                progress_tracking: manifestation.progress_tracking ?? null,
+                plan_type: entitlements.plan_type,
                 daily_progress_entries: dailyProgressEntries.map((entry) => ({
                     id: entry.id,
                     manifestation_id: entry.manifestation_id,
@@ -705,6 +711,7 @@ exports.AppManifestationController = AppManifestationController = __decorate([
     (0, common_1.Controller)('app/manifestation'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
-    __metadata("design:paramtypes", [manifestation_enhanced_service_1.ManifestationEnhancedService])
+    __metadata("design:paramtypes", [manifestation_enhanced_service_1.ManifestationEnhancedService,
+        entitlements_service_1.EntitlementsService])
 ], AppManifestationController);
 //# sourceMappingURL=app-manifestation.controller.js.map

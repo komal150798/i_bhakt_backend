@@ -33,6 +33,15 @@ let HomeController = class HomeController {
     async getPlan(uniqueId) {
         return this.plansService.findOneByUniqueId(uniqueId);
     }
+    getRuntimeConfig() {
+        const nodeEnv = (process.env.NODE_ENV || 'development').trim();
+        const lower = nodeEnv.toLowerCase();
+        const isDevLike = lower === 'dev' || lower === 'development';
+        return {
+            node_env: nodeEnv,
+            is_dev_like: isDevLike,
+        };
+    }
     async getReferralCode(user) {
         const code = await this.customerService.getReferralCode(user.id);
         const baseUrl = (process.env.APP_PUBLIC_URL || process.env.FRONTEND_URL || '').trim();
@@ -79,6 +88,15 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], HomeController.prototype, "getPlan", null);
+__decorate([
+    (0, common_1.Get)('runtime-config'),
+    (0, public_decorator_1.Public)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Public runtime config for SPA (NODE_ENV)' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Runtime flags' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], HomeController.prototype, "getRuntimeConfig", null);
 __decorate([
     (0, common_1.Get)('refer/code'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

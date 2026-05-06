@@ -17,6 +17,10 @@ class PlanResponseDto {
 exports.PlanResponseDto = PlanResponseDto;
 __decorate([
     (0, swagger_1.ApiProperty)(),
+    __metadata("design:type", Number)
+], PlanResponseDto.prototype, "id", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)(),
     __metadata("design:type", String)
 ], PlanResponseDto.prototype, "unique_id", void 0);
 __decorate([

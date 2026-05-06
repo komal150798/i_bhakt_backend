@@ -1036,6 +1036,40 @@ let KundliService = KundliService_1 = class KundliService {
                 : '',
         };
     }
+    async getCurrentDashaForDashboard(userId) {
+        const kundli = await this.kundliRepository.findOneByUserId(userId, { is_deleted: false });
+        const rawTimeline = kundli?.dasha_timeline;
+        if (!rawTimeline ||
+            typeof rawTimeline !== 'object' ||
+            Array.isArray(rawTimeline)) {
+            return null;
+        }
+        const dt = rawTimeline;
+        const vim = dt.vimshottari ?? dt;
+        const toLord = (x) => {
+            if (x == null)
+                return null;
+            if (typeof x === 'string' && x.trim())
+                return { lord: x.trim() };
+            if (typeof x === 'object' && x !== null && 'lord' in x) {
+                const lord = x.lord;
+                if (typeof lord === 'string' && lord.trim())
+                    return { lord: lord.trim() };
+            }
+            return null;
+        };
+        const vrec = vim;
+        const out = {
+            current_mahadasha: toLord(vrec.current_mahadasha),
+            current_antardasha: toLord(vrec.current_antardasha),
+            current_pratyantar: toLord(vrec.current_pratyantar),
+            current_sukshma: toLord(vrec.current_sukshma ?? vrec.current_suksma),
+        };
+        if (!out.current_mahadasha && !out.current_antardasha && !out.current_pratyantar) {
+            return null;
+        }
+        return out;
+    }
 };
 exports.KundliService = KundliService;
 exports.KundliService = KundliService = KundliService_1 = __decorate([

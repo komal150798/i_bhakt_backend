@@ -101,6 +101,33 @@ export class CustomerService {
   }
 
   /**
+   * Referred customers for web dashboard (shape matches legacy /api/users/:id/referrals).
+   */
+  async getReferralListForDashboard(userId: number): Promise<{
+    pending: Array<{ id: number; referral_type: string; referral_value: string }>;
+    completed: Array<{ id: number; referral_type: string; referral_value: string }>;
+  }> {
+    const rows = await this.customerRepository.find({
+      where: { referred_by: userId, is_deleted: false },
+      select: ['id', 'email', 'phone_number', 'is_verified'],
+      order: { added_date: 'DESC' },
+    });
+
+    const toItem = (c: Customer) => {
+      const email = c.email?.trim();
+      if (email) {
+        return { id: Number(c.id), referral_type: 'email', referral_value: email };
+      }
+      const phone = c.phone_number?.trim() || '—';
+      return { id: Number(c.id), referral_type: 'phone', referral_value: phone };
+    };
+
+    const pending = rows.filter((c) => !c.is_verified).map(toItem);
+    const completed = rows.filter((c) => c.is_verified).map(toItem);
+    return { pending, completed };
+  }
+
+  /**
    * Update customer profile
    */
   async updateProfile(id: number, updateData: UpdateCustomerProfileDto): Promise<Customer> {

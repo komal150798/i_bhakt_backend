@@ -65,4 +65,18 @@ export declare class KundliService {
     private calculateYogDetails;
     private calculateDoshaDetails;
     private calculateGocharAnalysis;
+    getCurrentDashaForDashboard(userId: number): Promise<{
+        current_mahadasha: {
+            lord: string;
+        } | null;
+        current_antardasha: {
+            lord: string;
+        } | null;
+        current_pratyantar: {
+            lord: string;
+        } | null;
+        current_sukshma: {
+            lord: string;
+        } | null;
+    } | null>;
 }

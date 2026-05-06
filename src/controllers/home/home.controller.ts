@@ -36,6 +36,25 @@ export class HomeController {
     return this.plansService.findOneByUniqueId(uniqueId);
   }
 
+  /**
+   * Lets the SPA align payment / upgrade UX with the API process (NODE_ENV),
+   * independent of Vite dev vs production build.
+   */
+  @Get('runtime-config')
+  @Public()
+  @ApiOperation({ summary: 'Public runtime config for SPA (NODE_ENV)' })
+  @ApiResponse({ status: 200, description: 'Runtime flags' })
+  getRuntimeConfig() {
+    const nodeEnv = (process.env.NODE_ENV || 'development').trim();
+    const lower = nodeEnv.toLowerCase();
+    const isDevLike = lower === 'dev' || lower === 'development';
+    return {
+      node_env: nodeEnv,
+      /** True when server treats environment as dev (matches payment bypass logic). */
+      is_dev_like: isDevLike,
+    };
+  }
+
   @Get('refer/code')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

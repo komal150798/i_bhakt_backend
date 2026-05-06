@@ -45,16 +45,22 @@ export class AppSubscriptionController {
     return {
       success: true,
       data: plans.map((plan) => ({
+        id: plan.id,
         unique_id: plan.unique_id,
         plan_type: plan.plan_type,
         name: plan.name,
         description: plan.description,
+        tagline: plan.tagline,
         monthly_price: plan.monthly_price,
         yearly_price: plan.yearly_price,
         currency: plan.currency,
         billing_cycle_days: plan.billing_cycle_days,
+        referral_count_required: plan.referral_count_required,
+        sort_order: plan.sort_order,
         features: plan.features || [],
         is_popular: plan.is_popular || false,
+        usage_limits: plan.usage_limits,
+        metadata: plan.metadata,
       })),
     };
   }

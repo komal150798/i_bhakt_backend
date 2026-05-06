@@ -49,6 +49,26 @@ let PlansService = class PlansService {
         await this.cacheManager.set(cacheKey, response, this.CACHE_TTL);
         return response;
     }
+    async resolveSubscribablePlan(params) {
+        const hasId = params.plan_id !== undefined && params.plan_id !== null;
+        const hasUnique = params.unique_id !== undefined &&
+            params.unique_id !== null &&
+            String(params.unique_id).trim() !== '';
+        if (!hasId && !hasUnique) {
+            throw new common_1.BadRequestException('Provide plan_id or unique_id');
+        }
+        let plan = null;
+        if (hasId) {
+            plan = await this.planRepository.findById(Number(params.plan_id));
+        }
+        else {
+            plan = await this.planRepository.findByUniqueId(String(params.unique_id).trim());
+        }
+        if (!plan || plan.is_deleted || !plan.is_enabled) {
+            throw new common_1.NotFoundException('Plan not found or not available');
+        }
+        return plan;
+    }
     async findOneByUniqueId(uniqueId) {
         const cacheKey = `${this.CACHE_KEY_PREFIX}unique:${uniqueId}`;
         const cached = await this.cacheManager.get(cacheKey);
@@ -108,6 +128,7 @@ let PlansService = class PlansService {
     }
     toResponseDto(plan) {
         return {
+            id: Number(plan.id),
             unique_id: plan.unique_id,
             plan_type: plan.plan_type,
             name: plan.name,

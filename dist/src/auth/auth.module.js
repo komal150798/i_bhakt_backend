@@ -13,7 +13,6 @@ const passport_1 = require("@nestjs/passport");
 const config_1 = require("@nestjs/config");
 const typeorm_1 = require("@nestjs/typeorm");
 const admin_auth_controller_1 = require("./controllers/admin/admin-auth.controller");
-const web_auth_controller_1 = require("./controllers/web/web-auth.controller");
 const app_auth_controller_1 = require("./controllers/app/app-auth.controller");
 const auth_controller_1 = require("./controllers/auth.controller");
 const auth_service_1 = require("./auth.service");
@@ -54,7 +53,6 @@ exports.AuthModule = AuthModule = __decorate([
         ],
         controllers: [
             admin_auth_controller_1.AdminAuthController,
-            web_auth_controller_1.WebAuthController,
             app_auth_controller_1.AppAuthController,
             auth_controller_1.AuthController,
         ],

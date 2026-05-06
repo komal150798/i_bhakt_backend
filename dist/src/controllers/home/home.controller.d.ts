@@ -8,6 +8,10 @@ export declare class HomeController {
     constructor(plansService: PlansService, customerService: CustomerService);
     getPlans(enabled?: string): Promise<PlanResponseDto[]>;
     getPlan(uniqueId: string): Promise<PlanResponseDto>;
+    getRuntimeConfig(): {
+        node_env: string;
+        is_dev_like: boolean;
+    };
     getReferralCode(user: CurrentUserPayload): Promise<{
         success: boolean;
         data: {

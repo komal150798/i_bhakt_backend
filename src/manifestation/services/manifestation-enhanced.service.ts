@@ -865,7 +865,11 @@ export class ManifestationEnhancedService {
     };
 
     // Only stringify in debug mode to avoid performance overhead (check log level)
-    if (process.env.LOG_LEVEL === 'debug' || process.env.NODE_ENV === 'development') {
+    if (
+      process.env.LOG_LEVEL === 'debug' ||
+      process.env.NODE_ENV === 'development' ||
+      process.env.NODE_ENV === 'dev'
+    ) {
       this.logger.debug(`Dashboard summary calculated:`, JSON.stringify(summary));
       this.logger.debug(`Locked manifestations count: ${lockedManifestations.length}`);
     }

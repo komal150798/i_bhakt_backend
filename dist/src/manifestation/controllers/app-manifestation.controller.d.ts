@@ -4,9 +4,11 @@ import { CreateManifestationEnhancedDto } from '../dtos/create-manifestation-enh
 import { AddAlignmentActionsDto, CommitIntentionDto } from '../dtos/alignment-action.dto';
 import { CalculateResonanceDto } from '../dtos/calculate-resonance.dto';
 import { AddDailyProgressEntryDto, UpdateDailyProgressEntryDto } from '../dtos/daily-progress-entry.dto';
+import { EntitlementsService } from '../../subscriptions/services/entitlements.service';
 export declare class AppManifestationController {
     private readonly manifestationService;
-    constructor(manifestationService: ManifestationEnhancedService);
+    private readonly entitlementsService;
+    constructor(manifestationService: ManifestationEnhancedService, entitlementsService: EntitlementsService);
     createManifestation(dto: CreateManifestationEnhancedDto, user: CurrentUserPayload): Promise<{
         success: boolean;
         code: number;
@@ -242,6 +244,42 @@ export declare class AppManifestationController {
                 energy_reason?: string;
             };
             summary_for_ui: string;
+            action_windows: {
+                optimal_dates?: string[];
+                next_optimal_date?: string;
+                planetary_influences?: Array<{
+                    date: string;
+                    planet: string;
+                    influence: "positive" | "neutral" | "negative";
+                    description: string;
+                }>;
+            };
+            progress_tracking: {
+                current_progress: number;
+                journal_entries_count: number;
+                last_journal_date?: string;
+                milestones?: Array<{
+                    date: string;
+                    description: string;
+                    progress: number;
+                }>;
+                alignment_actions?: Array<{
+                    id: number;
+                    title: string;
+                    description: string;
+                    icon: string;
+                    effort_level: string;
+                    karma_score: number;
+                    category: string;
+                    added_at: string;
+                    manifestation_id: number;
+                }>;
+                total_alignment_karma?: number;
+                is_committed?: boolean;
+                committed_at?: string;
+                commitment_message?: string;
+            };
+            plan_type: import("../../common/enums/plan-type.enum").PlanType;
             daily_progress_entries: {
                 id: number;
                 manifestation_id: number;

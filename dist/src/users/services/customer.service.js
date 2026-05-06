@@ -86,6 +86,24 @@ let CustomerService = CustomerService_1 = class CustomerService {
             total_earnings: 0,
         };
     }
+    async getReferralListForDashboard(userId) {
+        const rows = await this.customerRepository.find({
+            where: { referred_by: userId, is_deleted: false },
+            select: ['id', 'email', 'phone_number', 'is_verified'],
+            order: { added_date: 'DESC' },
+        });
+        const toItem = (c) => {
+            const email = c.email?.trim();
+            if (email) {
+                return { id: Number(c.id), referral_type: 'email', referral_value: email };
+            }
+            const phone = c.phone_number?.trim() || '—';
+            return { id: Number(c.id), referral_type: 'phone', referral_value: phone };
+        };
+        const pending = rows.filter((c) => !c.is_verified).map(toItem);
+        const completed = rows.filter((c) => c.is_verified).map(toItem);
+        return { pending, completed };
+    }
     async updateProfile(id, updateData) {
         const customer = await this.findOne(id);
         if (updateData.full_name !== undefined && updateData.full_name !== null) {

@@ -10,7 +10,6 @@ exports.UsersModule = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const admin_users_controller_1 = require("./controllers/admin/admin-users.controller");
-const web_users_controller_1 = require("./controllers/web/web-users.controller");
 const app_users_controller_1 = require("./controllers/app/app-users.controller");
 const users_service_1 = require("./services/users.service");
 const customer_service_1 = require("./services/customer.service");
@@ -20,6 +19,7 @@ const karma_entry_entity_1 = require("../karma/entities/karma-entry.entity");
 const subscriptions_module_1 = require("../subscriptions/subscriptions.module");
 const kundli_module_1 = require("../kundli/kundli.module");
 const repositories_module_1 = require("../infrastructure/repositories/repositories.module");
+const plans_module_1 = require("../plans/plans.module");
 let UsersModule = class UsersModule {
 };
 exports.UsersModule = UsersModule;
@@ -28,14 +28,11 @@ exports.UsersModule = UsersModule = __decorate([
         imports: [
             typeorm_1.TypeOrmModule.forFeature([customer_entity_1.Customer, admin_user_entity_1.AdminUser, karma_entry_entity_1.KarmaEntry]),
             subscriptions_module_1.SubscriptionsModule,
+            plans_module_1.PlansModule,
             kundli_module_1.KundliModule,
             repositories_module_1.RepositoriesModule,
         ],
-        controllers: [
-            admin_users_controller_1.AdminUsersController,
-            web_users_controller_1.WebUsersController,
-            app_users_controller_1.AppUsersController,
-        ],
+        controllers: [admin_users_controller_1.AdminUsersController, app_users_controller_1.AppUsersController],
         providers: [users_service_1.UsersService, customer_service_1.CustomerService],
         exports: [users_service_1.UsersService, customer_service_1.CustomerService],
     })

@@ -9,7 +9,7 @@
   ],
   "exec": "nest start",
   "env": {
-    "NODE_ENV": "development"
+    "NODE_ENV": "dev"
   },
   "delay": 2000,
   "verbose": true,

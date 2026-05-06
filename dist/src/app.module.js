@@ -37,6 +37,7 @@ const ai_prompt_module_1 = require("./common/ai/ai-prompt.module");
 const constants_module_1 = require("./common/constants/constants.module");
 const contact_module_1 = require("./contact/contact.module");
 const testimonial_module_1 = require("./testimonial/testimonial.module");
+const spa_web_module_1 = require("./spa/spa-web.module");
 const admin_controller_1 = require("./controllers/admin/admin.controller");
 const home_controller_1 = require("./controllers/home/home.controller");
 const karma_controller_1 = require("./controllers/home/karma.controller");
@@ -65,6 +66,7 @@ exports.AppModule = AppModule = __decorate([
             products_module_1.ProductsModule,
             plans_module_1.PlansModule,
             subscriptions_module_1.SubscriptionsModule,
+            spa_web_module_1.SpaWebModule,
             orders_module_1.OrdersModule,
             payments_module_1.PaymentsModule,
             astrology_module_1.AstrologyModule,

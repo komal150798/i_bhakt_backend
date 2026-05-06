@@ -1734,5 +1734,48 @@ export class KundliService {
         : '',
     };
   }
+
+  /**
+   * Web dashboard: current Vimshottari lords from persisted `kundli.dasha_timeline` (customer id = JWT sub).
+   */
+  async getCurrentDashaForDashboard(userId: number): Promise<{
+    current_mahadasha: { lord: string } | null;
+    current_antardasha: { lord: string } | null;
+    current_pratyantar: { lord: string } | null;
+    current_sukshma: { lord: string } | null;
+  } | null> {
+    const kundli = await this.kundliRepository.findOneByUserId(userId, { is_deleted: false });
+    const rawTimeline = kundli?.dasha_timeline as unknown;
+    if (
+      !rawTimeline ||
+      typeof rawTimeline !== 'object' ||
+      Array.isArray(rawTimeline)
+    ) {
+      return null;
+    }
+    const dt = rawTimeline as Record<string, unknown>;
+    const vim =
+      (dt as { vimshottari?: Record<string, unknown> }).vimshottari ?? dt;
+    const toLord = (x: unknown): { lord: string } | null => {
+      if (x == null) return null;
+      if (typeof x === 'string' && x.trim()) return { lord: x.trim() };
+      if (typeof x === 'object' && x !== null && 'lord' in x) {
+        const lord = (x as { lord?: unknown }).lord;
+        if (typeof lord === 'string' && lord.trim()) return { lord: lord.trim() };
+      }
+      return null;
+    };
+    const vrec = vim as Record<string, unknown>;
+    const out = {
+      current_mahadasha: toLord(vrec.current_mahadasha),
+      current_antardasha: toLord(vrec.current_antardasha),
+      current_pratyantar: toLord(vrec.current_pratyantar),
+      current_sukshma: toLord(vrec.current_sukshma ?? vrec.current_suksma),
+    };
+    if (!out.current_mahadasha && !out.current_antardasha && !out.current_pratyantar) {
+      return null;
+    }
+    return out;
+  }
 }
 

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Put,
+  Post,
   Body,
   UseGuards,
   BadRequestException,
@@ -14,10 +15,13 @@ import { CurrentUserPayload } from '../../../common/types/jwt-payload.interface'
 import { CustomerService } from '../../services/customer.service';
 import { SubscriptionsService } from '../../../subscriptions/services/subscriptions.service';
 import { UsageTrackingService } from '../../../subscriptions/services/usage-tracking.service';
+import { PlansService } from '../../../plans/services/plans.service';
 import { Customer } from '../../entities/customer.entity';
 import { UpdateCustomerProfileDto } from '../../dtos/update-customer-profile.dto';
+import { UpgradePlanDto } from '../../dtos/upgrade-plan.dto';
 import { parseDateString } from '../../../common/utils/date.util';
 import { formatFullName, splitFullName } from '../../../common/utils/string.util';
+import { KundliService } from '../../../kundli/services/kundli.service';
 
 @ApiTags('app-users')
 @Controller('app/users')
@@ -28,6 +32,8 @@ export class AppUsersController {
     private readonly customerService: CustomerService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly usageTrackingService: UsageTrackingService,
+    private readonly plansService: PlansService,
+    private readonly kundliService: KundliService,
   ) {}
 
   @Get('profile')
@@ -237,6 +243,79 @@ export class AppUsersController {
         referral_code: fullUser.referral_code,
         verified: fullUser.is_verified,
         usage: limits,
+      },
+    };
+  }
+
+  @Get('referrals')
+  @ApiOperation({ summary: 'Referred signups for web dashboard (JWT user)' })
+  @ApiResponse({ status: 200, description: 'Pending and completed referrals' })
+  async getReferralsList(@CurrentUser() user: CurrentUserPayload) {
+    const data = await this.customerService.getReferralListForDashboard(user.id);
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Get('referral-stats')
+  @ApiOperation({ summary: 'Referral summary for web dashboard (JWT user)' })
+  @ApiResponse({ status: 200, description: 'Referral stats' })
+  async getReferralStatsDashboard(@CurrentUser() user: CurrentUserPayload) {
+    const stats = await this.customerService.getReferralStats(user.id);
+    const fullUser = await this.customerService.findOne(user.id);
+    return {
+      success: true,
+      data: {
+        referral_code: stats.referral_code,
+        referral_count: stats.successful_referrals,
+        total_referrals: stats.total_referrals,
+        referrals_needed: 11,
+        referral_limit_awaken_to_builder: 5,
+        referral_limit_karma_pro_to_dharma: 51,
+        current_plan: fullUser.current_plan,
+      },
+    };
+  }
+
+  @Get('current-dasha')
+  @ApiOperation({ summary: 'Current Vimshottari lords from stored kundli (web dashboard)' })
+  @ApiResponse({ status: 200, description: 'Current dasha levels' })
+  async getCurrentDashaForWeb(@CurrentUser() user: CurrentUserPayload) {
+    const data = await this.kundliService.getCurrentDashaForDashboard(user.id);
+    return {
+      success: true,
+      data: data ?? {
+        current_mahadasha: null,
+        current_antardasha: null,
+        current_pratyantar: null,
+        current_sukshma: null,
+      },
+    };
+  }
+
+  @Post('upgrade-plan')
+  @ApiOperation({
+    summary:
+      'Assign subscription by plan id or unique_id (direct activation; pair with payment verify for paid checkout)',
+  })
+  @ApiResponse({ status: 200, description: 'Plan upgraded' })
+  @ApiResponse({ status: 400, description: 'Invalid plan or plan not available' })
+  async upgradePlan(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() body: UpgradePlanDto,
+  ) {
+    const plan = await this.plansService.resolveSubscribablePlan({
+      unique_id: body.unique_id,
+      plan_id: body.plan_id,
+    });
+    await this.subscriptionsService.createSubscription(user.id, plan.id, new Date());
+    return {
+      success: true,
+      data: {
+        plan: plan.plan_type,
+        plan_id: Number(plan.id),
+        unique_id: plan.unique_id,
       },
     };
   }

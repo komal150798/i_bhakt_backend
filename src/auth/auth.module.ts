@@ -4,7 +4,6 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminAuthController } from './controllers/admin/admin-auth.controller';
-import { WebAuthController } from './controllers/web/web-auth.controller';
 import { AppAuthController } from './controllers/app/app-auth.controller';
 import { AuthController } from './controllers/auth.controller';
 import { AuthService } from './auth.service';
@@ -43,7 +42,6 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
   ],
   controllers: [
     AdminAuthController,
-    WebAuthController,
     AppAuthController,
     AuthController,
   ],

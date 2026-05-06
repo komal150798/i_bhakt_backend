@@ -1,5 +1,6 @@
 import { PlanType } from '../../common/enums/plan-type.enum';
 export declare class PlanResponseDto {
+    id: number;
     unique_id: string;
     plan_type: PlanType;
     name: string;

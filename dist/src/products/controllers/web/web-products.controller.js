@@ -63,7 +63,7 @@ __decorate([
 ], WebProductsController.prototype, "findOne", null);
 exports.WebProductsController = WebProductsController = __decorate([
     (0, swagger_1.ApiTags)('web-products'),
-    (0, common_1.Controller)('web/products'),
+    (0, common_1.Controller)('products'),
     __metadata("design:paramtypes", [products_service_1.ProductsService])
 ], WebProductsController);
 //# sourceMappingURL=web-products.controller.js.map
