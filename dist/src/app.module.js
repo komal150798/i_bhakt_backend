@@ -21,29 +21,19 @@ const orders_module_1 = require("./orders/orders.module");
 const payments_module_1 = require("./payments/payments.module");
 const astrology_module_1 = require("./astrology/astrology.module");
 const kundli_module_1 = require("./kundli/kundli.module");
-const horoscope_module_1 = require("./horoscope/horoscope.module");
-const karma_module_1 = require("./karma/karma.module");
-const manifestation_module_1 = require("./manifestation/manifestation.module");
-const journal_module_1 = require("./journal/journal.module");
-const challenges_module_1 = require("./challenges/challenges.module");
-const twin_module_1 = require("./twin/twin.module");
 const messaging_module_1 = require("./common/messaging/messaging.module");
 const notifications_module_1 = require("./notifications/notifications.module");
-const cms_module_1 = require("./cms/cms.module");
 const modules_module_1 = require("./modules/modules.module");
 const audit_module_1 = require("./audit/audit.module");
 const admin_rbac_module_1 = require("./admin-rbac/admin-rbac.module");
 const ai_prompt_module_1 = require("./common/ai/ai-prompt.module");
 const constants_module_1 = require("./common/constants/constants.module");
-const contact_module_1 = require("./contact/contact.module");
-const testimonial_module_1 = require("./testimonial/testimonial.module");
+const zuno_module_1 = require("./zuno/zuno.module");
 const spa_web_module_1 = require("./spa/spa-web.module");
 const admin_controller_1 = require("./controllers/admin/admin.controller");
 const home_controller_1 = require("./controllers/home/home.controller");
-const karma_controller_1 = require("./controllers/home/karma.controller");
 const refer_controller_1 = require("./controllers/home/refer.controller");
 const customer_controller_1 = require("./controllers/customer/customer.controller");
-const karma_controller_2 = require("./controllers/customer/karma.controller");
 const app_controller_1 = require("./controllers/app/app.controller");
 const database_config_1 = require("./config/database.config");
 const redis_config_1 = require("./config/redis.config");
@@ -71,30 +61,20 @@ exports.AppModule = AppModule = __decorate([
             payments_module_1.PaymentsModule,
             astrology_module_1.AstrologyModule,
             kundli_module_1.KundliModule,
-            horoscope_module_1.HoroscopeModule,
-            karma_module_1.KarmaModule,
-            manifestation_module_1.ManifestationModule,
-            journal_module_1.JournalModule,
-            challenges_module_1.ChallengesModule,
-            twin_module_1.TwinModule,
             messaging_module_1.MessagingModule,
             notifications_module_1.NotificationsModule,
-            cms_module_1.CmsModule,
             modules_module_1.ModulesModule,
             audit_module_1.AuditModule,
             admin_rbac_module_1.AdminRbacModule,
             ai_prompt_module_1.AIPromptModule,
             constants_module_1.ConstantsModule,
-            contact_module_1.ContactModule,
-            testimonial_module_1.TestimonialModule,
+            zuno_module_1.ZunoModule,
         ],
         controllers: [
             admin_controller_1.AdminController,
             home_controller_1.HomeController,
-            karma_controller_1.HomeKarmaController,
             refer_controller_1.ReferController,
             customer_controller_1.CustomerController,
-            karma_controller_2.KarmaController,
             app_controller_1.AppController,
         ],
     })

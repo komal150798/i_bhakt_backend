@@ -13,20 +13,20 @@ exports.AuthJwtService = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
+const crypto_1 = require("crypto");
 let AuthJwtService = class AuthJwtService {
     constructor(jwtService, configService) {
         this.jwtService = jwtService;
         this.configService = configService;
     }
+    sign(payload, expiresIn) {
+        return this.jwtService.sign({ ...payload, jti: (0, crypto_1.randomUUID)() }, { expiresIn });
+    }
     generateAccessToken(payload, expiresIn) {
-        return this.jwtService.sign(payload, {
-            expiresIn: expiresIn || this.configService.get('JWT_ACCESS_EXPIRY', '15m'),
-        });
+        return this.sign(payload, expiresIn || this.configService.get('JWT_ACCESS_EXPIRY', '15m'));
     }
     generateRefreshToken(payload, expiresIn) {
-        return this.jwtService.sign(payload, {
-            expiresIn: expiresIn || this.configService.get('JWT_REFRESH_EXPIRY', '7d'),
-        });
+        return this.sign(payload, expiresIn || this.configService.get('JWT_REFRESH_EXPIRY', '7d'));
     }
     verifyToken(token) {
         try {

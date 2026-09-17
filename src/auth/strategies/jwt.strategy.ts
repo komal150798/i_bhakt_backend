@@ -17,6 +17,10 @@ export interface JwtPayload {
   type: 'user' | 'admin';
   iat?: number;
   exp?: number;
+  /** Unique token id (RFC 7519 4.1.7). Keeps two tokens issued in the same
+   *  second from being byte-identical, which the UNIQUE index on
+   *  cst_tokens.token would otherwise reject. */
+  jti?: string;
 }
 
 @Injectable()

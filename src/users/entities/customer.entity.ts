@@ -4,8 +4,6 @@ import { PlanType } from '../../common/enums/plan-type.enum';
 import { Subscription } from '../../subscriptions/entities/subscription.entity';
 import { Order } from '../../orders/entities/order.entity';
 import { Kundli } from '../../kundli/entities/kundli.entity';
-// import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
-import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
 import { CustomerToken } from '../../auth/entities/customer-token.entity';
 
 /**
@@ -133,11 +131,7 @@ export class Customer extends BaseEntity {
   @OneToMany(() => Kundli, (kundli) => kundli.customer)
   kundlis: Kundli[];
 
-  // @OneToMany(() => KarmaEntry, (karma) => karma.customer)
-  // karma_entries: KarmaEntry[];
 
-  @OneToMany(() => ManifestationLog, (manifestation) => manifestation.customer)
-  manifestation_logs: ManifestationLog[];
 
   @OneToMany(() => CustomerToken, (token) => token.customer)
   tokens: CustomerToken[];

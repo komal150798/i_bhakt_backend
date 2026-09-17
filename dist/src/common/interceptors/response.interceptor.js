@@ -9,12 +9,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ResponseInterceptor = void 0;
 const common_1 = require("@nestjs/common");
 const operators_1 = require("rxjs/operators");
+const zuno_routes_1 = require("../../zuno/common/zuno-routes");
 let ResponseInterceptor = class ResponseInterceptor {
     intercept(context, next) {
         const ctx = context.switchToHttp();
         const response = ctx.getResponse();
         const request = ctx.getRequest();
         const method = request.method;
+        if ((0, zuno_routes_1.isZunoRoute)(request.url)) {
+            return next.handle();
+        }
         return next.handle().pipe((0, operators_1.map)((data) => {
             const statusCode = response.statusCode || 200;
             if (data &&

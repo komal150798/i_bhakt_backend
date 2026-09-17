@@ -1,0 +1,8 @@
+import { ZunoUser, ZunoUserProfile, ZunoUserPreference, ZunoUserConsent, ZunoBirthProfile } from './identity/entities';
+import { ZunoChallenge, ZunoChallengeContext, ZunoChallengeDomain, ZunoChallengeLink } from './challenges/entities';
+import { ZunoResponse } from './responses/entities';
+import { ZunoSafetyDecision, ZunoSafetyIncident } from './safety/entities';
+import { ZunoAiGenerationRun, ZunoEngineRun } from './ai/entities';
+import { ZunoEventOutbox, ZunoIdempotencyKey, ZunoAuditEvent } from './common/entities';
+import { ZunoRulebookVersion, ZunoRulebookRule, ZunoRulebookInterpretation, ZunoRulebookTimingRule, ZunoRulebookRemedy, ZunoRulebookDomainConfig, ZunoRulebookConflictRule, ZunoRulebookGoldenCase, ZunoRulebookValidationRun, ZunoRulebookReviewItem, ZunoRulebookAuditLog } from './rulebook/entities';
+export declare const ZUNO_ENTITIES: (typeof ZunoUserProfile | typeof ZunoUser | typeof ZunoBirthProfile | typeof ZunoUserPreference | typeof ZunoUserConsent | typeof ZunoChallengeContext | typeof ZunoChallenge | typeof ZunoChallengeDomain | typeof ZunoChallengeLink | typeof ZunoResponse | typeof ZunoSafetyDecision | typeof ZunoSafetyIncident | typeof ZunoAiGenerationRun | typeof ZunoEngineRun | typeof ZunoEventOutbox | typeof ZunoIdempotencyKey | typeof ZunoAuditEvent | typeof ZunoRulebookVersion | typeof ZunoRulebookRule | typeof ZunoRulebookInterpretation | typeof ZunoRulebookTimingRule | typeof ZunoRulebookRemedy | typeof ZunoRulebookDomainConfig | typeof ZunoRulebookConflictRule | typeof ZunoRulebookGoldenCase | typeof ZunoRulebookValidationRun | typeof ZunoRulebookReviewItem | typeof ZunoRulebookAuditLog)[];

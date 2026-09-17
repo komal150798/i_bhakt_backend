@@ -1,0 +1,37 @@
+export declare enum ZunoUserStatus {
+    ACTIVE = "ACTIVE",
+    SUSPENDED = "SUSPENDED",
+    PENDING_DELETION = "PENDING_DELETION",
+    DELETED = "DELETED"
+}
+export declare enum OnboardingStatus {
+    NOT_STARTED = "NOT_STARTED",
+    PROFILE_MINIMAL = "PROFILE_MINIMAL",
+    BIRTH_PENDING = "BIRTH_PENDING",
+    COMPLETED = "COMPLETED"
+}
+export declare enum BirthTimeAccuracy {
+    EXACT = "EXACT",
+    APPROXIMATE = "APPROXIMATE",
+    UNKNOWN = "UNKNOWN",
+    RECTIFIED = "RECTIFIED"
+}
+export declare enum BirthProfileSource {
+    USER_PROVIDED = "USER_PROVIDED",
+    USER_CONFIRMED = "USER_CONFIRMED",
+    IMPORTED = "IMPORTED",
+    ADMIN_ENTERED = "ADMIN_ENTERED"
+}
+export declare enum ConsentType {
+    TERMS_OF_SERVICE = "TERMS_OF_SERVICE",
+    PRIVACY_POLICY = "PRIVACY_POLICY",
+    BIRTH_DATA_PROCESSING = "BIRTH_DATA_PROCESSING",
+    PERSONALISATION = "PERSONALISATION",
+    NOTIFICATIONS = "NOTIFICATIONS",
+    ANALYTICS = "ANALYTICS"
+}
+export declare enum PreferenceSource {
+    USER_EXPLICIT = "USER_EXPLICIT",
+    SYSTEM_DEFAULT = "SYSTEM_DEFAULT",
+    INFERRED = "INFERRED"
+}

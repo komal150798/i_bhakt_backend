@@ -7,6 +7,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
+import { isZunoRoute } from '../../zuno/common/zuno-routes';
+import { ZunoException } from '../../zuno/common/errors/zuno.exception';
 
 /**
  * Standard API Error Response Format
@@ -36,6 +38,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+
+    // ZUNO routes use the error envelope from ZUNO API Contracts (Step 21)
+    // section 12. They are handled by ZunoExceptionFilter, which is applied
+    // per-controller; this global filter only sees them if that filter
+    // re-threw. Reformatting here would both break the contract and - because
+    // the branch below attaches `exception.stack` outside production - leak a
+    // stack trace, which Step 21 section 12 forbids outright.
+    if (isZunoRoute(request.url) || exception instanceof ZunoException) {
+      const zunoStatus =
+        exception instanceof ZunoException ? exception.getStatus() : 500;
+      const body =
+        exception instanceof ZunoException
+          ? exception.getResponse()
+          : { error: { code: 'INTERNAL_ERROR', message: 'Something went wrong on our side.' } };
+      this.logger.error(
+        `${request.method} ${request.url.split('?')[0]} -> ${zunoStatus}`,
+      );
+      response.status(zunoStatus).json(body);
+      return;
+    }
 
     let status: number;
     let message: string;

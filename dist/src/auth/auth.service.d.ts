@@ -7,7 +7,6 @@ import { CustomerToken } from './entities/customer-token.entity';
 import { AdminToken } from './entities/admin-token.entity';
 import { OtpService } from './services/otp.service';
 import { AuthJwtService } from './services/jwt.service';
-import { HoroscopeService } from '../horoscope/services/horoscope.service';
 import { SubscriptionsService } from '../subscriptions/services/subscriptions.service';
 export declare class AuthService {
     private customerRepository;
@@ -18,9 +17,8 @@ export declare class AuthService {
     private otpService;
     private jwtService;
     private configService;
-    private horoscopeService;
     private subscriptionsService;
-    constructor(customerRepository: Repository<Customer>, adminUserRepository: Repository<AdminUser>, refreshTokenRepository: Repository<RefreshToken>, customerTokenRepository: Repository<CustomerToken>, adminTokenRepository: Repository<AdminToken>, otpService: OtpService, jwtService: AuthJwtService, configService: ConfigService, horoscopeService: HoroscopeService, subscriptionsService: SubscriptionsService);
+    constructor(customerRepository: Repository<Customer>, adminUserRepository: Repository<AdminUser>, refreshTokenRepository: Repository<RefreshToken>, customerTokenRepository: Repository<CustomerToken>, adminTokenRepository: Repository<AdminToken>, otpService: OtpService, jwtService: AuthJwtService, configService: ConfigService, subscriptionsService: SubscriptionsService);
     private getAppSessionExpiration;
     sendOtp(phoneNumber: string): Promise<{
         message: string;

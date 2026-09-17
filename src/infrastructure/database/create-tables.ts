@@ -27,11 +27,6 @@ import { KundliHouse } from '../../kundli/entities/kundli-house.entity';
 import { PlanetMaster } from '../../kundli/entities/planet-master.entity';
 import { NakshatraMaster } from '../../kundli/entities/nakshatra-master.entity';
 import { AyanamsaMaster } from '../../kundli/entities/ayanamsa-master.entity';
-import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
-import { KarmaMasterGood } from '../../karma/entities/karma-master-good.entity';
-import { KarmaMasterBad } from '../../karma/entities/karma-master-bad.entity';
-import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
-import { CMSPage } from '../../cms/entities/cms-page.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { AuditLog } from '../../audit/entities/audit-log.entity';
 import { RefreshToken } from '../../auth/entities/refresh-token.entity';
@@ -51,11 +46,6 @@ const entities = [
   PlanetMaster,
   NakshatraMaster,
   AyanamsaMaster,
-  KarmaEntry,
-  KarmaMasterGood,
-  KarmaMasterBad,
-  ManifestationLog,
-  CMSPage,
   Notification,
   AuditLog,
   RefreshToken,

@@ -1,14 +1,12 @@
 import { Repository } from 'typeorm';
 import { Customer } from '../entities/customer.entity';
 import { AdminUser } from '../entities/admin-user.entity';
-import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
 import { PlanType } from '../../common/enums/plan-type.enum';
 import { UserRole } from '../../common/enums/user-role.enum';
 export declare class UsersService {
     private customerRepository;
     private adminUserRepository;
-    private karmaEntryRepository;
-    constructor(customerRepository: Repository<Customer>, adminUserRepository: Repository<AdminUser>, karmaEntryRepository: Repository<KarmaEntry>);
+    constructor(customerRepository: Repository<Customer>, adminUserRepository: Repository<AdminUser>);
     create(userData: Partial<Customer>, addedBy?: number): Promise<Customer>;
     findOneByUniqueId(uniqueId: string): Promise<Customer>;
     findOneById(id: number): Promise<Customer>;
@@ -53,11 +51,11 @@ export declare class UsersService {
         };
         karma_trends: {
             daily: {
-                date: any;
+                date: string;
                 count: number;
             }[];
             by_type: {
-                type: any;
+                type: string;
                 count: number;
             }[];
         };

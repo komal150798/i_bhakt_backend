@@ -3,7 +3,6 @@ import { PlanType } from '../../common/enums/plan-type.enum';
 import { Subscription } from '../../subscriptions/entities/subscription.entity';
 import { Order } from '../../orders/entities/order.entity';
 import { Kundli } from '../../kundli/entities/kundli.entity';
-import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
 import { CustomerToken } from '../../auth/entities/customer-token.entity';
 export declare class Customer extends BaseEntity {
     first_name: string | null;
@@ -44,6 +43,5 @@ export declare class Customer extends BaseEntity {
     subscriptions: Subscription[];
     orders: Order[];
     kundlis: Kundli[];
-    manifestation_logs: ManifestationLog[];
     tokens: CustomerToken[];
 }

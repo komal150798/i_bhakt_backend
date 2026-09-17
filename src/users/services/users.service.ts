@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Customer } from '../entities/customer.entity';
 import { AdminUser } from '../entities/admin-user.entity';
-import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
 import { PlanType } from '../../common/enums/plan-type.enum';
 import { UserRole } from '../../common/enums/user-role.enum';
 
@@ -14,8 +13,6 @@ export class UsersService {
     private customerRepository: Repository<Customer>,
     @InjectRepository(AdminUser)
     private adminUserRepository: Repository<AdminUser>,
-    @InjectRepository(KarmaEntry)
-    private karmaEntryRepository: Repository<KarmaEntry>,
   ) {}
 
   /**
@@ -270,36 +267,15 @@ export class UsersService {
       count: parseInt(item.count, 10),
     }));
 
-    // Get karma trends for last 30 days
-    const karmaTrendsDaily = await this.karmaEntryRepository
-      .createQueryBuilder('karma')
-      .select('DATE(karma.entry_date)', 'date')
-      .addSelect('COUNT(*)', 'count')
-      .where('karma.is_deleted = :deleted', { deleted: false })
-      .andWhere('karma.entry_date >= CURRENT_DATE - INTERVAL \'30 days\'')
-      .groupBy('DATE(karma.entry_date)')
-      .orderBy('DATE(karma.entry_date)', 'ASC')
-      .getRawMany();
-
-    const karmaTrendsData = karmaTrendsDaily.map((item) => ({
-      date: item.date,
-      count: parseInt(item.count, 10),
-    }));
-
-    // Get karma entries by type for last 7 days
-    const karmaByType = await this.karmaEntryRepository
-      .createQueryBuilder('karma')
-      .select('karma.karma_type', 'type')
-      .addSelect('COUNT(*)', 'count')
-      .where('karma.is_deleted = :deleted', { deleted: false })
-      .andWhere('karma.entry_date >= CURRENT_DATE - INTERVAL \'7 days\'')
-      .groupBy('karma.karma_type')
-      .getRawMany();
-
-    const karmaByTypeData = karmaByType.map((item) => ({
-      type: item.type,
-      count: parseInt(item.count, 10),
-    }));
+    // Karma trend charts removed with the iBhakt karma module.
+    //
+    // ZUNO has its own Karma Ledger (Step 17), but it is a different model -
+    // a private record of intentional actions with deterministic versioned
+    // scoring - and it arrives in Roadmap Phase 8. Reporting is left empty
+    // rather than removed from the response shape, so the admin dashboard
+    // keeps rendering and can be repointed at the Ledger when it exists.
+    const karmaTrendsData: { date: string; count: number }[] = [];
+    const karmaByTypeData: { type: string; count: number }[] = [];
 
     return {
       user_signups: {

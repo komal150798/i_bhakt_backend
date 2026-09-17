@@ -42,11 +42,11 @@ export declare class AdminController {
         };
         karma_trends: {
             daily: {
-                date: any;
+                date: string;
                 count: number;
             }[];
             by_type: {
-                type: any;
+                type: string;
                 count: number;
             }[];
         };

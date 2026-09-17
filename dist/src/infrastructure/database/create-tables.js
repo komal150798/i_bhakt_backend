@@ -20,11 +20,6 @@ const kundli_house_entity_1 = require("../../kundli/entities/kundli-house.entity
 const planet_master_entity_1 = require("../../kundli/entities/planet-master.entity");
 const nakshatra_master_entity_1 = require("../../kundli/entities/nakshatra-master.entity");
 const ayanamsa_master_entity_1 = require("../../kundli/entities/ayanamsa-master.entity");
-const karma_entry_entity_1 = require("../../karma/entities/karma-entry.entity");
-const karma_master_good_entity_1 = require("../../karma/entities/karma-master-good.entity");
-const karma_master_bad_entity_1 = require("../../karma/entities/karma-master-bad.entity");
-const manifestation_log_entity_1 = require("../../manifestation/entities/manifestation-log.entity");
-const cms_page_entity_1 = require("../../cms/entities/cms-page.entity");
 const notification_entity_1 = require("../../notifications/entities/notification.entity");
 const audit_log_entity_1 = require("../../audit/entities/audit-log.entity");
 const refresh_token_entity_1 = require("../../auth/entities/refresh-token.entity");
@@ -43,11 +38,6 @@ const entities = [
     planet_master_entity_1.PlanetMaster,
     nakshatra_master_entity_1.NakshatraMaster,
     ayanamsa_master_entity_1.AyanamsaMaster,
-    karma_entry_entity_1.KarmaEntry,
-    karma_master_good_entity_1.KarmaMasterGood,
-    karma_master_bad_entity_1.KarmaMasterBad,
-    manifestation_log_entity_1.ManifestationLog,
-    cms_page_entity_1.CMSPage,
     notification_entity_1.Notification,
     audit_log_entity_1.AuditLog,
     refresh_token_entity_1.RefreshToken,

@@ -7,6 +7,7 @@ import {
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Response } from 'express';
+import { isZunoRoute } from '../../zuno/common/zuno-routes';
 
 /**
  * Standard API Response Format
@@ -41,6 +42,15 @@ export class ResponseInterceptor<T>
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest();
     const method = request.method;
+
+    // ZUNO routes carry their own `{ data, meta }` envelope, mandated by
+    // ZUNO API Contracts (Step 21) section 11. Wrapping them again in the
+    // iBhakt `{ success, code, message, data }` shape would break that
+    // contract, so they are passed straight through to
+    // ZunoResponseInterceptor, which is applied per-controller.
+    if (isZunoRoute(request.url)) {
+      return next.handle() as Observable<StandardApiResponse<T>>;
+    }
 
     return next.handle().pipe(
       map((data) => {

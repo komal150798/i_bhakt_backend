@@ -1,0 +1,1559 @@
+{
+  "info": {
+    "_postman_id": "8f3c1a90-5d2e-4f77-9c18-zuno0000001",
+    "name": "ZUNO API (WhatNow) - Phases 1-3",
+    "description": "ZUNO WhatNow life-navigation API, implemented on the iBhakt NestJS backend.\n\n## What this covers\n\nImplementation Roadmap (Step 30) phases 1-3:\n- **Phase 1** platform foundation: identity bridge, ownership, error model, idempotency, correlation\n- **Phase 2** user, profile and birth context\n- **Phase 3** the Challenge -> WhatNow -> adaptive response vertical slice\n\n## How to use it\n\n1. Import this collection **and** `ZUNO-Local.postman_environment.json`.\n2. Select the *ZUNO Local* environment.\n3. Run **0. Auth -> Login** (or Register first). The token is captured automatically into `{{accessToken}}`; nothing else needs manual copying.\n4. Run the **1. Happy Path** folder top to bottom, or use Collection Runner on it.\n\n`{{challengeId}}` is captured automatically when you create a challenge.\n\n## Response envelope\n\nZUNO routes use their own envelope, mandated by ZUNO API Contracts (Step 21) sections 11-12 - **not** the iBhakt `{success, code, message, data}` shape used by the rest of this backend:\n\n```json\n{ \"data\": { }, \"meta\": { \"requestId\": \"req_...\", \"apiVersion\": \"v1\" } }\n```\n\nErrors:\n\n```json\n{ \"error\": { \"code\": \"VALIDATION_ERROR\", \"message\": \"...\" }, \"meta\": { } }\n```\n\nThe tests in this collection assert that envelope, so a regression that re-wraps ZUNO routes in the legacy shape will fail loudly.\n\n## Prerequisites\n\n- The backend running (`npm run start:dev`)\n- A reachable PostgreSQL with the ZUNO tables (`npm run migration:run`)\n- For `/analyze` only: an LLM provider configured (`OPENAI_API_KEY` or a provider base URL). Without one, analyze returns **503 INTELLIGENCE_SERVICE_UNAVAILABLE** - which is correct behaviour, not a bug. ZUNO refuses to fabricate rather than inventing an understanding (Build Rule 129).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Generate a fresh correlation id per request. The API echoes it back",
+          "// in meta.requestId and in the x-request-id response header",
+          "// (Step 21 section 15).",
+          "pm.collectionVariables.set('requestId', 'req_pm_' + Date.now() + '_' + Math.floor(Math.random() * 10000));"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Applies to every request in the collection.",
+          "",
+          "pm.test('responds within 30s', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(30000);",
+          "});",
+          "",
+          "// Step 21 section 12 / Build Rule 23: an error must never leak a stack",
+          "// trace, a SQL string, a prompt or a credential.",
+          "if (pm.response.code >= 400) {",
+          "    pm.test('error body leaks nothing internal', function () {",
+          "        const body = pm.response.text();",
+          "        pm.expect(body).to.not.match(/at [A-Za-z0-9_.]+ \\(.*:\\d+:\\d+\\)/, 'stack frame');",
+          "        pm.expect(body).to.not.match(/node_modules/, 'file path');",
+          "        pm.expect(body).to.not.match(/SELECT .* FROM|INSERT INTO/i, 'SQL');",
+          "        pm.expect(body).to.not.match(/sk-[A-Za-z0-9]{10,}/, 'API key');",
+          "        pm.expect(body).to.not.match(/systemPrompt|You are the understanding layer/i, 'prompt');",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "challengeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "challengeVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "responseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "requestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otherUserToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otherUserChallengeId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Auth (iBhakt - to obtain a token)",
+      "description": "ZUNO does not own authentication. Step 20 section 10 says credentials stay with the authentication provider, so ZUNO bridges to the existing `cst_customer` identity and never duplicates passwords or tokens.\n\nUse either request here to get a token; both capture it automatically.",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('registered (201) or already exists (409)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    const data = json.data || json;",
+                  "    if (data.access_token) {",
+                  "        pm.collectionVariables.set('accessToken', data.access_token);",
+                  "        pm.collectionVariables.set('refreshToken', data.refresh_token || '');",
+                  "        console.log('Captured access token from register.');",
+                  "    }",
+                  "} else {",
+                  "    console.log('Account already exists - run Login instead.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ZUNO Test User\",\n  \"email\": \"zuno.tester@example.com\",\n  \"phone_number\": \"+919876500001\",\n  \"password\": \"SecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/app/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Creates a customer. Returns 409 if the email or phone is already registered - in that case use Login."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('login succeeds', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('returns an access token', function () {",
+                  "    const json = pm.response.json();",
+                  "    const data = json.data || json;",
+                  "    pm.expect(data.access_token, 'access_token').to.be.a('string').and.not.empty;",
+                  "    pm.collectionVariables.set('accessToken', data.access_token);",
+                  "    pm.collectionVariables.set('refreshToken', data.refresh_token || '');",
+                  "});",
+                  "",
+                  "console.log('Token captured. Every ZUNO request now authenticates automatically.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"zuno.tester@example.com\",\n  \"password\": \"SecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/app/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Happy Path (run in order)",
+      "description": "The full Phase 3 vertical slice, in the order the Roadmap describes it:\n\n```\nUSER ENTERS CHALLENGE -> CHALLENGE PERSISTED -> WHATNOW ENGINE\n  -> STRUCTURED UNDERSTANDING -> MINIMAL USER RESPONSE\n```\n\nSafe to run with Collection Runner - each step feeds the next through collection variables.",
+      "item": [
+        {
+          "name": "1.1 Who am I",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "// Step 21 section 11: the ZUNO envelope, not the iBhakt one.",
+                  "pm.test('uses the ZUNO { data, meta } envelope', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('data');",
+                  "    pm.expect(json).to.have.property('meta');",
+                  "    pm.expect(json.meta).to.have.property('requestId');",
+                  "    pm.expect(json.meta.apiVersion).to.eql('v1');",
+                  "    pm.expect(json, 'must NOT be the legacy iBhakt shape').to.not.have.property('success');",
+                  "});",
+                  "",
+                  "pm.test('the ZUNO user was provisioned on first contact', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.id, 'ZUNO user id (uuid)').to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.expect(d).to.have.property('onboardingStatus');",
+                  "});",
+                  "",
+                  "// Step 21 section 15: correlation id is echoed in a header too.",
+                  "pm.test('echoes x-request-id', function () {",
+                  "    pm.expect(pm.response.headers.get('x-request-id')).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "Step 21 section 10.\n\nThe ZUNO user is created lazily on the first ZUNO request, so this call itself provisions the account - onboarding stays progressive (Step 30 Phase 2 section 18) rather than demanding a complete profile up front."
+          }
+        },
+        {
+          "name": "1.2 Update profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('fields persisted', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.preferredName).to.eql('Ashish');",
+                  "    pm.expect(d.countryCode).to.eql('AE');",
+                  "    pm.expect(d.timezone).to.eql('Asia/Dubai');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferredName\": \"Ashish\",\n  \"countryCode\": \"AE\",\n  \"city\": \"Dubai\",\n  \"occupation\": \"Engineering Manager\",\n  \"timezone\": \"Asia/Dubai\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/me/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "profile"
+              ]
+            },
+            "description": "Step 21 section 20.\n\nPATCH is genuinely partial - only supplied fields are written. Step 30 Phase 2 section 18 requires progressive enrichment, so sending one field must not blank the others."
+          }
+        },
+        {
+          "name": "1.2b Get profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('returns the profile just saved', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.preferredName).to.eql('Ashish');",
+                  "    pm.expect(d.timezone).to.eql('Asia/Dubai');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "profile"
+              ]
+            },
+            "description": "Step 21 section 20. Read back the profile to confirm the partial PATCH persisted."
+          }
+        },
+        {
+          "name": "1.3 Save birth profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('accuracy is preserved exactly as sent', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.timeAccuracy).to.eql('EXACT');",
+                  "});",
+                  "",
+                  "// Step 21 section 22 / Build Rule 52: coordinates come from a trusted",
+                  "// location service, never from the client and never from a model.",
+                  "pm.test('place is NOT auto-resolved, and says so honestly', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.placeResolved, 'no trusted location source wired yet').to.be.false;",
+                  "    pm.expect(d.calculationReady, 'astrology cannot run without coordinates').to.be.false;",
+                  "});",
+                  "",
+                  "pm.test('no coordinates were invented', function () {",
+                  "    const body = pm.response.text();",
+                  "    pm.expect(body).to.not.include('latitude');",
+                  "    pm.expect(body).to.not.include('longitude');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dateOfBirth\": \"1978-08-13\",\n  \"timeOfBirth\": \"07:05:00\",\n  \"timeAccuracy\": \"EXACT\",\n  \"placeName\": \"Dongargarh\",\n  \"placeCountryCode\": \"IN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/me/birth-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "birth-profile"
+              ]
+            },
+            "description": "Step 21 section 21.\n\nNote what this endpoint refuses to accept: latitude, longitude and timezone. Step 21 section 22 routes place resolution through a trusted location service, and Build Rule 52 forbids inventing them. `calculationReady: false` reports that gap honestly instead of letting astrology run on guessed coordinates.\n\n`timeOfBirth` is local clock time at the place of birth, not UTC (Step 21 section 18)."
+          }
+        },
+        {
+          "name": "1.3b Get birth profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 404) {",
+                  "    pm.test('404 is the honest answer before any details are saved', function () {",
+                  "        pm.expect(pm.response.json().error.code).to.eql('NOT_FOUND');",
+                  "    });",
+                  "    console.warn('No birth profile yet - run 1.3 first.');",
+                  "    return;",
+                  "}",
+                  "",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('accuracy round-trips unchanged', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.timeAccuracy).to.eql('EXACT');",
+                  "    pm.expect(d.timeOfBirth).to.eql('07:05:00');",
+                  "});",
+                  "",
+                  "pm.test('still reports that astrology cannot run yet', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    // Step 21 section 100: report the gap, never fabricate coordinates.",
+                  "    pm.expect(d.calculationReady).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/birth-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "birth-profile"
+              ]
+            },
+            "description": "Step 21 section 21.\n\nReturns 404 when no birth details have been saved. Under progressive onboarding that is an ordinary state, not a failure - but the contract still needs a definite answer, and an empty object would be ambiguous."
+          }
+        },
+        {
+          "name": "1.4 Create a WhatNow",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Step 21 section 16 lists challenge creation as retry-sensitive.",
+                  "// A stable key per run lets the next request prove replay works.",
+                  "pm.collectionVariables.set('idempotencyKey', 'pm-create-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "pm.test('returns PROCESSING, not a fabricated understanding', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    // Step 21 sections 25 and 109: creation persists the words and says",
+                  "    // honestly that nothing has been understood yet.",
+                  "    pm.expect(d.status).to.eql('PROCESSING');",
+                  "    pm.expect(d.challengeId).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    pm.collectionVariables.set('challengeId', d.challengeId);",
+                  "    pm.collectionVariables.set('challengeVersion', d.challenge.version);",
+                  "});",
+                  "",
+                  "pm.test('no domain has been assigned before analysis', function () {",
+                  "    const c = pm.response.json().data.challenge;",
+                  "    // Step 11 Rule 2: the user never picks a category, and ZUNO does not",
+                  "    // guess one before the engine has run.",
+                  "    pm.expect(c.primaryDomain).to.be.null;",
+                  "    pm.expect(c.status).to.eql('NEW');",
+                  "});",
+                  "",
+                  "console.log('challengeId = ' + pm.collectionVariables.get('challengeId'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statement\": \"Many people have been laid off in my company in Dubai. I have a home loan and I am worried about what happens if I lose my job. Finding another role could take time.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges"
+              ]
+            },
+            "description": "Step 21 section 25. This is the canonical reference case from Master Index section 39.\n\nThe request body has exactly one field: the person's own words. There is deliberately no domain, category or urgency parameter - Step 11 Rule 2 forbids making someone classify their own life before they can describe it. Offering the field would invite a client to build a category picker.\n\nA safety pre-check runs here, before anything is written."
+          }
+        },
+        {
+          "name": "1.5 Create again with the SAME Idempotency-Key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "// Step 21 Golden Contract Test 126: a retried write produces ONE",
+                  "// challenge, not two. The replay returns the original result.",
+                  "pm.test('replays the original challenge instead of creating a second', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.challengeId).to.eql(pm.collectionVariables.get('challengeId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statement\": \"Many people have been laid off in my company in Dubai. I have a home loan and I am worried about what happens if I lose my job. Finding another role could take time.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges"
+              ]
+            },
+            "description": "Simulates a mobile client that timed out and retried.\n\nStep 21 Golden Contract Test 126: same key must yield one challenge, one event, one downstream effect. Without this, a flaky connection would silently duplicate a user's WhatNow."
+          }
+        },
+        {
+          "name": "1.6 Analyze (run the WhatNow engine)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Build Rule 129 / Step 21 section 100: when the intelligence layer is",
+                  "// unavailable ZUNO refuses rather than fabricating. 503 here is correct",
+                  "// behaviour if no LLM provider is configured.",
+                  "if (pm.response.code === 503) {",
+                  "    pm.test('503 carries a clean machine code and invents nothing', function () {",
+                  "        const e = pm.response.json().error;",
+                  "        pm.expect(e.code).to.eql('INTELLIGENCE_SERVICE_UNAVAILABLE');",
+                  "    });",
+                  "    console.warn('No LLM provider configured. This is a correct refusal, not a bug.');",
+                  "    return;",
+                  "}",
+                  "",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('the challenge is now classified', function () {",
+                  "    const c = pm.response.json().data.challenge;",
+                  "    pm.expect(c.primaryDomain, 'a domain was determined').to.be.a('string');",
+                  "    pm.expect(c.status).to.be.oneOf(['ACTIVE', 'UNDERSTANDING']);",
+                  "    pm.expect(c.contextVersion, 'context version 1 written').to.be.at.least(1);",
+                  "    pm.collectionVariables.set('challengeVersion', c.version);",
+                  "});",
+                  "",
+                  "pm.test('response has a variable number of typed sections', function () {",
+                  "    const r = pm.response.json().data.response;",
+                  "    pm.collectionVariables.set('responseId', r.responseId);",
+                  "    pm.expect(r.sections).to.be.an('array').that.is.not.empty;",
+                  "    // Build Rule 15 / Step 21 Rule 19: never a fixed eight screens.",
+                  "    pm.expect(r.sections.length).to.be.below(8);",
+                  "    r.sections.forEach(function (s) {",
+                  "        pm.expect(s).to.have.property('type');",
+                  "        pm.expect(s).to.have.property('order');",
+                  "        pm.expect(s).to.have.property('emphasis');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('facts and fears are kept in SEPARATE arrays', function () {",
+                  "    const r = pm.response.json().data.response;",
+                  "    const ctx = r.sections.find(s => s.type === 'CONTEXT_VALIDATION');",
+                  "    pm.expect(ctx, 'CONTEXT_VALIDATION section present').to.not.be.undefined;",
+                  "    // Step 11 section 8 - the single most important invariant in ZUNO.",
+                  "    // A merged list is exactly how a fear becomes a stated fact.",
+                  "    pm.expect(ctx.payload).to.have.property('understood').that.is.an('array');",
+                  "    pm.expect(ctx.payload).to.have.property('concerns').that.is.an('array');",
+                  "    pm.expect(ctx.payload.correction_invited).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('never states a feared outcome as certain', function () {",
+                  "    const body = pm.response.text();",
+                  "    // Master Index section 22 and Step 19 section 7.",
+                  "    pm.expect(body).to.not.match(/you will (definitely|certainly) /i);",
+                  "    pm.expect(body).to.not.match(/you are going to (lose|be fired)/i);",
+                  "    pm.expect(body).to.not.match(/is guaranteed to/i);",
+                  "});",
+                  "",
+                  "pm.test('no internal mechanics leak into the payload', function () {",
+                  "    const r = JSON.stringify(pm.response.json().data.response);",
+                  "    // Step 11 Rule 5: no confidence scores, routing or engine internals",
+                  "    // in normal consumer UX.",
+                  "    pm.expect(r).to.not.include('\"routing\"');",
+                  "    pm.expect(r).to.not.include('extractor_version');",
+                  "    pm.expect(r).to.not.include('ai_generation_run_id');",
+                  "});",
+                  "",
+                  "pm.test('returns structure, not layout', function () {",
+                  "    const r = JSON.stringify(pm.response.json().data.response);",
+                  "    // Step 21 section 30: the client owns layout, theme and animation.",
+                  "    pm.expect(r).to.not.match(/\"(color|width|padding|fontSize|widget)\"/i);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges/{{challengeId}}/analyze",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges",
+                "{{challengeId}}",
+                "analyze"
+              ]
+            },
+            "description": "Step 21 section 26. Runs the pipeline from Step 11 section 67:\n\n```\nsafety pre-check -> semantic extraction -> deterministic validation\n  -> domain classification -> confidence evaluation -> context version\n  -> engine routing -> response composition -> safety post-check\n```\n\nSafety runs **first**, before any model call - a critical signal must be caught before a private statement reaches a provider.\n\n**Needs an LLM provider.** Without one you get 503 `INTELLIGENCE_SERVICE_UNAVAILABLE`, which is the designed behaviour: ZUNO degrades rather than fabricating (Build Rule 129)."
+          }
+        },
+        {
+          "name": "1.7 Get the adaptive response",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    pm.test('honest PROCESSING state when not yet analysed', function () {",
+                  "        pm.expect(pm.response.json().error.code).to.eql('PROCESSING');",
+                  "    });",
+                  "    console.warn('Not analysed yet - run 1.6 first.');",
+                  "    return;",
+                  "}",
+                  "",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('sections are ordered and typed', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.title).to.be.a('string').and.not.empty;",
+                  "    const orders = d.sections.map(s => s.order);",
+                  "    pm.expect(orders).to.eql(orders.slice().sort((a, b) => a - b), 'ascending order');",
+                  "});",
+                  "",
+                  "pm.test('a safety boundary, if present, is appended not substituted', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    const boundary = d.sections.find(s => s.type === 'SAFETY_BOUNDARY');",
+                  "    if (boundary) {",
+                  "        // Step 19 section 19: ZUNO still helps, within limits.",
+                  "        const hasContext = d.sections.some(s => s.type === 'CONTEXT_VALIDATION');",
+                  "        pm.expect(hasContext, 'useful content retained alongside the boundary').to.be.true;",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/challenges/{{challengeId}}/response",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges",
+                "{{challengeId}}",
+                "response"
+              ]
+            },
+            "description": "Step 21 section 28 - the primary rendering endpoint.\n\nReturns 202 `PROCESSING` if the challenge has not been analysed yet. Step 21 section 109 requires exposing real processing state rather than pretending everything is synchronous."
+          }
+        },
+        {
+          "name": "1.8 Challenge detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('understanding is split into understood vs concerns', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d).to.have.property('understood').that.is.an('array');",
+                  "    pm.expect(d).to.have.property('concerns').that.is.an('array');",
+                  "});",
+                  "",
+                  "pm.test('the raw statement is not echoed back', function () {",
+                  "    // Step 21 section 112: return only what this view needs. Repeating",
+                  "    // the user's private text on every read is needless exposure.",
+                  "    pm.expect(pm.response.json().data).to.not.have.property('rawUserStatement');",
+                  "});",
+                  "",
+                  "pm.test('internal priority score is not exposed', function () {",
+                  "    // Step 11 section 36.",
+                  "    pm.expect(pm.response.json().data).to.not.have.property('priority');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/challenges/{{challengeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges",
+                "{{challengeId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.9 List my WhatNows",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('data is an array; paging lives in meta', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.data).to.be.an('array');",
+                  "    // Step 21 section 17: cursor pagination in meta, not mixed into data.",
+                  "    pm.expect(json.meta).to.have.property('hasMore');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/challenges?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Step 21 sections 17 and 24. Cursor pagination; `nextCursor` comes back in `meta`."
+          }
+        },
+        {
+          "name": "1.10 Resolve",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('resolved, with history intact', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.status).to.eql('RESOLVED');",
+                  "    pm.expect(d.resolvedAt).to.be.a('string');",
+                  "    // Step 20 section 113: related history stays linked, not deleted.",
+                  "    pm.expect(d.contextVersion).to.be.at.least(0);",
+                  "    pm.collectionVariables.set('challengeVersion', d.version);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Secured a new role before the restructuring completed.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges/{{challengeId}}/resolve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges",
+                "{{challengeId}}",
+                "resolve"
+              ]
+            },
+            "description": "Step 21 section 24.\n\nOptionally send `version` to enable the optimistic-locking check (Step 21 section 108). See folder 3 for the stale-version case."
+          }
+        },
+        {
+          "name": "1.11 Reopen",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('back to ACTIVE without rewriting history', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.status).to.eql('ACTIVE');",
+                  "    pm.expect(d.resolvedAt).to.be.null;",
+                  "    // Step 20 section 114: reopening must not silently mutate history -",
+                  "    // every context version and the resolution note survive.",
+                  "    pm.expect(d.contextVersion).to.be.at.least(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges/{{challengeId}}/reopen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges",
+                "{{challengeId}}",
+                "reopen"
+              ]
+            },
+            "description": "Step 21 section 24, Step 20 section 114. A resolved WhatNow can come back - life does that."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Safety gate",
+      "description": "Step 19 Safety & Trust. Safety sits above astrology, engagement and subscription logic (section 3), and no endpoint can bypass it (Step 21 Rule 10).\n\nThe detection here is **deterministic** - it runs before any model call, so it still works when the AI provider is down, which is exactly when it matters most (Step 19 section 55).\n\n> The self-harm request below deliberately sends distressing text to verify the gate fires. It is a test fixture, not a real disclosure.",
+      "item": [
+        {
+          "name": "2.1 Critical signal is blocked before any model call",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('refused with 403 SAFETY_RESTRICTED', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('SAFETY_RESTRICTED');",
+                  "});",
+                  "",
+                  "pm.test('carries a machine-readable safety disposition', function () {",
+                  "    // Step 21 section 70: the client needs a stable code to render the",
+                  "    // right experience, not just prose.",
+                  "    const e = pm.response.json().error;",
+                  "    pm.expect(e.safety).to.be.an('object');",
+                  "    pm.expect(e.safety.disposition).to.eql('CRITICAL_ESCALATION');",
+                  "});",
+                  "",
+                  "pm.test('no guidance, prediction or remedy is offered', function () {",
+                  "    const body = pm.response.text().toLowerCase();",
+                  "    pm.expect(body).to.not.include('gemstone');",
+                  "    pm.expect(body).to.not.include('mantra');",
+                  "    pm.expect(body).to.not.include('your chart');",
+                  "});",
+                  "",
+                  "console.warn('KNOWN GAP: ZUNO stops safely and records an incident, but shows');",
+                  "console.warn('no onward crisis resource. Step 19 section 16 defers that to an');",
+                  "console.warn('approved jurisdiction policy which was never supplied, and');",
+                  "console.warn('Build Rule 70 forbids improvising one. BLOCKS BETA.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statement\": \"I do not want to live anymore. There is no point in going on.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges"
+              ]
+            },
+            "description": "Step 19 section 16: critical safety handling overrides the normal response flow entirely.\n\nThe challenge is **not** created, a safety decision and incident are recorded, and a `SAFETY_CRITICAL_ESCALATION` domain event is written to the outbox.\n\n**Known gap, logged in `ZUNO_DECISION_LOG.md` item 5:** no onward crisis resource is shown, because Step 19 section 16 defers escalation to an approved jurisdiction-specific policy that was not supplied with the spec set. Inventing a helpline would violate Build Rule 70. This must be closed before beta."
+          }
+        },
+        {
+          "name": "2.2 High-stakes domain gets a professional boundary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('allowed through - this is guidable, within limits', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201, 403]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('challenge created', function () {",
+                  "        pm.expect(pm.response.json().data.challengeId).to.be.a('string');",
+                  "    });",
+                  "    console.log('Now analyze this one - the response should carry a');",
+                  "    console.log('SAFETY_BOUNDARY section recommending a qualified adviser');",
+                  "    console.log('(rules SAFE-IMM-001 / SAFE-LEG-001, Step 19 sections 22-23).');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statement\": \"My visa was cancelled and I have received a legal notice. I am not sure whether I can stay in the country or what my rights are.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges"
+              ]
+            },
+            "description": "Step 19 sections 22-23. Immigration and legal are HIGH_STAKES: ZUNO may help you prepare and frame the decision, but must not present the outcome as settled.\n\nAnalysing this should attach a `SAFETY_BOUNDARY` section pointing to a qualified professional, **alongside** the useful content - a boundary is an addition, not a refusal."
+          }
+        },
+        {
+          "name": "2.3 Health question suppresses astrology entirely",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('accepted', () => pm.expect(pm.response.code).to.be.oneOf([201, 403]));",
+                  "console.log('Step 19 section 24: astrology is suppressed for health entirely.');",
+                  "console.log('Rule SAFE-MED-001 blocks ASTROLOGY_REMEDY and');",
+                  "console.log('GUARANTEED_MEDICAL_OUTCOME regardless of what any model returns.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statement\": \"I have been unwell for a few weeks and I am worried about what the test results will say.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges"
+              ]
+            },
+            "description": "Step 19 section 24: astrology must never substitute for medical care. `SAFE-MED-001` suppresses astrology-derived content and blocks any guaranteed-outcome claim."
+          }
+        },
+        {
+          "name": "2.4 Ambiguous input asks rather than guesses",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('accepted', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('ambiguousChallengeId', pm.response.json().data.challengeId);",
+                  "console.log('Analyze this one. Expected (Step 11 section 72):');",
+                  "console.log('  - status UNDERSTANDING, not ACTIVE');",
+                  "console.log('  - a CLARIFICATION section with at most 2 questions');",
+                  "console.log('  - NO invented domain, NO plan, NO priorities');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statement\": \"Nothing is working.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges"
+              ]
+            },
+            "description": "Step 11 section 72, a Golden acceptance case.\n\nBelow the 0.75 confidence threshold (section 30) ZUNO asks one high-value question instead of fabricating a problem. It still shows what it understood first - Step 11 section 29 forbids replying with questions alone."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Contract tests (negative cases)",
+      "description": "The Golden Contract Tests from Step 21 sections 125-132. These are the cases where getting it wrong leaks data or corrupts state, so they are release gates (Build Rule 99), not backlog.",
+      "item": [
+        {
+          "name": "3.1 Unauthenticated request is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));",
+                  "pm.test('stable machine code', function () {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('AUTHENTICATION_REQUIRED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/challenges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges"
+              ]
+            },
+            "description": "Step 30 Phase 1 acceptance: a protected endpoint must reject an anonymous caller."
+          }
+        },
+        {
+          "name": "3.2 Another user's challenge returns 404, never 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Step 21 Golden Contract Test 125.",
+                  "pm.test('404, not 403', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('reveals nothing about whether the id exists', function () {",
+                  "    const e = pm.response.json().error;",
+                  "    pm.expect(e.code).to.eql('NOT_FOUND');",
+                  "    // A 403 would confirm the resource exists, turning this endpoint",
+                  "    // into an id-enumeration oracle. Both paths must look identical.",
+                  "    pm.expect(pm.response.text()).to.not.match(/owner|belongs|forbidden|another user/i);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/challenges/11111111-1111-4111-8111-111111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges",
+                "11111111-1111-4111-8111-111111111111"
+              ]
+            },
+            "description": "Step 21 Golden Contract Test 125, and Step 20 section 85.\n\nA well-formed UUID that is not yours must be indistinguishable from one that does not exist. Returning 403 would confirm existence and let an attacker enumerate ids.\n\nTo test this properly with a *real* other-user id: register a second account, create a challenge with it, then request that id using the first account's token."
+          }
+        },
+        {
+          "name": "3.3 Malformed id is a validation error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));",
+                  "pm.test('typed field error', function () {",
+                  "    const e = pm.response.json().error;",
+                  "    pm.expect(e.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/challenges/not-a-uuid",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges",
+                "not-a-uuid"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.4 Stale version returns 409 CONFLICT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Step 21 Golden Contract Test 130.",
+                  "pm.test('409 CONFLICT', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('CONFLICT');",
+                  "});",
+                  "",
+                  "pm.test('message tells the client to refresh', function () {",
+                  "    pm.expect(pm.response.json().error.message).to.match(/changed|refresh/i);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{requestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Attempting to write with a version the server has moved past.\",\n  \"version\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges/{{challengeId}}/resolve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges",
+                "{{challengeId}}",
+                "resolve"
+              ]
+            },
+            "description": "Step 21 section 108 and Golden Contract Test 130.\n\nSimulates a client holding version 1 while the server has moved on (for example because a Realignment rewrote the plan). The write is refused rather than silently clobbering newer state.\n\nRun after 1.6 so the version has actually advanced. If the challenge really is still at version 1 this returns 200 - bump the `version` value to force the conflict."
+          }
+        },
+        {
+          "name": "3.5 Empty statement is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 with a field-level error', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "    const e = pm.response.json().error;",
+                  "    pm.expect(e.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(e.fields, 'typed fields array').to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statement\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/challenges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "challenges"
+              ]
+            },
+            "description": "Step 21 section 12: errors carry a typed `fields` array so the client can highlight the offending input rather than parsing prose."
+          }
+        },
+        {
+          "name": "3.6 EXACT birth time without a time is refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test('names the offending field', function () {",
+                  "    const e = pm.response.json().error;",
+                  "    pm.expect(e.code).to.eql('VALIDATION_ERROR');",
+                  "    const fields = (e.fields || []).map(f => f.field);",
+                  "    pm.expect(fields).to.include('timeOfBirth');",
+                  "});",
+                  "",
+                  "console.log('Build Rule 53: precision is never fabricated. Claiming EXACT');",
+                  "console.log('without a time would default to midnight and feed a made-up');",
+                  "console.log('value into chart calculation. A DB CHECK constraint enforces');",
+                  "console.log('the same rule at the storage layer.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dateOfBirth\": \"1978-08-13\",\n  \"timeAccuracy\": \"EXACT\",\n  \"placeName\": \"Dongargarh\",\n  \"placeCountryCode\": \"IN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/me/birth-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "birth-profile"
+              ]
+            },
+            "description": "Build Rule 53: uncertainty is preserved, never silently upgraded.\n\nEnforced twice - in the DTO and by the `chk_zuno_birth_time_accuracy` CHECK constraint on `zuno_birth_profiles`."
+          }
+        },
+        {
+          "name": "3.7 UNKNOWN birth time is a valid, honest state",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 - not knowing is allowed', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('uncertainty is preserved, not filled in', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.timeAccuracy).to.eql('UNKNOWN');",
+                  "    pm.expect(d.timeOfBirth, 'no midnight default invented').to.be.null;",
+                  "    pm.expect(d.calculationReady).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dateOfBirth\": \"1978-08-13\",\n  \"timeAccuracy\": \"UNKNOWN\",\n  \"placeName\": \"Dongargarh\",\n  \"placeCountryCode\": \"IN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/me/birth-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "birth-profile"
+              ]
+            },
+            "description": "The counterpart to 3.6. Many people genuinely do not know their birth time, and Step 20 section 15 treats UNKNOWN as a first-class value.\n\nRun 1.3 afterwards to restore an EXACT profile."
+          }
+        },
+        {
+          "name": "3.8 Legacy iBhakt routes keep their own envelope",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('legacy route still uses the iBhakt shape', function () {",
+                  "    const json = pm.response.json();",
+                  "    // Regression guard: adding the ZUNO envelope must not have changed",
+                  "    // any existing endpoint (Build Rule 152).",
+                  "    pm.expect(json, 'legacy routes keep { success, code, message, data }')",
+                  "      .to.have.property('success');",
+                  "    pm.expect(json).to.not.have.property('meta');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/home",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "home"
+              ]
+            },
+            "description": "Regression guard.\n\nZUNO routes use `{data, meta}`; everything else must keep the original `{success, code, message, data}`. This verifies the `isZunoRoute()` split in the global interceptor did not change existing behaviour (Build Rule 152).\n\nIf this fails, the legacy contract has been broken and the React frontend will break with it."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Not yet implemented (later phases)",
+      "description": "Specified in the ZUNO build pack but **not** built yet - these are listed so nobody assumes they exist. Each arrives with its Roadmap phase; see `ZUNO_DECISION_LOG.md` item 10.\n\n| Endpoint | Spec | Phase |\n|---|---|---|\n| `GET /challenges/{id}/astrology` | 21 §32 | 5 |\n| `POST /challenges/{id}/scenarios/generate` | 21 §36 | 6 |\n| `POST /challenges/{id}/what-if` | 21 §38 | 6 |\n| `POST /challenges/{id}/life-signals` | 21 §41 | 9 |\n| `POST /challenges/{id}/realign` | 21 §44 | 9 |\n| `GET /challenges/{id}/mka` | 21 §47 | 7 |\n| `GET /plans/{planId}` | 21 §50 | 7 |\n| `POST /plan-items/{id}/complete` | 21 §52 | 7 |\n| `GET /karma`, `GET /karma/summary` | 21 §54 | 8 |\n| `GET /memory` | 21 §58 | 10 |\n| `POST /future-self` | 21 §61 | 10 |\n| `POST /conversations/{id}/messages` (Ask ZUNO) | 21 §63 | later |\n| `POST /admin/rulebooks` + governance | 21 §71 | 5, 13 |\n\nCalling any of these today returns 404 from the router - they have no handler.",
+      "item": []
+    }
+  ]
+}

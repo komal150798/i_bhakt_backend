@@ -7,7 +7,6 @@ import { Order } from '../../orders/entities/order.entity';
 import { Kundli } from '../../kundli/entities/kundli.entity';
 // KarmaEntry now uses Customer entity, not User
 // import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
-import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
 import { DashaRecord } from '../../database/entities/dasha-record.entity';
 
 @Entity('users')

@@ -9,6 +9,8 @@ var HttpExceptionFilter_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HttpExceptionFilter = void 0;
 const common_1 = require("@nestjs/common");
+const zuno_routes_1 = require("../../zuno/common/zuno-routes");
+const zuno_exception_1 = require("../../zuno/common/errors/zuno.exception");
 let HttpExceptionFilter = HttpExceptionFilter_1 = class HttpExceptionFilter {
     constructor() {
         this.logger = new common_1.Logger(HttpExceptionFilter_1.name);
@@ -17,6 +19,15 @@ let HttpExceptionFilter = HttpExceptionFilter_1 = class HttpExceptionFilter {
         const ctx = host.switchToHttp();
         const response = ctx.getResponse();
         const request = ctx.getRequest();
+        if ((0, zuno_routes_1.isZunoRoute)(request.url) || exception instanceof zuno_exception_1.ZunoException) {
+            const zunoStatus = exception instanceof zuno_exception_1.ZunoException ? exception.getStatus() : 500;
+            const body = exception instanceof zuno_exception_1.ZunoException
+                ? exception.getResponse()
+                : { error: { code: 'INTERNAL_ERROR', message: 'Something went wrong on our side.' } };
+            this.logger.error(`${request.method} ${request.url.split('?')[0]} -> ${zunoStatus}`);
+            response.status(zunoStatus).json(body);
+            return;
+        }
         let status;
         let message;
         let errors = undefined;

@@ -20,33 +20,6 @@ import { KundliHouse } from '../../kundli/entities/kundli-house.entity';
 import { PlanetMaster } from '../../kundli/entities/planet-master.entity';
 import { NakshatraMaster } from '../../kundli/entities/nakshatra-master.entity';
 import { AyanamsaMaster } from '../../kundli/entities/ayanamsa-master.entity';
-import { KarmaEntry } from '../../karma/entities/karma-entry.entity';
-import { KarmaMasterGood } from '../../karma/entities/karma-master-good.entity';
-import { KarmaMasterBad } from '../../karma/entities/karma-master-bad.entity';
-import { KarmaCategory } from '../../karma/entities/karma-category.entity';
-import { KarmaWeightRule } from '../../karma/entities/karma-weight-rule.entity';
-import { KarmaHabitSuggestion } from '../../karma/entities/karma-habit-suggestion.entity';
-import { KarmaPattern } from '../../karma/entities/karma-pattern.entity';
-import { KarmaScoreSummary } from '../../karma/entities/karma-score-summary.entity';
-import { ManifestationLog } from '../../manifestation/entities/manifestation-log.entity';
-import { Manifestation } from '../../manifestation/entities/manifestation.entity';
-import { ManifestationProgressEntry } from '../../manifestation/entities/manifestation-progress-entry.entity';
-// New database-driven AI system entities
-import {
-  ManifestCategory,
-  ManifestSubcategory,
-  ManifestKeyword,
-  ManifestEnergyRule,
-  ManifestRitualTemplate,
-  ManifestToManifestTemplate,
-  ManifestNotToManifestTemplate,
-  ManifestAlignmentTemplate,
-  ManifestInsightTemplate,
-  ManifestSummaryTemplate,
-  ManifestBackendCache,
-  ManifestUserLog,
-} from '../../manifestation/entities';
-import { CMSPage } from '../../cms/entities/cms-page.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { AuditLog } from '../../audit/entities/audit-log.entity';
 import { AIPrompt } from '../../common/ai/entities/ai-prompt.entity';
@@ -65,12 +38,20 @@ import { SmsTemplate } from '../../common/messaging/entities/sms-template.entity
 import { EmailTemplate } from '../../common/messaging/entities/email-template.entity';
 import { SmsCredential } from '../../common/messaging/entities/sms-credential.entity';
 import { EmailCredential } from '../../common/messaging/entities/email-credential.entity';
-import { ContactInquiry } from '../../contact/entities/contact-inquiry.entity';
-import { Testimonial } from '../../testimonial/entities/testimonial.entity';
+// ZUNO (Step 20 Data Model). Registered as one array exported by ZunoModule so
+// that adding a ZUNO entity does not require editing this file again.
+import { ZUNO_ENTITIES } from '../../zuno/zuno-entities';
 import { SeedService } from './seeds/seed-admin.service';
 
-// All entities array
-const entities = [
+/**
+ * All entities array.
+ *
+ * Exported so a one-off bootstrap can create the legacy schema on a fresh
+ * database. Most of these 90+ tables have never had a migration written - they
+ * have only ever been created by `synchronize` - so a brand new database cannot
+ * be built from migrations alone. See ZUNO_DECISION_LOG.md item 18.
+ */
+export const entities = [
   // User Management (Normalized)
   AdminUser, // adm_users
   Customer, // cst_customer
@@ -100,32 +81,7 @@ const entities = [
   PlanetMaster,
   NakshatraMaster,
   AyanamsaMaster,
-  KarmaEntry,
-  KarmaMasterGood,
-  KarmaMasterBad,
-  KarmaCategory,
-  KarmaWeightRule,
-  KarmaHabitSuggestion,
-  KarmaPattern,
-  KarmaScoreSummary,
-  ManifestationLog,
-  Manifestation,
-  ManifestationProgressEntry,
-  // New database-driven AI system entities
-  ManifestCategory,
-  ManifestSubcategory,
-  ManifestKeyword,
-  ManifestEnergyRule,
-  ManifestRitualTemplate,
-  ManifestToManifestTemplate,
-  ManifestNotToManifestTemplate,
-  ManifestAlignmentTemplate,
-  ManifestInsightTemplate,
-  ManifestSummaryTemplate,
-  ManifestBackendCache,
-  ManifestUserLog,
-  CMSPage,
-  Notification,
+    Notification,
   AuditLog,
   // AI Prompt Management
   AIPrompt,
@@ -142,9 +98,10 @@ const entities = [
   SmsCredential,
   EmailCredential,
   // Contact
-  ContactInquiry,
   // Testimonials
-  Testimonial,
+
+  // ZUNO domain entities (zuno_* tables)
+  ...ZUNO_ENTITIES,
 ];
 
 @Module({
@@ -153,28 +110,72 @@ const entities = [
       imports: [ConfigModule.forFeature(databaseConfig)],
       useFactory: (configService: ConfigService) => {
         const config = configService.get('database');
-        const isDevelopment = process.env.NODE_ENV !== 'production';
-        
-        // Force synchronize to be true for development - CRITICAL FOR TABLE CREATION
-        const forceSynchronize = true; // Always enable for now to ensure tables are created
+        const isProduction = process.env.NODE_ENV === 'production';
+
+        /**
+         * Schema management strategy.
+         *
+         * ZUNO Data Model (Step 20) section 96 and Claude Build Rule 25 require
+         * schema changes to go through version-controlled migrations, and
+         * Build Rule 25 adds: never alter a production schema as normal
+         * deployment practice.
+         *
+         * This previously read `const forceSynchronize = true` unconditionally,
+         * which meant TypeORM reshaped the schema by reflection on every boot -
+         * in production too - and `migrationsRun: false` meant the migrations
+         * in this folder had never run at all.
+         *
+         * `synchronize` is now opt-in and can never be enabled in production:
+         *   - production                  -> always false, no exceptions
+         *   - DB_SYNCHRONIZE=true         -> true (local convenience only)
+         *   - otherwise                   -> false, migrations own the schema
+         *
+         * Every migration in this project is written with IF NOT EXISTS, so
+         * enabling migrationsRun against a database whose tables were
+         * previously created by synchronize is safe and simply records them as
+         * applied.
+         */
+        const synchronize = isProduction
+          ? false
+          : process.env.DB_SYNCHRONIZE === 'true';
+
+        // Migrations are the default way the schema moves. They are skipped
+        // only while synchronize is deliberately in charge, so the two
+        // mechanisms never race to define the same table in one boot.
+        const migrationsRun =
+          !synchronize && process.env.DB_MIGRATIONS_RUN !== 'false';
+
         const finalConfig = {
           ...config,
           entities, // Use explicit entities array (not path-based)
-          synchronize: forceSynchronize, // FORCE TRUE - this creates tables
+          synchronize,
           dropSchema: false, // Never drop schema
-          migrationsRun: false, // Don't run migrations
+          migrationsRun,
+          migrations: [__dirname + '/migrations/*{.ts,.js}'],
+          migrationsTableName: 'migrations_history',
         };
-        
-        // Log the final configuration
+
         console.log('🔧 TypeORM Final Configuration:');
         console.log(`   Type: ${finalConfig.type}`);
         console.log(`   Host: ${finalConfig.host}`);
         console.log(`   Port: ${finalConfig.port}`);
         console.log(`   Database: ${finalConfig.database}`);
-        console.log(`   Synchronize: ${finalConfig.synchronize} ✅ FORCED TO TRUE`);
+        console.log(`   Environment: ${process.env.NODE_ENV || 'not set'}`);
+        console.log(
+          `   Synchronize: ${synchronize}${isProduction ? ' (forced off in production)' : ''}`,
+        );
+        console.log(`   Migrations run on boot: ${migrationsRun}`);
         console.log(`   Entities count: ${entities.length}`);
-        console.log(`   Entity names: ${entities.map(e => e.name || e.constructor.name).join(', ')}`);
-        
+
+        if (synchronize) {
+          console.warn(
+            '   ⚠️  DB_SYNCHRONIZE=true - TypeORM will alter the schema by reflection.',
+          );
+          console.warn(
+            '      Use for local development only; migrations are the source of truth.',
+          );
+        }
+
         return finalConfig;
       },
       inject: [ConfigService],
@@ -222,9 +223,13 @@ export class DatabaseModule implements OnModuleInit {
     }
     
     if (!tablesReady) {
-      this.logger.warn('⚠️  Tables may not have been created. Check TypeORM synchronize is enabled.');
-      this.logger.warn('   Verify in logs: "TypeORM successfully connected to database"');
-      this.logger.warn('   Check .env has: NODE_ENV=development or DB_SYNCHRONIZE=true');
+      // Migrations, not synchronize, are now responsible for the schema, so the
+      // remedy is to run them rather than to switch reflection back on.
+      this.logger.warn('⚠️  Expected tables were not found.');
+      this.logger.warn('   The schema is managed by migrations (Step 20 §96, Build Rule 25).');
+      this.logger.warn('   Run: npm run migration:run');
+      this.logger.warn('   Migrations also run automatically on boot unless DB_MIGRATIONS_RUN=false.');
+      this.logger.warn('   For local development only, DB_SYNCHRONIZE=true restores schema sync.');
     }
     
     // Seed admin user on module initialization

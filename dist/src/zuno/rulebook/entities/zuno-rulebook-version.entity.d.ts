@@ -1,0 +1,33 @@
+import { ZunoBaseEntity } from '../../common/entities/zuno-base.entity';
+import { RulebookReleaseType, RulebookStatus } from '../../common/enums';
+export declare class ZunoRulebookVersion extends ZunoBaseEntity {
+    version: string;
+    release_name: string;
+    description: string | null;
+    release_type: RulebookReleaseType;
+    status: RulebookStatus;
+    source_file_name: string;
+    source_file_hash: string;
+    source_file_size: string;
+    source_file_location: string | null;
+    sme_reference: string | null;
+    change_summary: string | null;
+    uploaded_by: string | null;
+    uploaded_at: Date;
+    reviewed_by: string | null;
+    reviewed_at: Date | null;
+    approved_by: string | null;
+    approved_at: Date | null;
+    activated_by: string | null;
+    activated_at: Date | null;
+    superseded_at: Date | null;
+    supersedes_version_id: string | null;
+    total_rules: number;
+    total_interpretations: number;
+    total_remedies: number;
+    total_timing_rules: number;
+    total_golden_cases: number;
+    domains_covered: string[];
+    status_reason: string | null;
+    is_production: boolean;
+}

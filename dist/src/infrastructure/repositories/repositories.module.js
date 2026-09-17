@@ -16,18 +16,12 @@ const user_entity_1 = require("../../users/entities/user.entity");
 const order_entity_1 = require("../../orders/entities/order.entity");
 const payment_entity_1 = require("../../payments/entities/payment.entity");
 const subscription_entity_1 = require("../../subscriptions/entities/subscription.entity");
-const cms_page_entity_1 = require("../../cms/entities/cms-page.entity");
-const karma_entry_entity_1 = require("../../karma/entities/karma-entry.entity");
-const manifestation_log_entity_1 = require("../../manifestation/entities/manifestation-log.entity");
 const plan_repository_1 = require("./plan.repository");
 const kundli_repository_1 = require("./kundli.repository");
 const user_repository_1 = require("./user.repository");
 const order_repository_1 = require("./order.repository");
 const payment_repository_1 = require("./payment.repository");
 const subscription_repository_1 = require("./subscription.repository");
-const cms_repository_1 = require("./cms.repository");
-const karma_repository_1 = require("./karma.repository");
-const manifestation_repository_1 = require("./manifestation.repository");
 let RepositoriesModule = class RepositoriesModule {
 };
 exports.RepositoriesModule = RepositoriesModule;
@@ -42,9 +36,6 @@ exports.RepositoriesModule = RepositoriesModule = __decorate([
                 order_entity_1.Order,
                 payment_entity_1.Payment,
                 subscription_entity_1.Subscription,
-                cms_page_entity_1.CMSPage,
-                karma_entry_entity_1.KarmaEntry,
-                manifestation_log_entity_1.ManifestationLog,
             ]),
         ],
         providers: [
@@ -72,18 +63,6 @@ exports.RepositoriesModule = RepositoriesModule = __decorate([
                 provide: 'ISubscriptionRepository',
                 useClass: subscription_repository_1.SubscriptionRepository,
             },
-            {
-                provide: 'ICMSRepository',
-                useClass: cms_repository_1.CMSRepository,
-            },
-            {
-                provide: 'IKarmaRepository',
-                useClass: karma_repository_1.KarmaRepository,
-            },
-            {
-                provide: 'IManifestationRepository',
-                useClass: manifestation_repository_1.ManifestationRepository,
-            },
         ],
         exports: [
             'IPlanRepository',
@@ -92,9 +71,6 @@ exports.RepositoriesModule = RepositoriesModule = __decorate([
             'IOrderRepository',
             'IPaymentRepository',
             'ISubscriptionRepository',
-            'ICMSRepository',
-            'IKarmaRepository',
-            'IManifestationRepository',
         ],
     })
 ], RepositoriesModule);

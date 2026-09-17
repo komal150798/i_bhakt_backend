@@ -14,7 +14,6 @@ import { AuthJwtService } from './services/jwt.service';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { UserRole } from '../common/enums/user-role.enum';
 import { PlanType } from '../common/enums/plan-type.enum';
-import { HoroscopeService } from '../horoscope/services/horoscope.service';
 import { normalizePhoneNumber } from '../common/utils/string.util';
 import { SubscriptionsService } from '../subscriptions/services/subscriptions.service';
 
@@ -34,7 +33,6 @@ export class AuthService {
     private otpService: OtpService,
     private jwtService: AuthJwtService,
     private configService: ConfigService,
-    private horoscopeService: HoroscopeService,
     private subscriptionsService: SubscriptionsService,
   ) {}
 
@@ -775,18 +773,9 @@ export class AuthService {
     // Format customer response
     const userResponse = this.formatCustomerResponse(customer);
 
-    // Get personalized horoscope for logged-in user based on their birth data
-    try {
-      const personalizedHoroscope = await this.horoscopeService.getHoroscopeForUser(
-        customer.id,
-        'daily',
-      );
-      userResponse.horoscope = personalizedHoroscope;
-    } catch (error) {
-      // If horoscope fails (e.g., no birth date), continue without it (don't block login)
-      // User can update their profile with birth data to get personalized horoscope
-      // No horoscope will be included in the response
-    }
+    // Horoscope enrichment removed: ZUNO is not a horoscope product
+    // (Master Index section 2). Personalised guidance comes from the
+    // WhatNow pipeline, not from a daily horoscope attached to login.
 
     return {
       access_token: accessToken,
@@ -824,18 +813,9 @@ export class AuthService {
     // Format customer response
     const userResponse = this.formatCustomerResponse(customer);
 
-    // Get personalized horoscope for logged-in user based on their birth data
-    try {
-      const personalizedHoroscope = await this.horoscopeService.getHoroscopeForUser(
-        customer.id,
-        'daily',
-      );
-      userResponse.horoscope = personalizedHoroscope;
-    } catch (error) {
-      // If horoscope fails (e.g., no birth date), continue without it (don't block login)
-      // User can update their profile with birth data to get personalized horoscope
-      // No horoscope will be included in the response
-    }
+    // Horoscope enrichment removed: ZUNO is not a horoscope product
+    // (Master Index section 2). Personalised guidance comes from the
+    // WhatNow pipeline, not from a daily horoscope attached to login.
 
     return {
       access_token: accessToken,

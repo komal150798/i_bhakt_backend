@@ -27,11 +27,10 @@ const otp_service_1 = require("./services/otp.service");
 const jwt_service_1 = require("./services/jwt.service");
 const user_role_enum_1 = require("../common/enums/user-role.enum");
 const plan_type_enum_1 = require("../common/enums/plan-type.enum");
-const horoscope_service_1 = require("../horoscope/services/horoscope.service");
 const string_util_1 = require("../common/utils/string.util");
 const subscriptions_service_1 = require("../subscriptions/services/subscriptions.service");
 let AuthService = class AuthService {
-    constructor(customerRepository, adminUserRepository, refreshTokenRepository, customerTokenRepository, adminTokenRepository, otpService, jwtService, configService, horoscopeService, subscriptionsService) {
+    constructor(customerRepository, adminUserRepository, refreshTokenRepository, customerTokenRepository, adminTokenRepository, otpService, jwtService, configService, subscriptionsService) {
         this.customerRepository = customerRepository;
         this.adminUserRepository = adminUserRepository;
         this.refreshTokenRepository = refreshTokenRepository;
@@ -40,7 +39,6 @@ let AuthService = class AuthService {
         this.otpService = otpService;
         this.jwtService = jwtService;
         this.configService = configService;
-        this.horoscopeService = horoscopeService;
         this.subscriptionsService = subscriptionsService;
     }
     getAppSessionExpiration() {
@@ -475,12 +473,6 @@ let AuthService = class AuthService {
         await this.storeCustomerToken(refreshToken, customer.id);
         customer = await this.ensureCustomerReferralCode(customer);
         const userResponse = this.formatCustomerResponse(customer);
-        try {
-            const personalizedHoroscope = await this.horoscopeService.getHoroscopeForUser(customer.id, 'daily');
-            userResponse.horoscope = personalizedHoroscope;
-        }
-        catch (error) {
-        }
         return {
             access_token: accessToken,
             refresh_token: refreshToken,
@@ -501,12 +493,6 @@ let AuthService = class AuthService {
         await this.storeCustomerRefreshToken(refreshToken, customer.id, appSessionExpiration, 'google');
         customer = await this.ensureCustomerReferralCode(customer);
         const userResponse = this.formatCustomerResponse(customer);
-        try {
-            const personalizedHoroscope = await this.horoscopeService.getHoroscopeForUser(customer.id, 'daily');
-            userResponse.horoscope = personalizedHoroscope;
-        }
-        catch (error) {
-        }
         return {
             access_token: accessToken,
             refresh_token: refreshToken,
@@ -796,7 +782,6 @@ exports.AuthService = AuthService = __decorate([
         otp_service_1.OtpService,
         jwt_service_1.AuthJwtService,
         config_1.ConfigService,
-        horoscope_service_1.HoroscopeService,
         subscriptions_service_1.SubscriptionsService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

@@ -12,29 +12,19 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AstrologyModule } from './astrology/astrology.module';
 import { KundliModule } from './kundli/kundli.module';
-import { HoroscopeModule } from './horoscope/horoscope.module';
-import { KarmaModule } from './karma/karma.module';
-import { ManifestationModule } from './manifestation/manifestation.module';
-import { JournalModule } from './journal/journal.module';
-import { ChallengesModule } from './challenges/challenges.module';
-import { TwinModule } from './twin/twin.module';
 import { MessagingModule } from './common/messaging/messaging.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { CmsModule } from './cms/cms.module';
 import { ModulesModule } from './modules/modules.module';
 import { AuditModule } from './audit/audit.module';
 import { AdminRbacModule } from './admin-rbac/admin-rbac.module';
 import { AIPromptModule } from './common/ai/ai-prompt.module';
 import { ConstantsModule } from './common/constants/constants.module';
-import { ContactModule } from './contact/contact.module';
-import { TestimonialModule } from './testimonial/testimonial.module';
+import { ZunoModule } from './zuno/zuno.module';
 import { SpaWebModule } from './spa/spa-web.module';
 import { AdminController } from './controllers/admin/admin.controller';
 import { HomeController } from './controllers/home/home.controller';
-import { HomeKarmaController } from './controllers/home/karma.controller';
 import { ReferController } from './controllers/home/refer.controller';
 import { CustomerController } from './controllers/customer/customer.controller';
-import { KarmaController } from './controllers/customer/karma.controller';
 import { AppController } from './controllers/app/app.controller';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
@@ -59,30 +49,20 @@ import redisConfig from './config/redis.config';
     PaymentsModule,
     AstrologyModule,
     KundliModule,
-    HoroscopeModule,
-    KarmaModule,
-    ManifestationModule,
-    JournalModule,
-    ChallengesModule,
-    TwinModule,
     MessagingModule,
     NotificationsModule,
-    CmsModule,
     ModulesModule,
     AuditModule,
     AdminRbacModule,
     AIPromptModule, // AI Prompt Management System
     ConstantsModule, // Central Constants Service
-    ContactModule,
-    TestimonialModule,
+    ZunoModule, // ZUNO - WhatNow life-navigation domain (zuno_* tables)
   ],
   controllers: [
     AdminController,
     HomeController,
-    HomeKarmaController,
     ReferController,
     CustomerController,
-    KarmaController,
     AppController,
   ],
 })

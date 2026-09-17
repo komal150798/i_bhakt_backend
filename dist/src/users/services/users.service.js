@@ -18,13 +18,11 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const customer_entity_1 = require("../entities/customer.entity");
 const admin_user_entity_1 = require("../entities/admin-user.entity");
-const karma_entry_entity_1 = require("../../karma/entities/karma-entry.entity");
 const plan_type_enum_1 = require("../../common/enums/plan-type.enum");
 let UsersService = class UsersService {
-    constructor(customerRepository, adminUserRepository, karmaEntryRepository) {
+    constructor(customerRepository, adminUserRepository) {
         this.customerRepository = customerRepository;
         this.adminUserRepository = adminUserRepository;
-        this.karmaEntryRepository = karmaEntryRepository;
     }
     async create(userData, addedBy) {
         const existing = await this.customerRepository.findOne({
@@ -179,31 +177,8 @@ let UsersService = class UsersService {
             date: item.date,
             count: parseInt(item.count, 10),
         }));
-        const karmaTrendsDaily = await this.karmaEntryRepository
-            .createQueryBuilder('karma')
-            .select('DATE(karma.entry_date)', 'date')
-            .addSelect('COUNT(*)', 'count')
-            .where('karma.is_deleted = :deleted', { deleted: false })
-            .andWhere('karma.entry_date >= CURRENT_DATE - INTERVAL \'30 days\'')
-            .groupBy('DATE(karma.entry_date)')
-            .orderBy('DATE(karma.entry_date)', 'ASC')
-            .getRawMany();
-        const karmaTrendsData = karmaTrendsDaily.map((item) => ({
-            date: item.date,
-            count: parseInt(item.count, 10),
-        }));
-        const karmaByType = await this.karmaEntryRepository
-            .createQueryBuilder('karma')
-            .select('karma.karma_type', 'type')
-            .addSelect('COUNT(*)', 'count')
-            .where('karma.is_deleted = :deleted', { deleted: false })
-            .andWhere('karma.entry_date >= CURRENT_DATE - INTERVAL \'7 days\'')
-            .groupBy('karma.karma_type')
-            .getRawMany();
-        const karmaByTypeData = karmaByType.map((item) => ({
-            type: item.type,
-            count: parseInt(item.count, 10),
-        }));
+        const karmaTrendsData = [];
+        const karmaByTypeData = [];
         return {
             user_signups: {
                 last_30_days: userSignupsData,
@@ -224,9 +199,7 @@ exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(customer_entity_1.Customer)),
     __param(1, (0, typeorm_1.InjectRepository)(admin_user_entity_1.AdminUser)),
-    __param(2, (0, typeorm_1.InjectRepository)(karma_entry_entity_1.KarmaEntry)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
         typeorm_2.Repository])
 ], UsersService);
 //# sourceMappingURL=users.service.js.map
