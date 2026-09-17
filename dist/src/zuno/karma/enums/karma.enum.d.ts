@@ -1,0 +1,124 @@
+export declare enum KarmaEntrySource {
+    USER_CREATED = "USER_CREATED",
+    PLAN_COMPLETION = "PLAN_COMPLETION",
+    MKA_COMPLETION = "MKA_COMPLETION",
+    USER_REFLECTION = "USER_REFLECTION",
+    CONSTRUCTIVE_HABIT = "CONSTRUCTIVE_HABIT",
+    SERVICE = "SERVICE",
+    GRATITUDE = "GRATITUDE",
+    RESPONSIBILITY = "RESPONSIBILITY",
+    RELATIONSHIP_ACTION = "RELATIONSHIP_ACTION",
+    CAREER_ACTION = "CAREER_ACTION",
+    LEARNING_ACTION = "LEARNING_ACTION",
+    SELF_DISCIPLINE = "SELF_DISCIPLINE",
+    REPAIR_ACTION = "REPAIR_ACTION",
+    OTHER = "OTHER"
+}
+export declare const SYSTEM_KARMA_SOURCES: readonly KarmaEntrySource[];
+export declare enum KarmaClassification {
+    CONSTRUCTIVE = "CONSTRUCTIVE",
+    UNCONSTRUCTIVE = "UNCONSTRUCTIVE",
+    NEUTRAL = "NEUTRAL",
+    MIXED = "MIXED",
+    UNCERTAIN = "UNCERTAIN"
+}
+export declare const KARMA_CLASSIFICATIONS: readonly KarmaClassification[];
+export declare const SYSTEM_SOURCED_CLASSIFICATIONS: readonly KarmaClassification[];
+export declare enum KarmaCategory {
+    SELF_DISCIPLINE = "SELF_DISCIPLINE",
+    SERVICE = "SERVICE",
+    GRATITUDE = "GRATITUDE",
+    RESPONSIBILITY = "RESPONSIBILITY",
+    CAREER = "CAREER",
+    LEARNING = "LEARNING",
+    RELATIONSHIP = "RELATIONSHIP",
+    FAMILY = "FAMILY",
+    FINANCIAL_RESPONSIBILITY = "FINANCIAL_RESPONSIBILITY",
+    HEALTH_SUPPORT = "HEALTH_SUPPORT",
+    COMMUNICATION = "COMMUNICATION",
+    REPAIR = "REPAIR",
+    COURAGE = "COURAGE",
+    CONSISTENCY = "CONSISTENCY",
+    MINDFULNESS = "MINDFULNESS",
+    OTHER = "OTHER"
+}
+export declare const KARMA_CATEGORIES: readonly KarmaCategory[];
+export declare enum KarmaIntent {
+    SUPPORT = "SUPPORT",
+    RESPONSIBILITY = "RESPONSIBILITY",
+    REPAIR = "REPAIR",
+    GROWTH = "GROWTH",
+    FOLLOW_THROUGH = "FOLLOW_THROUGH",
+    INTENTIONAL_PRACTICE = "INTENTIONAL_PRACTICE",
+    ROUTINE = "ROUTINE",
+    UNKNOWN = "UNKNOWN"
+}
+export declare enum KarmaImpactScope {
+    SELF = "SELF",
+    OTHER_PERSON = "OTHER_PERSON",
+    FAMILY = "FAMILY",
+    COMMUNITY = "COMMUNITY",
+    WORK = "WORK",
+    UNKNOWN = "UNKNOWN"
+}
+export declare enum KarmaEntryStatus {
+    ACTIVE = "ACTIVE",
+    EDITED = "EDITED",
+    DELETED = "DELETED",
+    SUPERSEDED = "SUPERSEDED"
+}
+export declare enum KarmaVisibility {
+    PRIVATE = "PRIVATE"
+}
+export declare enum KarmaEffort {
+    LOW = "LOW",
+    MEDIUM = "MEDIUM",
+    HIGH = "HIGH"
+}
+export declare enum KarmaRelevance {
+    LOW = "LOW",
+    MEDIUM = "MEDIUM",
+    HIGH = "HIGH"
+}
+export declare enum KarmaActionOutcome {
+    COMPLETED = "COMPLETED",
+    MISSED = "MISSED",
+    DEFERRED = "DEFERRED",
+    CANCELLED_BY_REALIGNMENT = "CANCELLED_BY_REALIGNMENT"
+}
+export declare const NON_PENALISING_OUTCOMES: readonly KarmaActionOutcome[];
+export declare enum KarmaPatternType {
+    FOLLOW_THROUGH_INCREASING = "FOLLOW_THROUGH_INCREASING",
+    SERVICE_CONSISTENT = "SERVICE_CONSISTENT",
+    AVOIDANCE_DECREASING = "AVOIDANCE_DECREASING",
+    REPAIR_BEHAVIOUR_INCREASING = "REPAIR_BEHAVIOUR_INCREASING",
+    STUDY_DISCIPLINE_IMPROVING = "STUDY_DISCIPLINE_IMPROVING",
+    CONSISTENCY_STEADY = "CONSISTENCY_STEADY"
+}
+export declare enum KarmaPatternStatus {
+    OBSERVED = "OBSERVED",
+    FADED = "FADED"
+}
+export declare enum KarmaScoreConfigStatus {
+    DRAFT = "DRAFT",
+    ACTIVE = "ACTIVE",
+    RETIRED = "RETIRED"
+}
+export declare enum KarmaRescorePolicy {
+    FUTURE_ONLY = "FUTURE_ONLY",
+    USER_OPT_IN_RECALCULATION = "USER_OPT_IN_RECALCULATION",
+    ADMIN_MIGRATION_WITH_AUDIT = "ADMIN_MIGRATION_WITH_AUDIT"
+}
+export declare enum KarmaRevisionActor {
+    USER = "USER",
+    SYSTEM = "SYSTEM"
+}
+export declare enum KarmaIngestResult {
+    RECORDED = "RECORDED",
+    DUPLICATE = "DUPLICATE",
+    NOT_ELIGIBLE = "NOT_ELIGIBLE",
+    NO_PENALTY = "NO_PENALTY",
+    INTERPRETATION_UNAVAILABLE = "INTERPRETATION_UNAVAILABLE",
+    SAFETY_ROUTED = "SAFETY_ROUTED",
+    INVALID_EVENT = "INVALID_EVENT"
+}

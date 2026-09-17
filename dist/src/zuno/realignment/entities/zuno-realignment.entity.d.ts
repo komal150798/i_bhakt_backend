@@ -1,0 +1,35 @@
+import { ZunoVersionedEntity } from '../../common/entities/zuno-base.entity';
+import { ZunoChallenge } from '../../challenges/entities/zuno-challenge.entity';
+import { RealignmentReasonCode } from '../../signals/enums';
+import { PlanChangeMode, RealignmentLevel, RealignmentScope, RealignmentStatus, RealignmentTrigger } from '../enums';
+import { ZunoRealignmentChange } from './zuno-realignment-change.entity';
+import { ZunoRealignmentAssumption } from './zuno-realignment-assumption.entity';
+export declare class ZunoRealignment extends ZunoVersionedEntity {
+    user_id: string;
+    challenge_id: string;
+    trigger_type: RealignmentTrigger;
+    trigger_signal_id: string | null;
+    level: RealignmentLevel;
+    scope: RealignmentScope;
+    status: RealignmentStatus;
+    reason: string;
+    reason_codes: RealignmentReasonCode[];
+    previous_state_ref: Record<string, unknown>;
+    new_state_ref: Record<string, unknown>;
+    previous_context_version: number | null;
+    current_context_version: number | null;
+    plan_change_mode: PlanChangeMode;
+    scenario_reassessment_required: boolean;
+    mka_refresh_required: boolean;
+    user_confirmation_required: boolean;
+    safety_review_required: boolean;
+    trigger_fingerprint: string;
+    superseded_by_id: string | null;
+    rulebook_version_id: string | null;
+    engine_version: string;
+    applied_at: Date | null;
+    completed_at: Date | null;
+    challenge?: ZunoChallenge;
+    changes?: ZunoRealignmentChange[];
+    assumptions?: ZunoRealignmentAssumption[];
+}

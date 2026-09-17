@@ -17,6 +17,8 @@ exports.ZUNO_ROUTE_ROOTS = [
     'jobs',
     'locations',
     'internal',
+    'signals',
+    'realignment',
 ];
 const ZUNO_PREFIXES = exports.ZUNO_ROUTE_ROOTS.map((root) => `/api/v1/${root}`);
 function isZunoRoute(url) {

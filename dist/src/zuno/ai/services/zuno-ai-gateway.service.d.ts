@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
 import { LLMService } from '../../../common/ai/services/llm.service';
 import { ZunoAiGenerationRun } from '../entities/zuno-ai-generation-run.entity';
+import { AiPricingService } from './ai-pricing.service';
 export type SchemaValidationOk<T> = {
     ok: true;
     value: T;
@@ -34,8 +35,9 @@ export interface StructuredCallResult<T> {
 export declare class ZunoAiGateway {
     private readonly llm;
     private readonly runs;
+    private readonly pricing;
     private readonly logger;
-    constructor(llm: LLMService, runs: Repository<ZunoAiGenerationRun>);
+    constructor(llm: LLMService, runs: Repository<ZunoAiGenerationRun>, pricing: AiPricingService);
     callStructured<T>(options: StructuredCallOptions<T>): Promise<StructuredCallResult<T>>;
     isConfigured(): boolean;
     private recordRun;

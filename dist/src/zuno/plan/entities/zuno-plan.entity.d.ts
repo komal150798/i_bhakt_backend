@@ -1,0 +1,32 @@
+import { ZunoVersionedEntity } from '../../common/entities/zuno-base.entity';
+import { ZunoChallenge } from '../../challenges/entities/zuno-challenge.entity';
+import { ZunoUser } from '../../identity/entities/zuno-user.entity';
+import { PlanReviewTrigger, PlanStatus, PlanType } from '../enums/plan.enum';
+import { PlanCapacityLimits } from '../enums/plan-capacity';
+import { ZunoPlanItem } from './zuno-plan-item.entity';
+export declare class ZunoPlan extends ZunoVersionedEntity {
+    user_id: string;
+    challenge_id: string;
+    mka_program_id: string | null;
+    plan_type: PlanType;
+    title: string;
+    primary_goal: string | null;
+    start_date: string;
+    end_date: string | null;
+    status: PlanStatus;
+    timezone: string | null;
+    review_trigger: PlanReviewTrigger;
+    review_at: string | null;
+    generated_from_realignment_id: string | null;
+    superseded_by_id: string | null;
+    context_version: number;
+    safety_decision_id: string | null;
+    engine_version: string;
+    generated_reason: string;
+    capacity_snapshot: Partial<PlanCapacityLimits>;
+    activated_at: Date | null;
+    completed_at: Date | null;
+    user?: ZunoUser;
+    challenge?: ZunoChallenge;
+    items?: ZunoPlanItem[];
+}

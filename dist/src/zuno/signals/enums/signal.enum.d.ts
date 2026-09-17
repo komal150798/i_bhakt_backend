@@ -1,0 +1,179 @@
+export declare enum LifeSignalSource {
+    USER_EXPLICIT = "USER_EXPLICIT",
+    PLAN_EVENT = "PLAN_EVENT",
+    KARMA_LEDGER = "KARMA_LEDGER",
+    SYSTEM_DERIVED = "SYSTEM_DERIVED",
+    EXTERNAL_SOURCE = "EXTERNAL_SOURCE",
+    ADMIN = "ADMIN"
+}
+export declare const ACCEPTED_LIFE_SIGNAL_SOURCES: readonly LifeSignalSource[];
+export declare enum LifeSignalOrigin {
+    USER_MESSAGE = "USER_MESSAGE",
+    USER_CHECK_IN = "USER_CHECK_IN",
+    USER_ACTION = "USER_ACTION",
+    PLAN_PROGRESS = "PLAN_PROGRESS",
+    KARMA_LEDGER = "KARMA_LEDGER",
+    SCENARIO_UPDATE = "SCENARIO_UPDATE",
+    PROFILE_CHANGE = "PROFILE_CHANGE",
+    TIME_EVENT = "TIME_EVENT",
+    SYSTEM_EVENT = "SYSTEM_EVENT",
+    NOTIFICATION_RESPONSE = "NOTIFICATION_RESPONSE",
+    CONNECTED_DATA_SOURCE = "CONNECTED_DATA_SOURCE",
+    ADMIN_CONFIG = "ADMIN_CONFIG"
+}
+export declare enum LifeSignalType {
+    STATUS_CHANGE = "STATUS_CHANGE",
+    EXTERNAL_EVENT = "EXTERNAL_EVENT",
+    OPPORTUNITY = "OPPORTUNITY",
+    SETBACK = "SETBACK",
+    DECISION = "DECISION",
+    DEADLINE = "DEADLINE",
+    FINANCIAL_CHANGE = "FINANCIAL_CHANGE",
+    CAREER_EVENT = "CAREER_EVENT",
+    RELATIONSHIP_EVENT = "RELATIONSHIP_EVENT",
+    EDUCATION_EVENT = "EDUCATION_EVENT",
+    BUSINESS_EVENT = "BUSINESS_EVENT",
+    FAMILY_EVENT = "FAMILY_EVENT",
+    PROPERTY_EVENT = "PROPERTY_EVENT",
+    LEGAL_EVENT = "LEGAL_EVENT",
+    LOCATION_EVENT = "LOCATION_EVENT",
+    WELLBEING_SIGNAL = "WELLBEING_SIGNAL",
+    PLAN_PROGRESS = "PLAN_PROGRESS",
+    PLAN_BLOCKER = "PLAN_BLOCKER",
+    PREFERENCE_CHANGE = "PREFERENCE_CHANGE",
+    GOAL_CHANGE = "GOAL_CHANGE",
+    RISK_CHANGE = "RISK_CHANGE",
+    TIME_SIGNAL = "TIME_SIGNAL",
+    ASTRO_TIMING_CHANGE = "ASTRO_TIMING_CHANGE",
+    OTHER = "OTHER"
+}
+export declare enum LifeSignalNature {
+    EVENT = "EVENT",
+    STATE = "STATE"
+}
+export declare enum LifeSignalReliability {
+    USER_REPORTED = "USER_REPORTED",
+    USER_CONFIRMED = "USER_CONFIRMED",
+    SYSTEM_OBSERVED = "SYSTEM_OBSERVED",
+    CONNECTED_SOURCE = "CONNECTED_SOURCE",
+    ADMIN_CONFIRMED = "ADMIN_CONFIRMED",
+    INFERRED = "INFERRED",
+    UNVERIFIED = "UNVERIFIED"
+}
+export declare const INFERRED_RELIABILITIES: readonly LifeSignalReliability[];
+export declare enum LifeSignalMateriality {
+    LOW = "LOW",
+    MEDIUM = "MEDIUM",
+    HIGH = "HIGH",
+    CRITICAL = "CRITICAL"
+}
+export declare const MATERIALITY_RANK: Readonly<Record<LifeSignalMateriality, number>>;
+export declare enum LifeSignalRelevance {
+    DIRECT = "DIRECT",
+    INDIRECT = "INDIRECT",
+    UNRELATED = "UNRELATED",
+    UNCERTAIN = "UNCERTAIN"
+}
+export declare enum LifeSignalStatus {
+    CANDIDATE = "CANDIDATE",
+    ACTIVE = "ACTIVE",
+    SUPERSEDED = "SUPERSEDED",
+    STALE = "STALE",
+    DISMISSED = "DISMISSED",
+    RESOLVED = "RESOLVED",
+    ARCHIVED = "ARCHIVED"
+}
+export declare const LIFE_SIGNAL_STATUS_TRANSITIONS: Readonly<Record<LifeSignalStatus, readonly LifeSignalStatus[]>>;
+export declare function canTransitionLifeSignal(from: LifeSignalStatus, to: LifeSignalStatus): boolean;
+export declare enum SignalConfirmationStatus {
+    UNCONFIRMED = "UNCONFIRMED",
+    AWAITING_USER_CONFIRMATION = "AWAITING_USER_CONFIRMATION",
+    CONFIRMED_USER_REPORTED = "CONFIRMED_USER_REPORTED",
+    CONFIRMED_SYSTEM_OBSERVED = "CONFIRMED_SYSTEM_OBSERVED",
+    CONFIRMED_ADMIN = "CONFIRMED_ADMIN",
+    REJECTED = "REJECTED"
+}
+export declare const CONFIRMED_SIGNAL_STATUSES: readonly SignalConfirmationStatus[];
+export declare function isConfirmedSignal(status: SignalConfirmationStatus): boolean;
+export declare enum SignalConfirmationActor {
+    USER = "USER",
+    SYSTEM = "SYSTEM",
+    ADMIN = "ADMIN"
+}
+export declare enum SignalPatternType {
+    SINGLE_EVENT = "SINGLE_EVENT",
+    REPEATED_PATTERN = "REPEATED_PATTERN",
+    TREND = "TREND",
+    REVERSAL = "REVERSAL",
+    MILESTONE = "MILESTONE"
+}
+export declare enum SignalTrendDirection {
+    IMPROVING = "IMPROVING",
+    STEADY = "STEADY",
+    DECLINING = "DECLINING",
+    MIXED = "MIXED",
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+}
+export declare enum UrgencyChange {
+    INCREASE = "INCREASE",
+    DECREASE = "DECREASE",
+    NONE = "NONE"
+}
+export declare enum RealignmentReasonCode {
+    NEW_FACT = "NEW_FACT",
+    FACT_CORRECTED = "FACT_CORRECTED",
+    SCENARIO_TRIGGERED = "SCENARIO_TRIGGERED",
+    SCENARIO_RELEVANCE_CHANGED = "SCENARIO_RELEVANCE_CHANGED",
+    NEW_SCENARIO = "NEW_SCENARIO",
+    SCENARIO_DISMISSED = "SCENARIO_DISMISSED",
+    DEPENDENCY_CHANGED = "DEPENDENCY_CHANGED",
+    CONSTRAINT_CHANGED = "CONSTRAINT_CHANGED",
+    GOAL_CHANGED = "GOAL_CHANGED",
+    PREFERENCE_CHANGED = "PREFERENCE_CHANGED",
+    PLAN_BLOCKED = "PLAN_BLOCKED",
+    PLAN_INEFFECTIVE = "PLAN_INEFFECTIVE",
+    PLAN_TOO_COMPLEX = "PLAN_TOO_COMPLEX",
+    PLAN_COMPLETED = "PLAN_COMPLETED",
+    URGENCY_INCREASED = "URGENCY_INCREASED",
+    URGENCY_DECREASED = "URGENCY_DECREASED",
+    RISK_CHANGED = "RISK_CHANGED",
+    OPPORTUNITY_APPEARED = "OPPORTUNITY_APPEARED",
+    OPPORTUNITY_DISAPPEARED = "OPPORTUNITY_DISAPPEARED",
+    TIME_WINDOW_CHANGED = "TIME_WINDOW_CHANGED",
+    ASTRO_TIMING_CHANGED = "ASTRO_TIMING_CHANGED",
+    SAFETY_CHANGED = "SAFETY_CHANGED",
+    USER_REQUESTED_REASSESSMENT = "USER_REQUESTED_REASSESSMENT",
+    RULEBOOK_REASSESSMENT = "RULEBOOK_REASSESSMENT",
+    PRIMARY_STRATEGY_INVALIDATED = "PRIMARY_STRATEGY_INVALIDATED"
+}
+export declare enum SignalImpactType {
+    SUPPORTS = "SUPPORTS",
+    CONTRADICTS = "CONTRADICTS",
+    INVALIDATES = "INVALIDATES",
+    INTRODUCES = "INTRODUCES",
+    PROGRESSES = "PROGRESSES",
+    BLOCKS = "BLOCKS"
+}
+export declare enum SignalImpactEntityType {
+    CHALLENGE = "CHALLENGE",
+    CHALLENGE_CONTEXT = "CHALLENGE_CONTEXT",
+    SCENARIO = "SCENARIO",
+    PLAN = "PLAN",
+    PLAN_ITEM = "PLAN_ITEM",
+    MKA_PROGRAM = "MKA_PROGRAM",
+    ASSUMPTION = "ASSUMPTION"
+}
+export declare const NON_DECAYING_SIGNAL_TYPES: readonly LifeSignalType[];
+export declare const DEFAULT_SIGNAL_FRESHNESS_DAYS = 45;
+export declare const TREND_MIN_OBSERVATIONS = 3;
+export declare const SIGNAL_EVENT_TYPES: {
+    readonly LIFE_SIGNAL_DETECTED: "zuno.life_signal.detected";
+    readonly LIFE_SIGNAL_VALIDATED: "zuno.life_signal.validated";
+    readonly LIFE_SIGNAL_MATERIAL: "zuno.life_signal.material";
+    readonly LIFE_SIGNAL_CONFIRMED: "zuno.life_signal.confirmed";
+    readonly LIFE_SIGNAL_REJECTED: "zuno.life_signal.rejected";
+    readonly LIFE_SIGNAL_SUPERSEDED: "zuno.life_signal.superseded";
+    readonly LIFE_SIGNAL_STALE: "zuno.life_signal.stale";
+    readonly REALIGNMENT_REQUESTED: "zuno.realignment.requested";
+};
+export declare const LIFE_SIGNAL_AGGREGATE = "LIFE_SIGNAL";

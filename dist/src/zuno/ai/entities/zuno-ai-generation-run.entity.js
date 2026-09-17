@@ -71,6 +71,27 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'jsonb', name: 'token_usage', nullable: true }),
     __metadata("design:type", Object)
 ], ZunoAiGenerationRun.prototype, "token_usage", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: 'bigint',
+        name: 'cost_micro_usd',
+        nullable: true,
+        transformer: {
+            to: (value) => value,
+            from: (value) => (value === null ? null : Number(value)),
+        },
+    }),
+    __metadata("design:type", Number)
+], ZunoAiGenerationRun.prototype, "cost_micro_usd", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: 'varchar',
+        length: 32,
+        name: 'pricing_version',
+        nullable: true,
+    }),
+    __metadata("design:type", String)
+], ZunoAiGenerationRun.prototype, "pricing_version", void 0);
 exports.ZunoAiGenerationRun = ZunoAiGenerationRun = __decorate([
     (0, typeorm_1.Entity)('zuno_ai_generation_runs'),
     (0, typeorm_1.Index)('idx_zuno_ai_runs_operation', ['operation_type', 'created_at']),

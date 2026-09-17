@@ -1,0 +1,38 @@
+import { ZunoBaseEntity } from '../../common/entities/zuno-base.entity';
+import { PlanItemCategory, PlanItemPriority, PlanItemRealignmentPolicy, PlanItemScenarioScope, PlanItemSource, PlanItemStatus } from '../enums/plan.enum';
+import { ZunoPlan } from './zuno-plan.entity';
+export declare class ZunoPlanItem extends ZunoBaseEntity {
+    plan_id: string;
+    user_id: string;
+    parent_item_id: string | null;
+    title: string;
+    description: string | null;
+    why_this_matters: string | null;
+    category: PlanItemCategory;
+    priority: PlanItemPriority;
+    priority_rank: number;
+    is_practice: boolean;
+    status: PlanItemStatus;
+    scheduled_date: string | null;
+    due_at: string | Date | null;
+    due_source: string | null;
+    estimated_minutes: number | null;
+    source_type: PlanItemSource;
+    source_ref_id: string | null;
+    mka_item_id: string | null;
+    scenario_scope: PlanItemScenarioScope;
+    scenario_refs: string[];
+    trigger_condition: string | null;
+    depends_on_item_ids: string[];
+    karma_eligible: boolean;
+    realignment_policy: PlanItemRealignmentPolicy;
+    is_hypothetical: boolean;
+    display_order: number;
+    started_at: Date | null;
+    completed_at: Date | null;
+    deferred_to: string | null;
+    blocked_reason: string | null;
+    deferral_count: number;
+    user_note: string | null;
+    plan?: ZunoPlan;
+}

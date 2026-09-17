@@ -1,0 +1,31 @@
+import { ZunoVersionedEntity } from '../../common/entities/zuno-base.entity';
+import { ZunoChallenge } from '../../challenges/entities/zuno-challenge.entity';
+import { ZunoScenarioSet } from './zuno-scenario-set.entity';
+import { ZunoScenarioCondition } from './zuno-scenario-condition.entity';
+import { ScenarioCaseClass, ScenarioHorizon, ScenarioImpact, ScenarioRelevance, ScenarioStatus, ScenarioType } from '../enums/scenario.enum';
+import { ScenarioPayload } from './scenario.types';
+export declare class ZunoScenario extends ZunoVersionedEntity {
+    scenario_set_id: string;
+    challenge_id: string;
+    user_id: string;
+    name: string;
+    description: string;
+    scenario_type: ScenarioType;
+    case_class: ScenarioCaseClass;
+    status: ScenarioStatus;
+    relevance: ScenarioRelevance;
+    impact: ScenarioImpact;
+    horizon: ScenarioHorizon;
+    probability_label: string | null;
+    confidence: string | null;
+    hypothetical: boolean;
+    user_facing: boolean;
+    display_order: number;
+    option_ref: string | null;
+    payload: ScenarioPayload;
+    user_decision_note: string | null;
+    triggered_at: Date | null;
+    scenarioSet?: ZunoScenarioSet;
+    challenge?: ZunoChallenge;
+    conditions?: ZunoScenarioCondition[];
+}

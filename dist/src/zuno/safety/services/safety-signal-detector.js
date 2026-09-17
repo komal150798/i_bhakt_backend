@@ -15,11 +15,11 @@ let SafetySignalDetector = class SafetySignalDetector {
             {
                 flag: enums_1.SafetyFlag.SELF_HARM,
                 expressions: [
-                    /\b(kill|killing)\s+(myself|my\s?self)\b/,
-                    /\bend(ing)?\s+(my|it)\s+(life|all)\b/,
-                    /\b(want|going|plan(ning)?)\s+to\s+die\b/,
+                    /\b(kill|kills|killed|killing)\s+(myself|my\s?self)\b/,
+                    /\bend(s|ed|ing)?\s+(my|it)\s+(life|all)\b/,
+                    /\b(want(s|ed)?|going|plan(s|ned|ning)?)\s+to\s+die\b/,
                     /\bsuicid(e|al)\b/,
-                    /\b(hurt|harm|cut|cutting)\s+(myself|my\s?self)\b/,
+                    /\b(hurt|hurts|harm|harms|harmed|cut|cuts|cutting)\s+(myself|my\s?self)\b/,
                     /\bnot\s+(want|worth)\s+(to\s+)?(live|living|be\s+here)\b/,
                     /\bno\s+(reason|point)\s+(to\s+|in\s+)?(live|living|going\s+on)\b/,
                     /\bbetter\s+off\s+(dead|without\s+me)\b/,

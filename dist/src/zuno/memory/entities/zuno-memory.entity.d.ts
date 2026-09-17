@@ -1,0 +1,31 @@
+import { ZunoVersionedEntity } from '../../common/entities/zuno-base.entity';
+import { ZunoUser } from '../../identity/entities/zuno-user.entity';
+import { ZunoChallenge } from '../../challenges/entities/zuno-challenge.entity';
+import { MemoryEvidenceType, MemoryFactuality, MemoryRetentionClass, MemoryScope, MemorySensitivity, MemorySource, MemoryStatus, MemoryType } from '../enums/memory.enum';
+import { MemoryValue } from './memory.types';
+export declare class ZunoMemory extends ZunoVersionedEntity {
+    user_id: string;
+    challenge_id: string | null;
+    scope: MemoryScope;
+    memory_type: MemoryType;
+    memory_key: string;
+    memory_value: MemoryValue;
+    factuality: MemoryFactuality;
+    source: MemorySource;
+    source_event_id: string | null;
+    evidence_type: MemoryEvidenceType;
+    confidence: string;
+    retention_class: MemoryRetentionClass;
+    sensitivity_class: MemorySensitivity;
+    status: MemoryStatus;
+    last_confirmed_at: Date | null;
+    confirmation_count: number;
+    expires_at: Date | null;
+    supersedes_memory_id: string | null;
+    superseded_by_memory_id: string | null;
+    superseded_at: Date | null;
+    redacted_at: Date | null;
+    deletion_reason: string | null;
+    user?: ZunoUser;
+    challenge?: ZunoChallenge | null;
+}

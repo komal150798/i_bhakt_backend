@@ -22,6 +22,22 @@ describe('SafetyService', () => {
             expect(result.blocked).toBe(true);
             expect(result.astrologySuppressed).toBe(true);
         });
+        it.each([
+            'what if I killed myself',
+            'sometimes I think about what would happen if I ended my life',
+            'there were months when I wanted to die',
+            'I planned to die last year and never told anyone',
+            'I harmed myself when things got bad',
+        ])('detects a past-tense or hypothetical self-harm signal: %s', (text) => {
+            const result = service.preCheck({
+                ...base,
+                text,
+                domains: [enums_1.ZunoDomain.PERSONAL_GROWTH],
+            });
+            expect(result.flags).toContain(enums_1.SafetyFlag.SELF_HARM);
+            expect(result.blocked).toBe(true);
+            expect(result.astrologySuppressed).toBe(true);
+        });
         it('detects abuse and suppresses astrology', () => {
             const result = service.preCheck({
                 ...base,

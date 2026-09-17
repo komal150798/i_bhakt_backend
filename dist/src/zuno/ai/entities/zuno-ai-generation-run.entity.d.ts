@@ -27,4 +27,6 @@ export declare class ZunoAiGenerationRun extends ZunoImmutableEntity {
         completion_tokens?: number;
         total_tokens?: number;
     } | null;
+    cost_micro_usd: number | null;
+    pricing_version: string | null;
 }
